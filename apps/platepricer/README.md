@@ -1,4 +1,7 @@
-# PlatePricer (prototype)
+# Dinkum (prototype; working name)
+
+The name is set once, in `APP_NAME` at the top of the script in `index.html`. The folder is still called
+`apps/platepricer` so links and history stay stable while the name is temporary.
 
 A delivery marketplace for **Newtown, Enmore and Marrickville**. It shows the same menu priced
 every way you can get it: in-store, Uber Eats, DoorDash, ordering direct, and picking it up

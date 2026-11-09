@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PlatePricer</title>
+<title>Dinkum</title>
 <meta name="description" content="Compare delivery prices across Uber Eats, DoorDash, ordering direct and picking up yourself.">
 <style>
 /* ------------------------------------------------------------------
@@ -269,7 +269,7 @@ aside.cart.open { transform: none; visibility: visible; }
 <body>
 <header class="top">
   <div class="wrap">
-    <button class="brand" id="home" aria-label="PlatePricer home"><span class="dot">P</span><span class="name">PlatePricer</span></button>
+    <button class="brand" id="home" aria-label="Dinkum home"><span class="dot">D</span><span class="name">Dinkum</span></button>
     <button class="pill addr-pill" id="addrPill" hidden></button>
     <button class="pill member" data-member="doordash" aria-pressed="false">DashPass</button>
     <button class="pill member" data-member="ubereats" aria-pressed="false">Uber One</button>
@@ -295,6 +295,13 @@ aside.cart.open { transform: none; visibility: visible; }
 /* ==================================================================
  * Config
  * ================================================================== */
+// Working name. Changing it here updates the header, tab title and home label.
+const APP_NAME = 'Dinkum';
+document.title = APP_NAME;
+document.querySelector('#home .name').textContent = APP_NAME;
+document.querySelector('#home .dot').textContent = APP_NAME[0];
+document.querySelector('#home').setAttribute('aria-label', APP_NAME + ' home');
+
 const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', promotions: 'data/promotions.csv' };
 const STALE_AFTER_DAYS = 14;   // manual prices older than this are flagged
 const LIVE_WITHIN_MIN = 60;    // POS-synced prices newer than this read as "Live"
@@ -814,6 +821,7 @@ function landingView() {
   return `<section class="hero">
     ${subs.length ? `<div class="suburbs">${subs.map(s => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
     <h1>Same food.<br>See who's <em>charging you more.</em></h1>
+    <p style="margin:-6px auto 14px;font-weight:700;color:var(--brand-text)">Fair dinkum prices for your takeaway.</p>
     <p>Every menu price on Uber Eats, DoorDash and the restaurant's own site, side by side with the in-store price, including your deals and memberships.</p>
     <form class="addr-form" id="addrForm">
       <label class="sr" for="addrInput">Delivery address</label>
