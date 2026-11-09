@@ -553,7 +553,7 @@ const state = {
   filters: { q: '', cuisine: 'All', suburb: 'All', price: 'any', rating: '0', sort: 'best', favs: false, deals: false },
   layout: 'list', view: 'landing', restaurantId: null, focusItem: null,
   cart: store.get('cart', { restaurantId: null, lines: [] }),
-  choice: null, expanded: new Set(), showAll: false, dietOnly: false,
+  choice: null, dietOnly: false,
 };
 
 function applyTheme() {
@@ -1029,7 +1029,6 @@ function restaurantView(r) {
       </table></div>
     </details>
     <div class="menu-tools">
-      <label class="toggle"><input type="checkbox" id="showAll" ${state.showAll ? 'checked' : ''}> Show every platform's price</label>
       <span class="grow"></span>
       ${diet.length ? `<label class="toggle"><input type="checkbox" id="dietOnly" ${state.dietOnly ? 'checked' : ''}> Only ${esc(diet.join(' & '))}</label>` : '<button class="link-btn" data-nav="profile">Set dietary preferences</button>'}
     </div>
@@ -1045,14 +1044,12 @@ function itemView(r, it, on, q, rf) {
   const best = cheapestItemPrice(r, it);
   const itf = freshness(r.source, it.checkedAt);
   const ownDate = it.checkedAt && r.checkedAt && it.checkedAt.toDateString() !== r.checkedAt.toDateString();
-  const open = state.showAll || state.expanded.has(it.id);
   const chip = k => {
     const p = it.prices[k];
     if (p === null) return `<span class="price na">${badge(k)} n/a</span>`;
     const infl = p / it.prices.instore - 1;
     return `<span class="price ${best && best.k === k ? 'best' : ''}">${badge(k)} <b>${money(p)}</b>${infl > 0.004 ? `<span class="pct">${pct(infl)}</span>` : ''}<span class="sr"> on ${PLATFORMS[k].label}</span></span>`;
   };
-  const others = on.filter(k => !best || k !== best.k);
   return `<div class="item ${itf.cls === 'stale' ? 'stale' : ''} ${safeUrl(it.photo) ? '' : 'no-thumb'}" id="item-${esc(it.id)}">
     ${safeUrl(it.photo) ? `<div class="thumb" style="background-image:url('${esc(it.photo)}')" role="img" aria-label="${esc(it.name)}"></div>` : ''}
     <div>
@@ -1060,8 +1057,7 @@ function itemView(r, it, on, q, rf) {
       <div class="desc">${esc(it.desc)}</div>
       <div class="prices">
         <span class="price instore">In-store <b>${money(it.prices.instore)}</b></span>
-        ${best ? chip(best.k) : '<span class="price na">No delivery</span>'}
-        ${open ? others.map(chip).join('') : others.length ? `<button class="link-btn" data-expand="${esc(it.id)}">Compare ${others.length} more ▾</button>` : ''}
+        ${on.map(chip).join('')}
       </div>
       ${ownDate || (itf.cls === 'stale' && rf.cls !== 'stale') ? `<div style="margin-top:6px">${freshTag(itf)}</div>` : ''}
     </div>
@@ -1240,7 +1236,6 @@ async function loadCsvFiles(files) {
 }
 function openRestaurant(id, itemId) {
   state.view = 'restaurant'; state.restaurantId = id; state.focusItem = itemId || null;
-  if (itemId) state.expanded.add(itemId);
   render();
 }
 
@@ -1265,7 +1260,6 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'csvInput') { if (t.files.length) loadCsvFiles([...t.files]); return; }
   if (t.dataset.filter) { state.filters[t.dataset.filter] = t.value; renderResults(); return; }
-  if (t.id === 'showAll') { state.showAll = t.checked; rerenderInPlace(); return; }
   if (t.id === 'dietOnly') { state.dietOnly = t.checked; rerenderInPlace(); return; }
   if (t.dataset.pmember) { profile.members[t.dataset.pmember] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
   if (t.dataset.pnew) { profile.newTo[t.dataset.pnew] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
@@ -1304,7 +1298,6 @@ document.addEventListener('click', async e => {
   else if (d.cuisine) { state.filters.cuisine = d.cuisine; document.querySelectorAll('[data-cuisine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cuisine === d.cuisine))); renderResults(); }
   else if (d.open) openRestaurant(d.open, d.item);
   else if (d.nav) { state.view = d.nav; render(); }
-  else if (d.expand) { state.expanded.add(d.expand); rerenderInPlace(); }
   else if (d.inc) changeQty(d.inc, 1);
   else if (d.dec) changeQty(d.dec, -1);
   else if (d.choose) { state.choice = d.choose; renderCart(); }

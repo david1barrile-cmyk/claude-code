@@ -26,8 +26,7 @@ Data is picked in this order: spreadsheets loaded in the browser, then `data/*.c
   a typical order (the first item in each menu section). They also show a value label (from
   markup over in-store), active deals, distance, walking time and how fresh the prices are.
 - **Dish search** across all restaurants, cheapest first ("pad thai").
-- **Compact menu:** in-store price plus the cheapest option. "Compare 2 more" or "Show every
-  platform's price" reveals the rest.
+- **Menu prices:** every item shows its in-store price and every platform's price, with the cheapest highlighted.
 - **Distance:** the address is looked up with OpenStreetMap's Nominatim, falling back to the
   suburb centre ("Distances are approximate"). There's also "Use my location". Each platform has
   a delivery radius, so a restaurant whose own delivery doesn't reach you says so.
