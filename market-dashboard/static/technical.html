@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technical Breakouts</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <h1>Technical breakouts</h1>
+  <p class="sub">Breakouts and breakdowns flagged across NYSE stocks by indicator family, from daily bars (today's bar is live during the session; rescanned every 15 minutes). <span id="asof" class="small"></span></p>
+  <div class="grid4" id="cards"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="toolbar">
+    <span id="sectorbox"></span>
+    <input id="search" placeholder="Filter symbol or name" size="18">
+    <button class="btn" id="refresh">Re-run scan</button>
+  </div>
+  <div id="desc"></div>
+  <div id="content"><div class="panel empty">Loading…</div></div>
+</main>
+<script src="/static/common.js"></script>
+<script>
+let data = null, tab = "top", sector = "";
+const ctl = id => document.getElementById(id);
+const keyIndicator = {
+  "52w": [["pct_from_52w_high", "From 52w high", v => fmt.pct(v, 1, true)], ["high_52w", "52w high", fmt.money], ["low_52w", "52w low", fmt.money]],
+  donchian: [["atr14", "ATR(14)", fmt.money], ["volume_ratio", "Rel vol", v => fmt.num(v, 1) + "x"]],
+  ma: [["sma50", "SMA 50", fmt.money], ["sma200", "SMA 200", fmt.money]],
+  macd: [["macd", "MACD", v => fmt.num(v, 2)], ["macd_signal", "Signal", v => fmt.num(v, 2)]],
+  rsi: [["rsi14", "RSI(14)", v => fmt.num(v, 0)]],
+  bollinger: [["bb_upper", "Upper band", fmt.money], ["bb_lower", "Lower band", fmt.money]],
+  volume: [["volume_ratio", "Rel vol", v => fmt.num(v, 1) + "x"]],
+  adx: [["adx14", "ADX(14)", v => fmt.num(v, 0)]],
+};
+
+function pills(r, onlyFamily) {
+  return el("td", { class: "wrap" }, r.signals.filter(k => !onlyFamily || data.signals[k].family === onlyFamily)
+    .map(k => el("span", { class: "pill " + data.signals[k].direction, title: data.signals[k].description }, data.signals[k].label)));
+}
+
+function cols(family) {
+  const ind = (family ? keyIndicator[family] : [["rsi14", "RSI", v => fmt.num(v, 0)], ["adx14", "ADX", v => fmt.num(v, 0)], ["volume_ratio", "Rel vol", v => fmt.num(v, 1) + "x"]])
+    .map(([k, label, f]) => ({ key: "i_" + k, label, render: r => f(r.indicators[k]), value: r => r.indicators[k] }));
+  return [
+    { key: "symbol", label: "Symbol", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+    { key: "sector", label: "Sector", cls: "left", render: r => r.sector, value: r => r.sector },
+    { key: "price", label: "Price", render: r => fmt.money(r.price), value: r => r.price },
+    { key: "chg", label: "% Chg", render: r => signed(r.change_pct, fmt.pct(r.change_pct, 2, true)), value: r => r.change_pct },
+    { key: "signals", label: "Signals", cls: "left", render: r => pills(r, family) },
+    ...ind,
+    { key: "score", label: "Net score", render: r => signed(r.score, fmt.num(r.score, 1)), value: r => r.score },
+  ];
+}
+
+function filtered() {
+  const q = ctl("search").value.trim().toLowerCase();
+  return data.stocks.filter(r => (!sector || r.sector === sector) && (!q || r.symbol.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q)));
+}
+
+function twoPanels(bull, bear, family) {
+  return el("div", { class: "stack" },
+    el("section", { class: "panel" }, el("h2", { class: "up" }, `▲ Bullish (${bull.length})`), table(cols(family), bull, { sortKey: "score", sortDesc: true, empty: "No bullish signals" })),
+    el("section", { class: "panel" }, el("h2", { class: "down" }, `▼ Bearish (${bear.length})`), table(cols(family), bear, { sortKey: "score", sortDesc: false, empty: "No bearish signals" })));
+}
+
+function draw() {
+  if (!data) return;
+  const rows = filtered();
+  const fams = Object.entries(data.families);
+  ctl("cards").replaceChildren(...fams.map(([fk, fname]) => {
+    const bull = rows.filter(r => r.signals.some(k => data.signals[k].family === fk && data.signals[k].direction === "bull")).length;
+    const bear = rows.filter(r => r.signals.some(k => data.signals[k].family === fk && data.signals[k].direction === "bear")).length;
+    return el("div", { class: "panel card", style: "cursor:pointer", onclick: () => { tab = fk; draw(); } },
+      el("div", { class: "label" }, fname),
+      el("div", { class: "value" }, el("span", { class: "up" }, bull), el("span", { class: "muted" }, " / "), el("span", { class: "down" }, bear)),
+      el("div", { class: "meta" }, "bullish / bearish"));
+  }));
+  ctl("tabs").replaceChildren(...[["top", "Strongest setups"], ...fams].map(([k, label]) =>
+    el("button", { class: "tab" + (tab === k ? " active" : ""), onclick: () => { tab = k; draw(); } }, label)));
+  if (tab === "top") {
+    ctl("desc").replaceChildren(el("div", { class: "method-desc" },
+      "Net score = sum of bullish signal weights − bearish weights, ±0.5 for being above/below the 200-day average. Hover a signal for its exact rule."));
+    ctl("content").replaceChildren(twoPanels(
+      rows.filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, 50),
+      rows.filter(r => r.score < 0).sort((a, b) => a.score - b.score).slice(0, 50), null));
+    return;
+  }
+  const defs = Object.values(data.signals).filter(s => s.family === tab);
+  ctl("desc").replaceChildren(el("div", { class: "method-desc" }, ...defs.map(s => el("div", {}, el("b", {}, s.label + ": "), s.description))));
+  const has = (r, dir) => r.signals.some(k => data.signals[k].family === tab && data.signals[k].direction === dir);
+  ctl("content").replaceChildren(twoPanels(rows.filter(r => has(r, "bull")), rows.filter(r => has(r, "bear")), tab));
+}
+
+function render(d) {
+  data = d;
+  ctl("asof").textContent = `${d.count} charts · scanned ${fmt.time(d.as_of)} (market ${d.session}).`;
+  ctl("sectorbox").replaceChildren(sectorSelect(d.stocks, v => { sector = v; draw(); }));
+  draw();
+}
+ctl("search").oninput = draw;
+ctl("refresh").onclick = async () => {
+  await api("/api/refresh/technical", { method: "POST" });
+  ctl("refresh").textContent = "Scanning…";
+  const poll = async () => {
+    const st = await api("/api/status");
+    if (st.jobs.technical.running) return setTimeout(poll, 3000);
+    ctl("refresh").textContent = "Re-run scan";
+    loadSnapshot("/api/technicals", ctl("content"), render);
+  };
+  setTimeout(poll, 1500);
+};
+initPage().then(() => loadSnapshot("/api/technicals", ctl("content"), render));
+setInterval(() => api("/api/technicals").then(d => { if (!d.pending && data && d.as_of !== data.as_of) render(d); }).catch(() => {}), 120000);
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NYSE Top Movers</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <h1>Top movers today</h1>
+  <p class="sub">Biggest NYSE gainers and losers by % change (price ≥ $5, liquid names only). Refreshes automatically. <span id="asof" class="small"></span></p>
+  <div class="toolbar">
+    <span id="sectorbox"></span>
+    <label class="small muted">Show <select id="limit"><option>10</option><option selected>25</option><option>50</option></select></label>
+    <button class="btn" id="reload">Refresh now</button>
+  </div>
+  <div class="grid2">
+    <section class="panel"><h2 class="up">▲ Top gainers</h2><div id="gainers" class="empty">Loading…</div></section>
+    <section class="panel"><h2 class="down">▼ Top losers</h2><div id="losers" class="empty">Loading…</div></section>
+  </div>
+</main>
+<script src="/static/common.js"></script>
+<script>
+let sector = "", timer = null, last = null;
+const cols = [
+  { key: "symbol", label: "Symbol", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+  { key: "sector", label: "Sector", cls: "left", render: r => r.sector || "—", value: r => r.sector },
+  { key: "price", label: "Price", render: r => fmt.money(r.price), value: r => r.price },
+  { key: "change_pct", label: "% Chg", render: r => signed(r.change_pct, fmt.pct(r.change_pct, 2, true)), value: r => r.change_pct },
+  { key: "change", label: "Chg", render: r => signed(r.change, fmt.num(r.change)), value: r => r.change },
+  { key: "volume", label: "Volume", render: r => fmt.big(r.volume), value: r => r.volume },
+  { key: "rvol", label: "Rel Vol", render: r => r.avg_volume ? fmt.num(r.volume / r.avg_volume, 1) + "x" : "—", value: r => r.avg_volume ? r.volume / r.avg_volume : null },
+  { key: "market_cap", label: "Mkt Cap", render: r => fmt.big(r.market_cap), value: r => r.market_cap },
+];
+function draw() {
+  if (!last) return;
+  const f = rows => rows.filter(r => !sector || r.sector === sector);
+  document.getElementById("gainers").replaceChildren(table(cols, f(last.gainers), { sortKey: "change_pct", sortDesc: true }));
+  document.getElementById("losers").replaceChildren(table(cols, f(last.losers), { sortKey: "change_pct", sortDesc: false }));
+}
+async function load() {
+  clearTimeout(timer);
+  const limit = document.getElementById("limit").value;
+  try {
+    last = await api("/api/movers?limit=" + limit);
+    document.getElementById("asof").textContent = "Updated " + fmt.time(last.as_of) + ".";
+    document.getElementById("sectorbox").replaceChildren(sectorSelect([...last.gainers, ...last.losers], v => { sector = v; draw(); }));
+    if (sector) document.querySelector("#sectorbox select").value = sector;
+    draw();
+  } catch (e) {
+    document.getElementById("gainers").replaceChildren(el("div", { class: "empty" }, "Error: " + e.message));
+  }
+  timer = setTimeout(load, last && last.session === "open" ? 30000 : 120000);
+}
+document.getElementById("reload").onclick = load;
+document.getElementById("limit").onchange = load;
+initPage().then(load);
+</script>
+</body>
+</html>

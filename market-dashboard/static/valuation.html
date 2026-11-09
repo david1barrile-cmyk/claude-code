@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fundamental Valuation</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <h1>Fundamental valuation</h1>
+  <p class="sub">Most undervalued NYSE stocks, organized by valuation theory. Upside = model fair value ÷ price − 1. <span id="asof" class="small"></span></p>
+  <div class="tabs" id="tabs"></div>
+  <div class="toolbar">
+    <span id="sectorbox"></span>
+    <select id="side"><option value="under">Most undervalued</option><option value="over">Most overvalued</option></select>
+    <input id="search" placeholder="Filter symbol or name" size="18">
+    <label class="small muted">Min mkt cap <select id="mcap"><option value="0">Any</option><option value="1e10">$10B</option><option value="5e10">$50B</option></select></label>
+    <button class="btn" id="refresh">Re-run scan</button>
+  </div>
+  <div id="desc"></div>
+  <div id="content" class="panel"><div class="empty">Loading…</div></div>
+</main>
+<script src="/static/common.js"></script>
+<script>
+let data = null, tab = "composite", sector = "";
+const ctl = id => document.getElementById(id);
+
+function baseCols() {
+  return [
+    { key: "symbol", label: "Symbol", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+    { key: "sector", label: "Sector", cls: "left", render: r => r.sector, value: r => r.sector },
+    { key: "price", label: "Price", render: r => fmt.money(r.price), value: r => r.price },
+  ];
+}
+const m = (k, label, f = v => fmt.num(v, 1)) => ({ key: "m_" + k, label, render: r => f(r.metrics[k]), value: r => r.metrics[k] });
+
+function filtered() {
+  const q = ctl("search").value.trim().toLowerCase();
+  const minCap = Number(ctl("mcap").value);
+  return data.stocks.filter(r => (!sector || r.sector === sector)
+    && (!q || r.symbol.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q))
+    && (!minCap || (r.market_cap || 0) >= minCap));
+}
+
+function methodTable(key, rows) {
+  const meth = data.methods.find(x => x.key === key);
+  const under = ctl("side").value === "under";
+  if (meth.kind === "score") {
+    const withScore = rows.filter(r => r.methods[key]).sort((a, b) => (b.methods[key].score - a.methods[key].score) * (under ? 1 : -1));
+    const extra = key === "fcf_yield"
+      ? [{ key: "yield", label: "FCF yield", render: r => fmt.pct(r.methods[key].yield), value: r => r.methods[key].yield }]
+      : [{ key: "ey", label: "EBITDA/EV", render: r => fmt.pct(r.methods[key].earnings_yield), value: r => r.methods[key].earnings_yield },
+         { key: "roe", label: "ROE", render: r => fmt.pct(r.methods[key].roe), value: r => r.methods[key].roe }];
+    return table([...baseCols(),
+      { key: "score", label: "Percentile", render: r => fmt.num(r.methods[key].score, 0), value: r => r.methods[key].score },
+      ...extra, m("trailing_pe", "P/E"), m("ev_to_ebitda", "EV/EBITDA"),
+      { key: "mc", label: "Mkt Cap", render: r => fmt.big(r.market_cap), value: r => r.market_cap }],
+      withScore.slice(0, 100), { sortKey: "score", sortDesc: under });
+  }
+  const list = rows.filter(r => r.methods[key] && (under ? r.methods[key].upside > 0 : r.methods[key].upside < 0))
+    .sort((a, b) => (b.methods[key].upside - a.methods[key].upside) * (under ? 1 : -1)).slice(0, 100);
+  const extras = {
+    dcf: [{ key: "g", label: "Growth", render: r => fmt.pct(r.methods.dcf.growth), value: r => r.methods.dcf.growth },
+          { key: "r", label: "Discount", render: r => fmt.pct(r.methods.dcf.discount_rate), value: r => r.methods.dcf.discount_rate }],
+    ddm: [m("dividend_rate", "Dividend", fmt.money),
+          { key: "g", label: "Div growth", render: r => fmt.pct(r.methods.ddm.dividend_growth), value: r => r.methods.ddm.dividend_growth }],
+    graham_number: [m("eps_ttm", "EPS", fmt.money), m("price_to_book", "P/B")],
+    graham_formula: [m("eps_ttm", "EPS", fmt.money), { key: "g", label: "Growth", render: r => fmt.pct(r.methods.graham_formula.growth), value: r => r.methods.graham_formula.growth }],
+    lynch: [{ key: "peg", label: "PEG", render: r => fmt.num(r.methods.lynch.peg, 2), value: r => r.methods.lynch.peg },
+            { key: "fpe", label: "Fair P/E", render: r => fmt.num(r.methods.lynch.fair_pe, 1), value: r => r.methods.lynch.fair_pe }],
+    relative: [m("trailing_pe", "P/E"), m("ev_to_ebitda", "EV/EBITDA"), m("price_to_book", "P/B"), m("price_to_sales", "P/S"),
+               { key: "med", label: "Sector median P/E", render: r => fmt.num((r.methods.relative.sector_medians || {}).trailing_pe, 1), value: null }],
+  }[key] || [];
+  return table([...baseCols(),
+    { key: "value", label: "Fair value", render: r => fmt.money(r.methods[key].value), value: r => r.methods[key].value },
+    { key: "upside", label: "Upside", render: r => signed(r.methods[key].upside, fmt.pct(r.methods[key].upside)), value: r => r.methods[key].upside },
+    ...extras], list, { sortKey: "upside", sortDesc: under, empty: "No stocks qualify for this model with the current filters." });
+}
+
+function compositeTable(rows) {
+  const under = ctl("side").value === "under";
+  const list = rows.filter(r => r.composite.upside !== null && (under ? r.composite.upside > 0 : r.composite.upside < 0))
+    .sort((a, b) => (b.composite.upside - a.composite.upside) * (under ? 1 : -1)).slice(0, 100);
+  const mcol = k => ({ key: "c_" + k, label: data.methods.find(x => x.key === k).name.replace("Discounted Cash Flow", "DCF").replace("Dividend Discount Model", "DDM").replace(" (PEG)", ""),
+    render: r => r.methods[k] ? signed(r.methods[k].upside, fmt.pct(r.methods[k].upside, 0)) : el("span", { class: "muted" }, "—"),
+    value: r => r.methods[k] ? r.methods[k].upside : null });
+  return table([...baseCols(),
+    { key: "up", label: "Median upside", render: r => signed(r.composite.upside, fmt.pct(r.composite.upside)), value: r => r.composite.upside },
+    { key: "agree", label: "Models agree", render: r => `${Math.round(r.composite.agreement * r.composite.methods)}/${r.composite.methods}`, value: r => r.composite.agreement },
+    ...["dcf", "ddm", "graham_number", "graham_formula", "lynch", "relative"].map(mcol),
+    { key: "q", label: "Quality pct", render: r => r.methods.magic_formula ? fmt.num(r.methods.magic_formula.score, 0) : "—", value: r => r.methods.magic_formula ? r.methods.magic_formula.score : null },
+  ], list, { sortKey: "up", sortDesc: under });
+}
+
+function sectorView(rows) {
+  const under = ctl("side").value === "under";
+  const bySector = {};
+  rows.filter(r => r.composite.upside !== null).forEach(r => (bySector[r.sector] ||= []).push(r));
+  const grid = el("div", { class: "grid2" });
+  Object.keys(bySector).sort().forEach(sec => {
+    const list = bySector[sec].filter(r => under ? r.composite.upside > 0 : r.composite.upside < 0)
+      .sort((a, b) => (b.composite.upside - a.composite.upside) * (under ? 1 : -1)).slice(0, 5);
+    const all = bySector[sec].map(r => r.metrics.trailing_pe).filter(v => v > 0).sort((a, b) => a - b);
+    const medPe = all.length ? all[Math.floor(all.length / 2)] : null;
+    grid.append(el("section", { class: "panel" },
+      el("h2", {}, sec, el("span", { class: "muted small" }, `  ·  ${bySector[sec].length} stocks · median P/E ${fmt.num(medPe, 1)}`)),
+      table([
+        { key: "symbol", label: "Symbol", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+        { key: "price", label: "Price", render: r => fmt.money(r.price), value: r => r.price },
+        { key: "up", label: "Median upside", render: r => signed(r.composite.upside, fmt.pct(r.composite.upside)), value: r => r.composite.upside },
+        { key: "agree", label: "Agree", render: r => `${Math.round(r.composite.agreement * r.composite.methods)}/${r.composite.methods}`, value: r => r.composite.agreement },
+        m("trailing_pe", "P/E"),
+      ], list, { sortKey: "up", sortDesc: under, empty: "None" })));
+  });
+  return grid;
+}
+
+function draw() {
+  if (!data) return;
+  const rows = filtered();
+  const tabs = [["composite", "All models (composite)"], ...data.methods.map(x => [x.key, x.name]), ["sector", "By sector"]];
+  ctl("tabs").replaceChildren(...tabs.map(([k, label]) => el("button", { class: "tab" + (tab === k ? " active" : ""), onclick: () => { tab = k; draw(); } }, label)));
+  const meth = data.methods.find(x => x.key === tab);
+  ctl("desc").replaceChildren(meth
+    ? el("div", { class: "method-desc" }, el("b", {}, meth.theory + " · " + meth.name + ": "), meth.description)
+    : el("div", { class: "method-desc" }, tab === "sector"
+        ? "Top five per sector by median model upside, so you can compare cheapness within an industry group."
+        : "Median upside across every intrinsic-value model that applies to the stock (capped at +300% / −95% to blunt bad data), with how many models agree on direction."));
+  const content = tab === "composite" ? compositeTable(rows) : tab === "sector" ? sectorView(rows) : methodTable(tab, rows);
+  ctl("content").replaceChildren(content);
+  ctl("content").className = tab === "sector" ? "" : "panel";
+}
+
+function render(d) {
+  data = d;
+  ctl("asof").textContent = `${d.count} stocks · scanned ${fmt.time(d.as_of)}.`;
+  ctl("sectorbox").replaceChildren(sectorSelect(d.stocks, v => { sector = v; draw(); }));
+  draw();
+}
+["side", "mcap"].forEach(id => ctl(id).onchange = draw);
+ctl("search").oninput = draw;
+ctl("refresh").onclick = async () => {
+  await api("/api/refresh/valuation", { method: "POST" });
+  ctl("refresh").textContent = "Scanning…";
+  const poll = async () => {
+    const st = await api("/api/status");
+    if (st.jobs.valuation.running) return setTimeout(poll, 3000);
+    ctl("refresh").textContent = "Re-run scan";
+    loadSnapshot("/api/valuation", ctl("content"), render);
+  };
+  setTimeout(poll, 1500);
+};
+initPage().then(() => loadSnapshot("/api/valuation", ctl("content"), render));
+</script>
+</body>
+</html>

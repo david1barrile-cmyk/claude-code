@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Picks Track Record</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<main>
+  <h1>Track record</h1>
+  <p class="sub">How every day's picks have done since they were published. Long return = price change; short P/L = the inverse. "vs benchmark" compares each pick with the index over the same period. <span id="asof" class="small"></span></p>
+  <div class="grid4" id="summary"></div>
+  <section class="panel" style="margin-bottom:16px">
+    <div class="toolbar"><h2 style="margin:0">Average return path</h2>
+      <label class="small muted">Cohort <select id="cohort"></select></label></div>
+    <div style="position:relative;height:300px"><canvas id="chart"></canvas></div>
+  </section>
+  <section class="panel">
+    <h2>All cohorts</h2>
+    <div class="toolbar">
+      <select id="strategy"><option value="">All lists</option><option value="fundamental|long">Fundamental buys</option><option value="fundamental|short">Fundamental shorts</option><option value="technical|long">Technical buys</option><option value="technical|short">Technical shorts</option></select>
+    </div>
+    <div id="cohorts" class="empty">Loading…</div>
+    <div id="detail"></div>
+  </section>
+</main>
+<script src="/static/common.js"></script>
+<script>
+const ctl = id => document.getElementById(id);
+let perf = null, chart = null;
+const label = (s, side) => `${s === "fundamental" ? "Fundamental" : "Technical"} ${side === "long" ? "buys" : "shorts"}`;
+const COLORS = { "fundamental|long": "#2557d6", "fundamental|short": "#c2410c", "technical|long": "#0f8a4a", "technical|short": "#9333ea" };
+
+function drawChart() {
+  const date = ctl("cohort").value;
+  const series = perf.series.filter(s => s.pick_date === date);
+  const labels = [...new Set(series.flatMap(s => s.points.map(p => p.date)))].sort();
+  const ds = series.map(s => ({
+    label: label(s.strategy, s.side), borderColor: COLORS[s.strategy + "|" + s.side], backgroundColor: COLORS[s.strategy + "|" + s.side],
+    data: labels.map(d => { const p = s.points.find(p => p.date === d); return p ? +(p.avg_return * 100).toFixed(2) : null; }),
+    spanGaps: true, tension: 0.2, pointRadius: 3,
+  }));
+  if (chart) chart.destroy();
+  if (!window.Chart) {
+    if (ctl("chart")) ctl("chart").replaceWith(el("div", { class: "empty" }, "Chart library failed to load (is cdn.jsdelivr.net reachable?)."));
+    return;
+  }
+  const grid = getComputedStyle(document.body).getPropertyValue("--border");
+  const text = getComputedStyle(document.body).getPropertyValue("--muted");
+  chart = new Chart(ctl("chart"), {
+    type: "line", data: { labels, datasets: ds },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      scales: { y: { ticks: { callback: v => v + "%", color: text }, grid: { color: grid } }, x: { ticks: { color: text }, grid: { color: grid } } },
+      plugins: { legend: { labels: { color: text } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y > 0 ? "+" : ""}${c.parsed.y}%` } } } },
+  });
+}
+
+function showDetail(c) {
+  ctl("detail").replaceChildren(el("h2", { style: "margin-top:16px" }, `${c.pick_date} · ${label(c.strategy, c.side)}`),
+    table([
+      { key: "rank", label: "#", render: r => r.rank, value: r => r.rank },
+      { key: "symbol", label: "Symbol", cls: "left", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+      { key: "sector", label: "Sector", cls: "left", render: r => r.sector || "—", value: r => r.sector },
+      { key: "entry", label: "Entry", render: r => fmt.money(r.entry_price), value: r => r.entry_price },
+      { key: "now", label: "Now", render: r => fmt.money(r.current_price), value: r => r.current_price },
+      { key: "ret", label: "Return", render: r => signed(r.return_pct, fmt.pct(r.return_pct, 2)), value: r => r.return_pct },
+      { key: "bench", label: perf.benchmark, render: r => signed(r.benchmark_return, fmt.pct(r.benchmark_return, 2)), value: r => r.benchmark_return },
+      { key: "x", label: "vs benchmark", render: r => signed(r.excess_return, fmt.pct(r.excess_return, 2)), value: r => r.excess_return },
+    ], c.picks, { sortKey: "ret", sortDesc: true }));
+  ctl("detail").scrollIntoView({ behavior: "smooth" });
+}
+
+function drawCohorts() {
+  const f = ctl("strategy").value;
+  const rows = perf.cohorts.filter(c => !f || c.strategy + "|" + c.side === f);
+  ctl("cohorts").className = "";
+  ctl("cohorts").replaceChildren(table([
+    { key: "date", label: "Pick date", render: r => r.pick_date, value: r => r.pick_date },
+    { key: "list", label: "List", cls: "left", render: r => label(r.strategy, r.side), value: r => r.strategy + r.side },
+    { key: "n", label: "Picks", render: r => r.count, value: r => r.count },
+    { key: "avg", label: "Avg return", render: r => signed(r.avg_return, fmt.pct(r.avg_return, 2)), value: r => r.avg_return },
+    { key: "med", label: "Median", render: r => signed(r.median_return, fmt.pct(r.median_return, 2)), value: r => r.median_return },
+    { key: "bench", label: perf.benchmark, render: r => fmt.pct(r.benchmark_return, 2), value: r => r.benchmark_return },
+    { key: "x", label: "Avg vs benchmark", render: r => signed(r.avg_excess, fmt.pct(r.avg_excess, 2)), value: r => r.avg_excess },
+    { key: "hit", label: "Winners", render: r => r.hit_rate === null ? "—" : Math.round(r.hit_rate * 100) + "%", value: r => r.hit_rate },
+    { key: "best", label: "Best / worst", cls: "left", render: r => `${r.best || "—"} / ${r.worst || "—"}` },
+    { key: "open", label: "", render: r => el("td", {}, el("button", { class: "btn small", onclick: () => showDetail(r) }, "Details")) },
+  ], rows, { sortKey: "date", sortDesc: true, empty: "No picks recorded yet." }));
+}
+
+async function load() {
+  perf = await api("/api/performance");
+  ctl("asof").textContent = "Live prices as of " + fmt.time(perf.as_of) + ".";
+  ctl("summary").replaceChildren(...(perf.summary.length ? perf.summary.map(s => el("div", { class: "panel card" },
+    el("div", { class: "label" }, label(s.strategy, s.side) + ` · ${s.cohorts} day${s.cohorts === 1 ? "" : "s"}, ${s.count} picks`),
+    el("div", { class: "value" }, signed(s.avg_return, fmt.pct(s.avg_return, 2))),
+    el("div", { class: "meta" }, `avg per pick · ${fmt.pct(s.avg_excess, 2)} vs ${perf.benchmark} · ${Math.round((s.hit_rate || 0) * 100)}% winners`))) :
+    [el("div", { class: "panel empty" }, "No picks yet — the first set is published after today's close.")]));
+  const dates = [...new Set(perf.cohorts.map(c => c.pick_date))];
+  const prev = ctl("cohort").value;
+  ctl("cohort").replaceChildren(...dates.map(d => el("option", { value: d }, d)));
+  ctl("cohort").value = prev && dates.includes(prev) ? prev : dates[dates.length - 1] || "";
+  drawCohorts();
+  if (dates.length) drawChart();
+}
+ctl("cohort").onchange = drawChart;
+ctl("strategy").onchange = drawCohorts;
+initPage().then(load).catch(e => ctl("cohorts").replaceChildren(el("div", { class: "empty" }, "Error: " + e.message)));
+setInterval(() => load().catch(() => {}), 120000);
+</script>
+</body>
+</html>

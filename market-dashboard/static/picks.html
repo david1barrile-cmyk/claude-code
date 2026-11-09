@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Picks</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <h1>Daily top-10 picks</h1>
+  <p class="sub">Ten buys and ten shorts from each approach, published after every close at the closing price (max three per sector per list). Use them as a watchlist for the next session. <span id="asof" class="small"></span></p>
+  <div class="toolbar">
+    <label class="small muted">Pick date <select id="date"></select></label>
+    <button class="btn" id="gen">Regenerate for latest session</button>
+    <a class="btn small" href="/performance" style="text-decoration:none">See track record →</a>
+  </div>
+  <div class="grid4" id="cards"></div>
+  <div class="stack" id="lists"><div class="panel empty">Loading…</div></div>
+</main>
+<script src="/static/common.js"></script>
+<script>
+const ctl = id => document.getElementById(id);
+const LISTS = [
+  ["fundamental", "long", "Fundamental · Buy", "Cheapest across valuation models, with most models agreeing and positive earnings."],
+  ["fundamental", "short", "Fundamental · Short", "Most overvalued across models, weighted toward falling earnings and low quality."],
+  ["technical", "long", "Technical · Buy", "Strongest bullish breakouts that are not below the 200-day average."],
+  ["technical", "short", "Technical · Short", "Strongest bearish breakdowns that are not above the 200-day average."],
+];
+
+async function load(date) {
+  const picks = await api("/api/picks" + (date ? "?date=" + date : ""));
+  const sel = ctl("date");
+  sel.replaceChildren(...picks.dates.map(d => el("option", { value: d }, d)));
+  if (picks.date) sel.value = picks.date;
+  if (!picks.picks.length) {
+    ctl("lists").replaceChildren(el("div", { class: "panel empty" },
+      picks.job.running ? "Generating picks…" : "No picks yet. They are generated automatically at 4:15pm ET, or click Regenerate."));
+    if (picks.job.running) setTimeout(() => load(), 4000);
+    return;
+  }
+  let perf = null;
+  try { perf = await api("/api/performance"); } catch (_) {}
+  const live = {};
+  (perf ? perf.cohorts : []).filter(c => c.pick_date === picks.date)
+    .forEach(c => c.picks.forEach(p => live[p.id] = p));
+  ctl("asof").textContent = perf ? `Prices as of ${fmt.time(perf.as_of)}.` : "";
+  ctl("cards").replaceChildren(...LISTS.map(([s, side, title]) => {
+    const c = perf && perf.cohorts.find(c => c.pick_date === picks.date && c.strategy === s && c.side === side);
+    return el("div", { class: "panel card" }, el("div", { class: "label" }, title),
+      el("div", { class: "value" }, c ? signed(c.avg_return, fmt.pct(c.avg_return, 2)) : "—"),
+      el("div", { class: "meta" }, c ? `avg return since pick · ${fmt.pct(c.avg_excess, 2)} vs ${perf.benchmark} · ${Math.round((c.hit_rate || 0) * 100)}% winners` : ""));
+  }));
+  ctl("lists").replaceChildren(...LISTS.map(([s, side, title, blurb]) => {
+    const rows = picks.picks.filter(p => p.strategy === s && p.side === side).map(p => ({ ...p, ...(live[p.id] || {}) }));
+    return el("section", { class: "panel" },
+      el("h2", { class: side === "long" ? "up" : "down" }, title),
+      el("p", { class: "muted small", style: "margin-top:-6px" }, blurb),
+      table([
+        { key: "rank", label: "#", render: r => r.rank, value: r => r.rank },
+        { key: "symbol", label: "Symbol", cls: "left", render: r => symCell(r.symbol, r.name), value: r => r.symbol },
+        { key: "sector", label: "Sector", cls: "left", render: r => r.sector || "—", value: r => r.sector },
+        { key: "entry", label: "Entry", render: r => fmt.money(r.entry_price), value: r => r.entry_price },
+        { key: "now", label: "Now", render: r => fmt.money(r.current_price), value: r => r.current_price },
+        { key: "ret", label: side === "long" ? "Return" : "Short P/L", render: r => signed(r.return_pct, fmt.pct(r.return_pct, 2)), value: r => r.return_pct },
+        { key: "why", label: "Why", cls: "left", render: r => el("td", { class: "wrap small" }, r.rationale.slice(0, 5).map((t, i) => el("span", { class: i ? "pill" : "pill " + (side === "long" ? "bull" : "bear") }, t))) },
+      ], rows, { sortKey: "rank", sortDesc: false, empty: "No stocks qualified today" }));
+  }));
+}
+ctl("date").onchange = e => load(e.target.value);
+ctl("gen").onclick = async () => {
+  if (!confirm("Re-run the scans and replace the picks for the latest session?")) return;
+  await api("/api/picks/generate?force=true", { method: "POST" });
+  ctl("lists").replaceChildren(el("div", { class: "panel empty" }, "Generating picks…"));
+  const poll = async () => {
+    const st = await api("/api/status");
+    if (st.jobs.picks.running) return setTimeout(poll, 3000);
+    if (st.jobs.picks.last_error) alert("Generation failed: " + st.jobs.picks.last_error);
+    load();
+  };
+  setTimeout(poll, 2000);
+};
+initPage().then(() => load());
+</script>
+</body>
+</html>
