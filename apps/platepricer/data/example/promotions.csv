@@ -1,0 +1,6 @@
+restaurant_id,platform,type,value,min_order,max_discount,item,members_only,new_customers_only,starts,ends,description
+example-thai,ubereats,percent,20,30,8,,no,no,2026-11-01,2026-11-30,20% off orders over $30 (up to $8)
+example-thai,doordash,free_delivery,,25,,,no,no,,2026-11-30,
+example-thai,doordash,percent,40,20,10,,no,yes,,,40% off your first order
+example-thai,ubereats,bogo,,,,Pad Thai,no,no,,,
+example-thai,direct,amount,5,40,,,no,no,,,
