@@ -35,7 +35,7 @@ header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srg
 header.top .wrap { display: flex; align-items: center; gap: 12px; height: 60px; }
 .brand { font-weight: 750; font-size: 18px; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; }
 .brand .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); display: inline-grid; place-items: center; color: var(--bg); font-size: 13px; }
-.addr-pill { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); max-width: 46vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.addr-pill { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); max-width: 30vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .cart-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 0; background: var(--text); color: var(--bg); font-weight: 600; }
 .cart-btn .count { background: var(--accent); color: #fff; border-radius: 999px; min-width: 20px; padding: 0 6px; font-size: 12px; text-align: center; }
 
@@ -59,9 +59,9 @@ header.top .wrap { display: flex; align-items: center; gap: 12px; height: 60px; 
 .chip { flex: none; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; }
 .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding-bottom: 48px; }
-.card { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; padding: 0; box-shadow: var(--shadow); transition: transform .12s; }
+.card { display: flex; flex-direction: column; justify-content: flex-start; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; padding: 0; box-shadow: var(--shadow); transition: transform .12s; }
 .card:hover { transform: translateY(-2px); }
-.card .banner { height: 96px; display: grid; place-items: center; font-size: 42px; }
+.card .banner { flex: none; width: 100%; height: 96px; display: grid; place-items: center; font-size: 42px; }
 .card .body { padding: 12px 14px 14px; }
 .card h3 { margin: 0 0 2px; font-size: 16px; }
 .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
@@ -132,6 +132,29 @@ aside.cart.open { transform: none; }
   .item { grid-template-columns: 1fr; }
   .item .actions { justify-self: end; }
 }
+.fresh { font-size: 12px; display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.fresh::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.fresh.live { color: var(--accent); font-weight: 600; }
+.fresh.live::before { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fresh.stale { color: var(--warn); }
+.fresh.stale::before { background: var(--warn); }
+.item.stale .prices .price:not(.instore) { opacity: .6; }
+.data-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; font-size: 13px; color: var(--muted); padding: 0 0 32px; }
+.data-bar button, .data-bar label.btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 10px; font-size: 13px; cursor: pointer; color: var(--text); }
+.data-bar input[type=file] { display: none; }
+.suburbs { display: flex; justify-content: center; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
+.suburbs span { font-size: 13px; padding: 4px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.cart-fresh { font-size: 12px; color: var(--muted); margin: -4px 0 12px; }
+.members { display: flex; gap: 6px; margin-left: auto; }
+.addr-pill:not([hidden]) + .members { margin-left: 0; }
+.member { font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); white-space: nowrap; }
+.member::before { content: "○ "; }
+.member[aria-pressed="true"] { color: #fff; border-color: transparent; }
+.member[aria-pressed="true"]::before { content: "✓ "; }
+.member[data-member="doordash"][aria-pressed="true"] { background: var(--dd); }
+.member[data-member="ubereats"][aria-pressed="true"] { background: #0b8a4c; }
+.opt .member-note { color: var(--accent); font-weight: 600; }
+@media (max-width: 560px) { .members { margin-left: auto !important; } .r-head > div:last-child { min-width: 0; flex: 1; } .r-head h2 { font-size: 21px; } .member { padding: 5px 8px; font-size: 12px; } .brand { font-size: 0; gap: 0; } .brand .dot { font-size: 13px; } }
 </style>
 </head>
 <body>
@@ -139,6 +162,10 @@ aside.cart.open { transform: none; }
   <div class="wrap">
     <button class="brand" id="home"><span class="dot">$</span>PlatePricer</button>
     <button class="addr-pill" id="addrPill" hidden></button>
+    <div class="members" role="group" aria-label="Memberships">
+      <button class="member" data-member="doordash" aria-pressed="false" title="I have DashPass">DashPass</button>
+      <button class="member" data-member="ubereats" aria-pressed="false" title="I have Uber One">Uber One</button>
+    </div>
     <button class="cart-btn" id="cartBtn" aria-label="Open cart">Cart <span class="count" id="cartCount">0</span></button>
   </div>
 </header>
@@ -157,15 +184,13 @@ aside.cart.open { transform: none; }
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-/* ------------------------------------------------------------------
- * Data layer
- * ------------------------------------------------------------------
- * In production this would be replaced by calls to a backend that
- * aggregates menus from Uber Eats, DoorDash and each restaurant's own
- * ordering site (see README.md). Here a seeded generator builds a
- * believable set of nearby restaurants for any address, so the same
- * address always shows the same results.
- */
+/* ==================================================================
+ * Config
+ * ================================================================== */
+const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv' };
+const STALE_AFTER_DAYS = 14;   // manual prices older than this are flagged
+const LIVE_WITHIN_MIN = 60;    // POS-synced prices newer than this read as "Live"
+
 const PLATFORMS = {
   ubereats: { label: 'Uber Eats', short: 'UE', color: 'var(--ue)' },
   doordash: { label: 'DoorDash', short: 'DD', color: 'var(--dd)' },
@@ -173,154 +198,324 @@ const PLATFORMS = {
 };
 const PKEYS = Object.keys(PLATFORMS);
 
-const CUISINES = {
-  Mexican:  { emoji: '🌮', hue: 28, names: ['Taqueria El Sol', 'Casa Verde', 'Burrito Barn', 'La Palma Cocina'],
-    menu: { Tacos: [['Carne Asada Taco', 'Grilled steak, onion, cilantro', 3.75], ['Al Pastor Taco', 'Marinated pork, pineapple', 3.50], ['Baja Fish Taco', 'Beer-battered cod, cabbage slaw', 4.25]],
-            Burritos: [['Super Burrito', 'Choice of meat, rice, beans, guac', 12.50], ['Veggie Burrito', 'Grilled peppers, black beans, rice', 10.75]],
-            Sides: [['Chips & Guacamole', 'Made fresh daily', 6.50], ['Elote', 'Street corn, cotija, lime', 4.75], ['Horchata', '16 oz', 3.50]] } },
-  Italian:  { emoji: '🍝', hue: 4, names: ['Nonna’s Table', 'Trattoria Lume', 'Sal’s Pizzeria', 'Via Roma'],
-    menu: { Pizza: [['Margherita', 'San Marzano, fior di latte, basil', 15.00], ['Pepperoni', 'Cup-and-char pepperoni', 17.00], ['Funghi', 'Wild mushrooms, truffle oil', 18.50]],
-            Pasta: [['Spaghetti Pomodoro', 'Tomato, garlic, basil', 14.00], ['Rigatoni alla Vodka', 'Creamy tomato, chili', 16.50], ['Lasagna', 'Beef ragù, béchamel', 18.00]],
-            Sides: [['Garlic Knots', '6 pieces', 6.00], ['Caesar Salad', 'Romaine, parmesan, croutons', 10.00], ['Tiramisu', 'House-made', 8.00]] } },
-  Chinese:  { emoji: '🥟', hue: 0, names: ['Golden Dragon', 'Dumpling House', 'Szechuan Garden', 'Jade Palace'],
-    menu: { Mains: [['General Tso’s Chicken', 'Sweet & spicy, steamed rice', 14.95], ['Beef & Broccoli', 'Garlic sauce', 15.95], ['Mapo Tofu', 'Silken tofu, Sichuan pepper', 12.95]],
-            Dumplings: [['Pork Soup Dumplings', '6 pieces', 10.50], ['Veggie Potstickers', '8 pieces', 8.95]],
-            Sides: [['Egg Roll', '2 pieces', 4.50], ['Fried Rice', 'Egg, scallion', 9.50], ['Hot & Sour Soup', 'Pint', 5.95]] } },
-  Japanese: { emoji: '🍣', hue: 350, names: ['Sakura Sushi', 'Ramen Ichi', 'Tokyo Bento', 'Umi Izakaya'],
-    menu: { Rolls: [['California Roll', 'Crab, avocado, cucumber', 8.50], ['Spicy Tuna Roll', 'Tuna, spicy mayo', 9.50], ['Dragon Roll', 'Eel, avocado, tempura', 15.00]],
-            Ramen: [['Tonkotsu Ramen', 'Pork broth, chashu, egg', 16.00], ['Miso Ramen', 'Corn, bean sprouts, butter', 15.00]],
-            Sides: [['Edamame', 'Sea salt', 5.00], ['Gyoza', '5 pieces', 7.00], ['Miso Soup', 'Tofu, wakame', 3.50]] } },
-  Indian:   { emoji: '🍛', hue: 38, names: ['Taj Spice', 'Curry Leaf', 'Bombay Bistro', 'Masala Junction'],
-    menu: { Curries: [['Chicken Tikka Masala', 'Creamy tomato sauce', 17.95], ['Lamb Rogan Josh', 'Kashmiri spices', 19.95], ['Chana Masala', 'Chickpeas, onion, tomato', 13.95]],
-            Tandoor: [['Tandoori Chicken', 'Half chicken', 16.95], ['Paneer Tikka', 'Charred cottage cheese', 14.95]],
-            Sides: [['Garlic Naan', '', 3.95], ['Samosas', '2 pieces', 6.95], ['Mango Lassi', '', 4.95]] } },
-  American: { emoji: '🍔', hue: 22, names: ['Main St. Burger', 'Smokehouse 54', 'The Daily Diner', 'Patty Wagon'],
-    menu: { Burgers: [['Classic Cheeseburger', 'American cheese, pickles, special sauce', 11.50], ['Bacon BBQ Burger', 'Cheddar, onion rings', 14.00], ['Beyond Burger', 'Plant-based patty', 13.50]],
-            Mains: [['Chicken Tenders', '4 pieces, choice of sauce', 11.00], ['Pulled Pork Sandwich', 'House slaw', 12.50]],
-            Sides: [['Fries', 'Regular', 4.00], ['Onion Rings', '', 5.00], ['Milkshake', 'Vanilla, chocolate or strawberry', 6.50]] } },
-  Thai:     { emoji: '🍜', hue: 140, names: ['Bangkok Kitchen', 'Thai Orchid', 'Lemongrass', 'Siam Street'],
-    menu: { Noodles: [['Pad Thai', 'Rice noodles, peanuts, tamarind', 14.50], ['Pad See Ew', 'Wide noodles, Chinese broccoli', 14.50], ['Drunken Noodles', 'Basil, chili', 15.00]],
-            Curries: [['Green Curry', 'Coconut milk, Thai basil', 15.50], ['Massaman Curry', 'Potato, peanut', 16.00]],
-            Sides: [['Spring Rolls', '4 pieces', 6.50], ['Tom Yum Soup', 'Spicy & sour', 7.00], ['Thai Iced Tea', '', 4.50]] } },
-  Mediterranean: { emoji: '🥙', hue: 200, names: ['Olive & Fig', 'Pita Pit Stop', 'Aegean Grill', 'Zaatar House'],
-    menu: { Plates: [['Chicken Shawarma Plate', 'Rice, salad, garlic sauce', 15.50], ['Falafel Plate', 'Hummus, tabbouleh', 13.50], ['Lamb Kofta Plate', 'Grilled skewers, rice', 17.50]],
-            Wraps: [['Gyro Wrap', 'Tzatziki, tomato, onion', 11.00], ['Falafel Wrap', 'Tahini, pickles', 9.50]],
-            Sides: [['Hummus & Pita', '', 6.50], ['Baklava', '2 pieces', 4.50], ['Greek Salad', 'Feta, olives', 9.00]] } },
+// Used when a fee column in restaurants.csv is left blank. These are placeholders:
+// replace them with what you see in the apps. All fees are shown as estimates.
+const DEFAULT_FEES = {
+  ubereats: { delivery: 2.99, servicePct: 0.15, serviceMin: 2.00, smallOrder: 15, smallFee: 3.00 },
+  doordash: { delivery: 2.99, servicePct: 0.15, serviceMin: 2.00, smallOrder: 15, smallFee: 3.00 },
+  direct:   { delivery: 0,    servicePct: 0,    serviceMin: 0,    smallOrder: 0,  smallFee: 0 },
 };
 
-function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+// Membership benefits applied when the toggle in the header is on. These are
+// placeholders: check the current DashPass / Uber One terms in Australia and adjust.
+const MEMBERSHIPS = {
+  doordash: { name: 'DashPass', minOrder: 25, delivery: 0, servicePct: 0.05 },
+  ubereats: { name: 'Uber One', minOrder: 25, delivery: 0, servicePct: 0.05 },
+};
+
+const CUISINE_STYLE = {
+  Thai: ['🍜', 140], Vietnamese: ['🍲', 100], Italian: ['🍝', 4], Pizza: ['🍕', 10], Chinese: ['🥟', 0],
+  Japanese: ['🍣', 350], Indian: ['🍛', 38], Burgers: ['🍔', 22], American: ['🍔', 22], BBQ: ['🍖', 15],
+  Mexican: ['🌮', 28], Mediterranean: ['🥙', 200], Lebanese: ['🥙', 200], Greek: ['🥙', 210],
+  Korean: ['🍱', 330], Cafe: ['☕', 30], Dessert: ['🍰', 320],
+};
+const styleFor = c => CUISINE_STYLE[c] || ['🍽️', 50];
+
+/* ==================================================================
+ * CSV loading
+ * ==================================================================
+ * The site reads two spreadsheets (exported as CSV) from data/:
+ *   restaurants.csv  one row per restaurant (fees, links, source, date checked)
+ *   menu.csv         one row per menu item (in-store, UE, DD and direct price)
+ * If they're missing or empty, it shows the built-in demo data instead.
+ * See README.md for the columns.
+ */
+function parseCSV(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  const [header, ...body] = rows.filter(r => r.some(v => v.trim() !== ''));
+  if (!header) return [];
+  const keys = header.map(h => h.trim().toLowerCase());
+  return body.map(r => Object.fromEntries(keys.map((k, i) => [k, (r[i] ?? '').trim()])));
+}
+
+const num = v => { if (v === undefined || v === '') return null; const n = parseFloat(String(v).replace(/[$,%\s]/g, '')); return Number.isFinite(n) ? n : null; };
+const pctNum = v => { const n = num(v); return n === null ? null : (n > 1 ? n / 100 : n); };  // "15", "15%" or "0.15"
+function parseDate(v) {
+  if (!v) return null;
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(v);           // 03/11/2026 (Australian day/month/year)
+  const d = m ? new Date(+m[3], +m[2] - 1, +m[1]) : new Date(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v + 'T12:00' : v);
+  return isNaN(d) ? null : d;
+}
+
+function restaurantsFromCSV(restRows, menuRows) {
+  const byId = new Map();
+  for (const r of restRows) {
+    const id = r.restaurant_id || r.name;
+    if (!id || !r.name) continue;
+    const [emoji, hue] = styleFor(r.cuisine);
+    const fees = {};
+    for (const k of PKEYS) {
+      const d = DEFAULT_FEES[k];
+      fees[k] = {
+        delivery: num(r[`${k}_delivery_fee`]) ?? d.delivery,
+        servicePct: pctNum(r[`${k}_service_fee_pct`]) ?? d.servicePct,
+        serviceMin: d.serviceMin, smallOrder: d.smallOrder, smallFee: d.smallFee,
+        url: r[`${k}_url`] || '',
+      };
+    }
+    byId.set(id, {
+      id, name: r.name, suburb: r.suburb || '', cuisine: r.cuisine || 'Other', emoji, hue,
+      tier: Math.min(4, Math.max(1, Math.round(num(r.price_tier) ?? (r.price_tier || '').length) || 2)),
+      rating: num(r.rating), reviews: num(r.review_count),
+      source: (r.price_source || 'manual').toLowerCase() === 'pos' ? 'pos' : 'manual',
+      checkedAt: parseDate(r.last_checked), feesFrom: r.fees_checked_from || '',
+      fees, platforms: {}, menu: [],
+    });
+  }
+  const sections = new Map();
+  for (const m of menuRows) {
+    const r = byId.get(m.restaurant_id); const instore = num(m.instore_price);
+    if (!r || !m.item || instore === null) continue;
+    const key = r.id + '\u0000' + (m.section || 'Menu');
+    if (!sections.has(key)) { const s = { section: m.section || 'Menu', items: [] }; sections.set(key, s); r.menu.push(s); }
+    const s = sections.get(key);
+    const prices = { instore };
+    for (const k of PKEYS) prices[k] = num(m[`${k}_price`]);
+    s.items.push({ id: `${r.id}::${s.section}::${s.items.length}`, name: m.item, desc: m.description || '', prices, checkedAt: parseDate(m.last_checked) });
+  }
+  return finalize([...byId.values()]);
+}
+
+// A restaurant is listed on a platform when at least one of its items has a price there.
+function finalize(list) {
+  for (const r of list) {
+    for (const k of PKEYS) if (r.menu.some(s => s.items.some(it => it.prices[k] !== null))) r.platforms[k] = r.fees[k];
+    for (const s of r.menu) for (const it of s.items) it.checkedAt = it.checkedAt || r.checkedAt;
+  }
+  return list.filter(r => r.menu.length);
+}
+
+/* ==================================================================
+ * Demo data: fictional restaurants in Newtown, Enmore and Marrickville.
+ * Names, prices and ratings are made up. Dates are relative to today so
+ * the freshness labels always have something to show.
+ * ================================================================== */
+const DEMO_MENUS = {
+  Thai: { Noodles: [['Pad Thai', 'Rice noodles, egg, peanuts, tamarind', 19.5], ['Pad See Ew', 'Wide noodles, Chinese broccoli', 19.5], ['Drunken Noodles', 'Thai basil, chilli', 20]],
+          Curries: [['Green Curry', 'Coconut milk, Thai eggplant', 21], ['Massaman Beef', 'Slow-cooked, potato, peanut', 23]],
+          Sides: [['Spring Rolls (4)', '', 9], ['Tom Yum Soup', 'Hot & sour', 10], ['Thai Iced Tea', '', 6]] },
+  Vietnamese: { Pho: [['Beef Pho', 'Brisket, rare beef, herbs', 18.5], ['Chicken Pho', '', 17.5]],
+          'Banh Mi': [['Pork Banh Mi', 'Crackling pork, pâté, pickles', 11], ['Lemongrass Chicken Banh Mi', '', 11]],
+          Sides: [['Rice Paper Rolls (2)', 'Prawn & pork', 9.5], ['Vietnamese Iced Coffee', '', 6.5]] },
+  Italian: { Pasta: [['Spaghetti Pomodoro', 'Tomato, garlic, basil', 22], ['Rigatoni Vodka', 'Creamy tomato, chilli', 26], ['Lasagne', 'Beef ragù, béchamel', 28]],
+          Pizza: [['Margherita', 'Fior di latte, basil', 22], ['Diavola', 'Hot salami, chilli', 26]],
+          Sides: [['Garlic Bread', '', 9], ['Tiramisu', 'House-made', 14]] },
+  Burgers: { Burgers: [['Cheeseburger', 'American cheese, pickles, sauce', 16], ['Bacon Double', 'Two patties, bacon, cheese', 21], ['Fried Chicken Burger', 'Slaw, hot honey', 18]],
+          Sides: [['Chips', 'Chicken salt', 7], ['Onion Rings', '', 8], ['Thickshake', 'Vanilla, choc or salted caramel', 9.5]] },
+  Indian: { Curries: [['Butter Chicken', 'Creamy tomato sauce', 24], ['Lamb Rogan Josh', 'Kashmiri spices', 26], ['Dal Makhani', 'Black lentils', 19]],
+          Tandoor: [['Tandoori Chicken (half)', '', 22], ['Paneer Tikka', '', 20]],
+          Sides: [['Garlic Naan', '', 5.5], ['Samosas (2)', '', 9], ['Mango Lassi', '', 7]] },
+  Lebanese: { Plates: [['Chicken Shawarma Plate', 'Rice, salad, toum', 22], ['Falafel Plate', 'Hummus, tabouli', 19], ['Mixed Grill', 'Lamb, chicken, kafta', 32]],
+          Wraps: [['Chicken Wrap', 'Toum, pickles, chips', 15], ['Falafel Wrap', 'Tahini, salad', 13]],
+          Sides: [['Hummus & Bread', '', 10], ['Baklava (2)', '', 7]] },
+  Japanese: { Rolls: [['Salmon Avocado Roll', '', 14], ['Spicy Tuna Roll', '', 15], ['Dragon Roll', 'Eel, avocado, tempura', 22]],
+          Ramen: [['Tonkotsu Ramen', 'Pork broth, chashu, egg', 22], ['Spicy Miso Ramen', '', 22]],
+          Sides: [['Edamame', '', 7], ['Gyoza (5)', '', 10]] },
+  Chinese: { Dumplings: [['Pork Xiao Long Bao (6)', '', 14], ['Prawn Har Gow (4)', '', 12]],
+          Mains: [['Salt & Pepper Squid', '', 24], ['Mapo Tofu', 'Sichuan pepper', 20], ['Kung Pao Chicken', '', 23]],
+          Sides: [['Fried Rice', 'Egg, shallot', 15], ['Spring Onion Pancake', '', 9]] },
+  Mexican: { Tacos: [['Carnitas Taco', '', 8], ['Fish Taco', 'Battered fish, slaw', 8.5], ['Mushroom Taco', '', 7.5]],
+          Burritos: [['Chicken Burrito', 'Rice, beans, salsa', 19], ['Beef Burrito', '', 20]],
+          Sides: [['Corn Chips & Guac', '', 12], ['Churros', 'Dulce de leche', 10]] },
+};
+const DEMO_RESTAURANTS = [
+  // name, suburb, cuisine, tier, source ('pos' = connected), days since manual check
+  ['Lantern Thai Kitchen', 'Newtown', 'Thai', 2, 'pos', 0],
+  ['Pho Number Nine', 'Newtown', 'Vietnamese', 1, 'manual', 2],
+  ['Burrow Burgers', 'Newtown', 'Burgers', 2, 'manual', 5],
+  ['Saltbush Trattoria', 'Newtown', 'Italian', 3, 'manual', 9],
+  ['Tiny Tiger Dumplings', 'Newtown', 'Chinese', 1, 'manual', 21],
+  ['Marigold Curry House', 'Enmore', 'Indian', 2, 'pos', 0],
+  ['Neon Noodle Bar', 'Enmore', 'Thai', 1, 'manual', 3],
+  ['Tidal Sushi & Ramen', 'Enmore', 'Japanese', 3, 'manual', 6],
+  ['Calle Taco Club', 'Enmore', 'Mexican', 2, 'manual', 12],
+  ['Cedar & Sumac', 'Marrickville', 'Lebanese', 2, 'pos', 0],
+  ['Golden Lotus Pho', 'Marrickville', 'Vietnamese', 1, 'manual', 1],
+  ['Mama Rosa’s', 'Marrickville', 'Italian', 2, 'manual', 4],
+  ['Smoky Shed Burgers', 'Marrickville', 'Burgers', 2, 'manual', 30],
+  ['Jade Garden Canteen', 'Marrickville', 'Chinese', 2, 'manual', 8],
+];
+
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const r2 = n => Math.round(n * 100) / 100;
-const psych = n => Math.max(0.99, Math.round(n * 4) / 4 - 0.01); // 12.37 -> 12.24/12.49 style pricing
+const to10c = n => Math.round(n * 10) / 10;
 
-function buildRestaurants(address) {
-  const rand = rng(hashStr(address.trim().toLowerCase()));
-  const pick = arr => arr[Math.floor(rand() * arr.length)];
-  const out = [];
-  const usedNames = new Set();
-  const count = 14 + Math.floor(rand() * 6);
-  for (let i = 0; i < count; i++) {
-    const cuisine = pick(Object.keys(CUISINES));
-    const c = CUISINES[cuisine];
-    let name = pick(c.names);
-    if (usedNames.has(name)) name += ' ' + pick(['Express', 'Downtown', 'II', 'Westside']);
-    if (usedNames.has(name)) continue;
-    usedNames.add(name);
-    const tier = 1 + Math.floor(rand() * 4);                // $–$$$$
-    const priceMult = [0.85, 1, 1.2, 1.5][tier - 1];
-    const rating = r2(3.6 + rand() * 1.35);
-    const reviews = 40 + Math.floor(rand() * 2400);
-    const distance = r2(0.3 + rand() * 4.5);
-
-    // Platform availability & pricing policy (markup is applied per item)
-    const platforms = {};
-    if (rand() > 0.12) platforms.ubereats = { markup: 0.10 + rand() * 0.22, delivery: pick([0.49, 1.49, 2.49, 2.99, 3.99]), servicePct: 0.15, serviceMin: 3, smallOrder: 10, smallFee: 2.00, eta: 20 + Math.floor(distance * 5 + rand() * 12) };
-    if (rand() > 0.10) platforms.doordash = { markup: 0.08 + rand() * 0.24, delivery: pick([0, 0.99, 1.99, 2.99, 3.99]), servicePct: 0.15, serviceMin: 2.5, smallOrder: 12, smallFee: 2.50, eta: 22 + Math.floor(distance * 5 + rand() * 12) };
-    if (!platforms.ubereats && !platforms.doordash) platforms.doordash = { markup: 0.15, delivery: 1.99, servicePct: 0.15, serviceMin: 2.5, smallOrder: 12, smallFee: 2.5, eta: 30 };
-    if (rand() > 0.45) platforms.direct = { markup: rand() > 0.6 ? 0 : rand() * 0.06, delivery: pick([0, 2.99, 3.99, 4.99]), servicePct: 0, serviceMin: 0, smallOrder: 0, smallFee: 0, eta: 25 + Math.floor(distance * 6 + rand() * 15) };
-
-    const menu = Object.entries(c.menu).map(([section, items]) => ({
+function demoRestaurants() {
+  const rand = rng(20261109), pick = a => a[Math.floor(rand() * a.length)];
+  const now = Date.now(), day = 864e5;
+  return finalize(DEMO_RESTAURANTS.map(([name, suburb, cuisine, tier, source, ago], i) => {
+    const [emoji, hue] = styleFor(cuisine);
+    const mult = [0.9, 1, 1.15, 1.3][tier - 1];
+    const ueMark = rand() > 0.1 ? 0.12 + rand() * 0.2 : null;
+    const ddMark = rand() > 0.1 ? 0.10 + rand() * 0.22 : null;
+    const directMark = rand() > 0.45 ? (rand() > 0.5 ? 0 : rand() * 0.05) : null;
+    const checkedAt = source === 'pos' ? new Date(now - (2 + Math.floor(rand() * 20)) * 6e4) : new Date(now - ago * day);
+    const fees = {
+      ubereats: { ...DEFAULT_FEES.ubereats, delivery: pick([0.99, 1.99, 2.99, 3.99, 4.99]), url: '' },
+      doordash: { ...DEFAULT_FEES.doordash, delivery: pick([0, 0.99, 1.99, 2.99, 3.99]), url: '' },
+      direct:   { ...DEFAULT_FEES.direct, delivery: pick([0, 3, 5, 6.5]), url: '' },
+    };
+    const menu = Object.entries(DEMO_MENUS[cuisine]).map(([section, items]) => ({
       section,
       items: items.map(([n, d, base], j) => {
-        const inStore = psych(base * priceMult);
-        const prices = { instore: inStore };
-        for (const k of PKEYS) {
-          const p = platforms[k];
-          if (!p) { prices[k] = null; continue; }
-          const jitter = (rand() - 0.5) * 0.06;            // platforms don't mark everything up evenly
-          prices[k] = p.markup === 0 && jitter < 0.02 ? inStore : psych(inStore * (1 + Math.max(0, p.markup + jitter)));
-        }
-        if (rand() < 0.06) for (const k of PKEYS) if (prices[k] !== null && k !== 'direct' && rand() < 0.5) prices[k] = null; // item missing on a platform
-        return { id: `${i}-${section}-${j}`, name: n, desc: d, prices };
+        const instore = Math.round(base * mult * 2) / 2;
+        const mk = m => m === null ? null : (m === 0 ? instore : to10c(instore * (1 + Math.max(0, m + (rand() - 0.5) * 0.06))));
+        return { id: `demo${i}::${section}::${j}`, name: n, desc: d, checkedAt: null,
+                 prices: { instore, ubereats: mk(ueMark), doordash: mk(ddMark), direct: mk(directMark) } };
       }),
     }));
-    out.push({ id: String(i), name, cuisine, emoji: c.emoji, hue: c.hue, tier, rating, reviews, distance, platforms, menu });
-  }
-  return out;
+    return { id: `demo${i}`, name, suburb, cuisine, emoji, hue, tier,
+             rating: r2(3.8 + rand() * 1.15), reviews: 30 + Math.floor(rand() * 1800),
+             source, checkedAt, feesFrom: 'King St, Newtown', fees, platforms: {}, menu };
+  }));
 }
 
-/* ------------------------------------------------------------------
- * Pricing engine
- * ------------------------------------------------------------------ */
-function quote(restaurant, cart, platform) {
-  const p = restaurant.platforms[platform];
+/* ==================================================================
+ * Freshness
+ * ================================================================== */
+const fmtDate = d => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+function ago(d) {
+  const m = Math.max(0, Math.round((Date.now() - d) / 6e4));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  if (m < 1440) return `${Math.round(m / 60)} hr ago`;
+  return `${Math.round(m / 1440)} days ago`;
+}
+// Returns { cls: 'live' | 'ok' | 'stale' | 'unknown', short, long }
+function freshness(source, date) {
+  if (!date) return { cls: 'unknown', short: 'Date unknown', long: 'Prices: date checked unknown' };
+  const ageMin = (Date.now() - date) / 6e4;
+  if (source === 'pos') {
+    if (ageMin <= LIVE_WITHIN_MIN) return { cls: 'live', short: 'Live prices', long: `Live from restaurant · synced ${ago(date)}` };
+    return { cls: ageMin > STALE_AFTER_DAYS * 1440 ? 'stale' : 'ok', short: `Synced ${ago(date)}`, long: `Synced from restaurant ${ago(date)}` };
+  }
+  if (ageMin > STALE_AFTER_DAYS * 1440) return { cls: 'stale', short: `Checked ${fmtDate(date)}`, long: `Prices checked ${fmtDate(date)} · may be out of date` };
+  return { cls: 'ok', short: `Checked ${fmtDate(date)}`, long: `Prices checked ${fmtDate(date)}` };
+}
+const freshTag = f => `<span class="fresh ${f.cls}">${f.short}</span>`;
+
+/* ==================================================================
+ * Pricing engine (Australian menu prices include GST, so no tax line)
+ * ================================================================== */
+function quote(r, cart, platform) {
+  const p = r.platforms[platform];
   if (!p) return { available: false, reason: 'Not on this platform' };
-  let subtotal = 0, instore = 0, missing = [];
+  let subtotal = 0, instore = 0; const missing = [];
   for (const line of cart.lines) {
-    const item = findItem(restaurant, line.itemId);
-    const price = item.prices[platform];
-    instore += item.prices.instore * line.qty;
-    if (price === null) { missing.push(item.name); continue; }
-    subtotal += price * line.qty;
+    const it = findItem(r, line.itemId);
+    instore += it.prices.instore * line.qty;
+    if (it.prices[platform] === null) { missing.push(it.name); continue; }
+    subtotal += it.prices[platform] * line.qty;
   }
   if (missing.length) return { available: false, reason: `Unavailable: ${missing.join(', ')}` };
-  const service = p.servicePct ? Math.max(p.serviceMin, subtotal * p.servicePct) : 0;
+  const mem = MEMBERSHIPS[platform], isMember = !!(mem && state.members[platform]);
+  const memberApplied = isMember && subtotal >= mem.minOrder;
+  const delivery = memberApplied ? mem.delivery : p.delivery;
+  const servicePct = memberApplied ? Math.min(p.servicePct, mem.servicePct) : p.servicePct;
+  const service = servicePct ? (memberApplied ? subtotal * servicePct : Math.max(p.serviceMin, subtotal * servicePct)) : 0;
   const small = subtotal < p.smallOrder ? p.smallFee : 0;
-  const tax = subtotal * 0.0875;
-  const total = subtotal + p.delivery + service + small + tax;
-  const instoreTotal = instore * 1.0875;
-  return {
-    available: true, subtotal: r2(subtotal), delivery: p.delivery, service: r2(service), small: r2(small), tax: r2(tax), total: r2(total), eta: p.eta,
-    menuInflation: instore ? (subtotal / instore - 1) : 0,          // markup on menu prices only
-    totalInflation: instoreTotal ? (total / instoreTotal - 1) : 0,  // everything vs. walking in
-  };
+  const total = subtotal + delivery + service + small;
+  return { available: true, subtotal: r2(subtotal), delivery, memberApplied, memberName: mem?.name,
+           memberShortBy: isMember && !memberApplied ? r2(mem.minOrder - subtotal) : 0, service: r2(service), small: r2(small), total: r2(total),
+           menuInflation: instore ? subtotal / instore - 1 : 0, totalInflation: instore ? total / instore - 1 : 0, url: p.url };
 }
 function avgMarkup(r) {
-  const ms = ['ubereats', 'doordash'].map(k => r.platforms[k]?.markup).filter(m => m !== undefined);
-  return ms.reduce((a, b) => a + b, 0) / ms.length;
+  const ms = [];
+  for (const s of r.menu) for (const it of s.items) for (const k of ['ubereats', 'doordash']) if (it.prices[k] !== null) ms.push(it.prices[k] / it.prices.instore - 1);
+  return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0;
 }
-function findItem(r, id) { for (const s of r.menu) for (const it of s.items) if (it.id === id) return it; }
+function platformMarkup(r, k) {
+  const ms = [];
+  for (const s of r.menu) for (const it of s.items) if (it.prices[k] !== null) ms.push(it.prices[k] / it.prices.instore - 1);
+  return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0;
+}
+function findItem(r, id) { for (const s of r.menu) for (const it of s.items) if (it.id === id) return it; return null; }
 
-/* ------------------------------------------------------------------
+/* ==================================================================
  * State
- * ------------------------------------------------------------------ */
+ * ================================================================== */
 const store = {
   get(k, d) { try { const v = localStorage.getItem('pp:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('pp:' + k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { v === undefined ? localStorage.removeItem('pp:' + k) : localStorage.setItem('pp:' + k, JSON.stringify(v)); } catch {} },
 };
 const state = {
   address: store.get('address', ''),
-  restaurants: [],
-  filters: { cuisine: 'All', price: 'any', rating: '0', sort: 'rating' },
+  restaurants: [], dataSource: 'demo',
+  filters: { cuisine: 'All', suburb: 'All', price: 'any', rating: '0', sort: 'rating' },
   view: 'landing', restaurantId: null,
   cart: store.get('cart', { restaurantId: null, lines: [] }),
+  members: store.get('members', { doordash: false, ubereats: false }),
   choice: null,
 };
-if (state.address) { state.restaurants = buildRestaurants(state.address); state.view = 'browse'; }
-if (state.cart.restaurantId && !state.restaurants.find(r => r.id === state.cart.restaurantId)) state.cart = { restaurantId: null, lines: [] };
+
+async function loadData() {
+  // 1. Spreadsheets the user loaded in this browser
+  const uploaded = store.get('uploadedCsv', null);
+  if (uploaded) {
+    const list = restaurantsFromCSV(parseCSV(uploaded.restaurants), parseCSV(uploaded.menu));
+    if (list.length) return { list, source: 'uploaded' };
+  }
+  // 2. data/*.csv next to this page (works when the site is served, not opened as a file)
+  if (location.protocol !== 'file:') try {
+    const [a, b] = await Promise.all([fetch(DATA_FILES.restaurants), fetch(DATA_FILES.menu)]);
+    if (a.ok && b.ok) {
+      const list = restaurantsFromCSV(parseCSV(await a.text()), parseCSV(await b.text()));
+      if (list.length) return { list, source: 'files' };
+    }
+  } catch {}
+  // 3. Built-in demo
+  return { list: demoRestaurants(), source: 'demo' };
+}
+
+async function init() {
+  const { list, source } = await loadData();
+  state.restaurants = list; state.dataSource = source;
+  const r = list.find(x => x.id === state.cart.restaurantId);
+  if (!r || state.cart.lines.some(l => !findItem(r, l.itemId))) state.cart = { restaurantId: null, lines: [] };
+  if (state.address) state.view = 'browse';
+  render();
+}
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => '$' + n.toFixed(2);
 const pct = n => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
-const stars = r => `<span class="star">★</span> ${r.toFixed(1)}`;
+const stars = r => r === null ? '' : `<span><span class="star">★</span> ${r.toFixed(1)}</span>`;
 const dollars = t => '$'.repeat(t);
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000); }
+const suburbs = () => [...new Set(state.restaurants.map(r => r.suburb).filter(Boolean))].sort();
 
-/* ------------------------------------------------------------------
+/* ==================================================================
  * Views
- * ------------------------------------------------------------------ */
+ * ================================================================== */
+function renderMembers() {
+  document.querySelectorAll('[data-member]').forEach(b => b.setAttribute('aria-pressed', String(!!state.members[b.dataset.member])));
+}
 function render() {
+  renderMembers();
   $('#addrPill').hidden = !state.address;
   $('#addrPill').textContent = '📍 ' + state.address;
   const app = $('#app');
@@ -332,11 +527,13 @@ function render() {
 }
 
 function landingView() {
+  const subs = suburbs();
   return `<section class="hero">
+    ${subs.length ? `<div class="suburbs">${subs.map(s => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
     <h1>Same food. See who's<br>charging you more.</h1>
-    <p>Enter your address to see restaurants that deliver near you, with every menu price on Uber Eats, DoorDash and the restaurant's own site, side by side.</p>
+    <p>Every menu price on Uber Eats, DoorDash and the restaurant's own site, side by side with what it costs in-store.</p>
     <form class="addr-form" id="addrForm">
-      <input id="addrInput" name="address" placeholder="Enter delivery address" autocomplete="street-address" value="${esc(state.address)}" required>
+      <input id="addrInput" name="address" placeholder="Enter your delivery address" autocomplete="street-address" value="${esc(state.address)}" required>
       <button type="submit">Find food</button>
     </form>
     <div class="legend">
@@ -348,104 +545,121 @@ function landingView() {
 
 function filteredRestaurants() {
   const f = state.filters;
-  let list = state.restaurants.filter(r =>
+  const list = state.restaurants.filter(r =>
     (f.cuisine === 'All' || r.cuisine === f.cuisine) &&
+    (f.suburb === 'All' || r.suburb === f.suburb) &&
     (f.price === 'any' || r.tier === +f.price) &&
-    r.rating >= +f.rating);
+    (r.rating ?? 0) >= +f.rating);
   const sorters = {
-    rating: (a, b) => b.rating - a.rating,
-    priceLow: (a, b) => a.tier - b.tier || b.rating - a.rating,
-    priceHigh: (a, b) => b.tier - a.tier || b.rating - a.rating,
-    distance: (a, b) => a.distance - b.distance,
+    rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
+    priceLow: (a, b) => a.tier - b.tier || (b.rating ?? 0) - (a.rating ?? 0),
+    priceHigh: (a, b) => b.tier - a.tier || (b.rating ?? 0) - (a.rating ?? 0),
     markup: (a, b) => avgMarkup(a) - avgMarkup(b),
+    fresh: (a, b) => (b.source === 'pos') - (a.source === 'pos') || (b.checkedAt || 0) - (a.checkedAt || 0),
   };
   return list.sort(sorters[f.sort]);
 }
 
+function dataBar() {
+  const label = { demo: 'Showing demo data (fictional restaurants)', files: 'Showing prices from data/restaurants.csv and data/menu.csv', uploaded: 'Showing your uploaded spreadsheets' }[state.dataSource];
+  return `<div class="data-bar"><span>${label}</span>
+    <label class="btn">Load spreadsheets…<input type="file" id="csvInput" accept=".csv,text/csv" multiple></label>
+    ${state.dataSource === 'uploaded' ? '<button id="clearCsv">Remove uploaded data</button>' : ''}
+  </div>`;
+}
+
 function browseView() {
   const f = state.filters;
-  const cuisines = ['All', ...new Set(state.restaurants.map(r => r.cuisine))].sort((a, b) => a === 'All' ? -1 : b === 'All' ? 1 : a.localeCompare(b));
+  const cuisines = ['All', ...[...new Set(state.restaurants.map(r => r.cuisine))].sort()];
   const list = filteredRestaurants();
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === String(v) ? 'selected' : ''}>${esc(l)}</option>`;
   return `<div class="toolbar">
-      <h2>${list.length} restaurants deliver here</h2>
-      <label class="ctl">Price <select data-filter="price">
-        <option value="any">Any</option>${[1, 2, 3, 4].map(t => `<option value="${t}" ${f.price == t ? 'selected' : ''}>${dollars(t)}</option>`).join('')}
-      </select></label>
-      <label class="ctl">Rating <select data-filter="rating">
-        ${[['0', 'Any'], ['4', '4.0+'], ['4.5', '4.5+']].map(([v, l]) => `<option value="${v}" ${f.rating === v ? 'selected' : ''}>${l}</option>`).join('')}
-      </select></label>
-      <label class="ctl">Sort <select data-filter="sort">
-        ${[['rating', 'Highest rated'], ['priceLow', 'Price: low to high'], ['priceHigh', 'Price: high to low'], ['distance', 'Closest'], ['markup', 'Lowest app markup']].map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
-      </select></label>
+      <h2>${list.length} restaurant${list.length === 1 ? '' : 's'} near you</h2>
+      <label class="ctl">Suburb <select data-filter="suburb">${opt('All', 'All', f.suburb)}${suburbs().map(s => opt(s, s, f.suburb)).join('')}</select></label>
+      <label class="ctl">Price <select data-filter="price">${opt('any', 'Any', f.price)}${[1, 2, 3, 4].map(t => opt(t, dollars(t), f.price)).join('')}</select></label>
+      <label class="ctl">Rating <select data-filter="rating">${[['0', 'Any'], ['4', '4.0+'], ['4.5', '4.5+']].map(([v, l]) => opt(v, l, f.rating)).join('')}</select></label>
+      <label class="ctl">Sort <select data-filter="sort">${[['rating', 'Highest rated'], ['priceLow', 'Price: low to high'], ['priceHigh', 'Price: high to low'], ['markup', 'Lowest app markup'], ['fresh', 'Freshest prices']].map(([v, l]) => opt(v, l, f.sort)).join('')}</select></label>
     </div>
     <div class="chips" role="toolbar" aria-label="Cuisine">
-      ${cuisines.map(c => `<button class="chip" data-cuisine="${esc(c)}" aria-pressed="${f.cuisine === c}">${c === 'All' ? 'All' : CUISINES[c].emoji + ' ' + c}</button>`).join('')}
+      ${cuisines.map(c => `<button class="chip" data-cuisine="${esc(c)}" aria-pressed="${f.cuisine === c}">${c === 'All' ? 'All' : styleFor(c)[0] + ' ' + esc(c)}</button>`).join('')}
     </div>
-    <div class="grid">
-      ${list.map(cardView).join('') || '<div class="empty">No restaurants match those filters.</div>'}
-    </div>
-    <p class="note">Demo data: restaurants and prices are generated for illustration.</p>`;
+    <div class="grid">${list.map(cardView).join('') || '<div class="empty">No restaurants match those filters.</div>'}</div>
+    ${dataBar()}`;
 }
 
 function cardView(r) {
   const has = PKEYS.filter(k => r.platforms[k]);
-  return `<button class="card" data-open="${r.id}">
+  return `<button class="card" data-open="${esc(r.id)}">
     <div class="banner" style="background:hsl(${r.hue} 70% 85% / .55)">${r.emoji}</div>
     <div class="body">
       <h3>${esc(r.name)}</h3>
-      <div class="meta"><span>${stars(r.rating)} (${r.reviews.toLocaleString()})</span><span>${dollars(r.tier)}</span><span>${r.cuisine}</span><span>${r.distance} mi</span></div>
+      <div class="meta">${stars(r.rating)}${r.reviews ? ` <span>(${r.reviews.toLocaleString()})</span>` : ''}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span><span>${esc(r.suburb)}</span></div>
       <div class="platforms">
-        ${has.map(k => `<span class="tag"><i class="swatch" style="background:${PLATFORMS[k].color}"></i>${PLATFORMS[k].short}${k !== 'direct' ? ' +' + Math.round(r.platforms[k].markup * 100) + '%' : ''}</span>`).join('')}
-        ${r.platforms.direct ? '<span class="tag save">Order direct</span>' : ''}
+        ${has.map(k => { const m = platformMarkup(r, k); return `<span class="tag"><i class="swatch" style="background:${PLATFORMS[k].color}"></i>${PLATFORMS[k].short}${m > 0.004 ? ' ' + pct(m) : ''}</span>`; }).join('')}
       </div>
+      <div style="margin-top:8px">${freshTag(freshness(r.source, r.checkedAt))}</div>
     </div>
   </button>`;
 }
 
 function restaurantView(r) {
   const qtyOf = id => state.cart.restaurantId === r.id ? (state.cart.lines.find(l => l.itemId === id)?.qty || 0) : 0;
-  const feeRow = (label, fn) => `<tr><td>${label}</td>${PKEYS.map(k => `<td>${r.platforms[k] ? fn(r.platforms[k]) : '—'}</td>`).join('')}</tr>`;
+  const on = PKEYS.filter(k => r.platforms[k]);
+  const feeRow = (label, fn) => `<tr><td>${label}</td>${on.map(k => `<td>${fn(r.platforms[k])}</td>`).join('')}</tr>`;
+  const rf = freshness(r.source, r.checkedAt);
   return `<button class="back" data-nav="browse">← All restaurants</button>
     <div class="r-head">
       <div class="logo" style="background:hsl(${r.hue} 70% 85% / .55)">${r.emoji}</div>
       <div><h2>${esc(r.name)}</h2>
-        <div class="meta"><span>${stars(r.rating)} (${r.reviews.toLocaleString()} ratings)</span><span>${dollars(r.tier)}</span><span>${r.cuisine}</span><span>${r.distance} mi</span></div></div>
+        <div class="meta">${stars(r.rating)}${r.reviews ? `<span>(${r.reviews.toLocaleString()} ratings)</span>` : ''}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span><span>${esc(r.suburb)}</span></div>
+        <div style="margin-top:6px"><span class="fresh ${rf.cls}">${rf.long}</span></div></div>
     </div>
     <div class="fee-wrap"><table class="fee-table">
-      <thead><tr><th>Fees</th>${PKEYS.map(k => `<th><i class="swatch" style="background:${PLATFORMS[k].color}"></i> ${PLATFORMS[k].label}</th>`).join('')}</tr></thead>
+      <thead><tr><th>Estimated fees${r.feesFrom ? ` <span style="font-weight:400;color:var(--muted)">(checked from ${esc(r.feesFrom)})</span>` : ''}</th>${on.map(k => `<th><i class="swatch" style="background:${PLATFORMS[k].color}"></i> ${PLATFORMS[k].label}</th>`).join('')}</tr></thead>
       <tbody>
         ${feeRow('Delivery fee', p => p.delivery ? money(p.delivery) : 'Free')}
-        ${feeRow('Service fee', p => p.servicePct ? `${p.servicePct * 100}% (min ${money(p.serviceMin)})` : 'None')}
+        ${feeRow('Service fee', p => p.servicePct ? `${Math.round(p.servicePct * 100)}% (min ${money(p.serviceMin)})` : 'None')}
         ${feeRow('Small-order fee', p => p.smallFee ? `${money(p.smallFee)} under ${money(p.smallOrder)}` : 'None')}
-        ${feeRow('Est. delivery', p => `${p.eta}–${p.eta + 10} min`)}
+        ${on.some(k => MEMBERSHIPS[k] && state.members[k]) ? `<tr><td>Your membership</td>${on.map(k => `<td>${MEMBERSHIPS[k] && state.members[k] ? `${MEMBERSHIPS[k].name}: ${MEMBERSHIPS[k].delivery ? money(MEMBERSHIPS[k].delivery) : '$0'} delivery, ${Math.round(MEMBERSHIPS[k].servicePct * 100)}% service over ${money(MEMBERSHIPS[k].minOrder)}` : '—'}</td>`).join('')}</tr>` : ''}
       </tbody>
     </table></div>
-    ${r.menu.map(s => `<section class="menu-section"><h3>${s.section}</h3>
+    ${r.menu.map(s => `<section class="menu-section"><h3>${esc(s.section)}</h3>
       ${s.items.map(it => {
-        const avail = PKEYS.filter(k => it.prices[k] !== null);
-        const best = Math.min(...avail.map(k => it.prices[k]));
+        const best = Math.min(...on.filter(k => it.prices[k] !== null).map(k => it.prices[k]));
         const q = qtyOf(it.id);
-        return `<div class="item">
+        const itf = freshness(r.source, it.checkedAt);
+        const ownDate = it.checkedAt && r.checkedAt && it.checkedAt.toDateString() !== r.checkedAt.toDateString();
+        return `<div class="item ${itf.cls === 'stale' ? 'stale' : ''}">
           <div>
             <div class="name">${esc(it.name)}</div>
-            ${it.desc ? `<div class="desc">${esc(it.desc)}</div>` : '<div class="desc"></div>'}
+            <div class="desc">${esc(it.desc)}</div>
             <div class="prices">
               <span class="price instore">In-store <b>${money(it.prices.instore)}</b></span>
-              ${PKEYS.filter(k => r.platforms[k]).map(k => {
+              ${on.map(k => {
                 const p = it.prices[k];
                 if (p === null) return `<span class="price na"><i class="swatch" style="background:${PLATFORMS[k].color}"></i>${PLATFORMS[k].short} n/a</span>`;
                 const infl = p / it.prices.instore - 1;
                 return `<span class="price ${p === best ? 'best' : ''}"><i class="swatch" style="background:${PLATFORMS[k].color}"></i>${PLATFORMS[k].short} <b>${money(p)}</b>${infl > 0.004 ? `<span class="pct">${pct(infl)}</span>` : ''}</span>`;
               }).join('')}
             </div>
+            ${ownDate || (itf.cls === 'stale' && rf.cls !== 'stale') ? `<div style="margin-top:6px">${freshTag(itf)}</div>` : ''}
           </div>
           <div class="actions">${q
-            ? `<div class="qty"><button data-dec="${it.id}" aria-label="Remove one">−</button><b>${q}</b><button data-inc="${it.id}" aria-label="Add one">+</button></div>`
-            : `<button class="add" data-inc="${it.id}" aria-label="Add ${esc(it.name)} to cart">+</button>`}</div>
+            ? `<div class="qty"><button data-dec="${esc(it.id)}" aria-label="Remove one">−</button><b>${q}</b><button data-inc="${esc(it.id)}" aria-label="Add one">+</button></div>`
+            : `<button class="add" data-inc="${esc(it.id)}" aria-label="Add ${esc(it.name)} to cart">+</button>`}</div>
         </div>`;
       }).join('')}
     </section>`).join('')}
-    <p class="note" style="padding-top:16px">Demo data: prices are generated for illustration.</p>`;
+    <div style="height:32px"></div>`;
+}
+
+function cartFreshness(r) {
+  // The oldest price in the cart decides how fresh the comparison is.
+  const dates = state.cart.lines.map(l => findItem(r, l.itemId).checkedAt).filter(Boolean);
+  const oldest = dates.length ? new Date(Math.min(...dates)) : null;
+  const f = freshness(r.source, oldest);
+  const menu = f.cls === 'live' ? 'Menu prices live' : f.cls === 'unknown' ? 'Menu prices: date unknown' : `Menu prices ${f.short.replace(/^Checked/, 'checked').replace(/^Synced/, 'synced')}`;
+  return `<span class="fresh ${f.cls}">${menu}</span> · fees estimated`;
 }
 
 function renderCart() {
@@ -469,10 +683,11 @@ function renderCart() {
 
   body.innerHTML = `
     ${cart.lines.map(l => { const it = findItem(r, l.itemId); return `<div class="line">
-      <div class="qty"><button data-dec="${it.id}" aria-label="Remove one">−</button><b>${l.qty}</b><button data-inc="${it.id}" aria-label="Add one">+</button></div>
+      <div class="qty"><button data-dec="${esc(it.id)}" aria-label="Remove one">−</button><b>${l.qty}</b><button data-inc="${esc(it.id)}" aria-label="Add one">+</button></div>
       <span style="flex:1">${esc(it.name)}</span><span>${money(it.prices.instore * l.qty)} <small style="color:var(--muted)">in-store</small></span></div>`; }).join('')}
     <h3 class="compare-title">Compare this cart</h3>
-    <div class="instore-ref"><span>In-store price (menu + tax)</span><b>${money(r2(instore * 1.0875))}</b></div>
+    <div class="cart-fresh">${cartFreshness(r)}</div>
+    <div class="instore-ref"><span>In-store price</span><b>${money(r2(instore))}</b></div>
     <div role="radiogroup" aria-label="Ordering platform">
     ${[...avail, ...PKEYS.filter(k => !quotes[k].available)].map(k => {
       const q = quotes[k], P = PLATFORMS[k];
@@ -480,18 +695,18 @@ function renderCart() {
         <div><div class="pname"><i class="swatch" style="background:${P.color}"></i>${P.label}</div><div class="sub">${esc(q.reason)}</div></div><div></div></button>`;
       return `<button class="opt" role="radio" data-choose="${k}" aria-checked="${state.choice === k}"><span class="radio"></span>
         <div><div class="pname"><i class="swatch" style="background:${P.color}"></i>${P.label} ${k === cheapest && avail.length > 1 ? '<span class="badge">Cheapest</span>' : ''}</div>
-          <div class="sub"><span class="infl">${pct(q.totalInflation)}</span> vs. in-store · menu ${pct(q.menuInflation)} · ${q.eta}–${q.eta + 10} min</div></div>
+          <div class="sub"><span class="infl">${pct(q.totalInflation)}</span> vs. in-store · menu ${pct(q.menuInflation)}</div>
+          ${q.memberApplied ? `<div class="sub member-note">✓ ${q.memberName} applied</div>` : q.memberShortBy ? `<div class="sub member-note">Add ${money(q.memberShortBy)} more for ${q.memberName} benefits</div>` : ''}</div>
         <div class="total">${money(q.total)}</div>
         <div class="breakdown">
           <span>Items</span><span>${money(q.subtotal)}</span>
-          <span>Delivery</span><span>${q.delivery ? money(q.delivery) : 'Free'}</span>
-          ${q.service ? `<span>Service fee</span><span>${money(q.service)}</span>` : ''}
-          ${q.small ? `<span>Small-order fee</span><span>${money(q.small)}</span>` : ''}
-          <span>Tax</span><span>${money(q.tax)}</span>
+          <span>Delivery${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${q.delivery ? money(q.delivery) : 'Free'}</span>
+          ${q.service ? `<span>Service fee${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${money(q.service)}</span>` : ''}
+          ${q.small ? `<span>Small-order fee (est.)</span><span>${money(q.small)}</span>` : ''}
         </div></button>`;
     }).join('')}
     </div>
-    <p style="font-size:12px;color:var(--muted)">Before tip. Fees and promotions on each platform can change; check the total at checkout.</p>`;
+    <p style="font-size:12px;color:var(--muted)">Prices include GST. Before tip. Fees change with your address and the time of day; check the total at checkout.</p>`;
 
   if (state.choice) {
     const q = quotes[state.choice], worst = Math.max(...avail.map(k => quotes[k].total));
@@ -504,17 +719,15 @@ function renderCart() {
   }
 }
 
-/* ------------------------------------------------------------------
+/* ==================================================================
  * Actions
- * ------------------------------------------------------------------ */
+ * ================================================================== */
 function setAddress(a) {
   state.address = a.trim(); store.set('address', state.address);
-  state.restaurants = buildRestaurants(state.address);
-  state.cart = { restaurantId: null, lines: [] }; store.set('cart', state.cart);
   state.view = 'browse'; render();
 }
 function changeQty(itemId, delta) {
-  const rid = itemId.split('-')[0]; // item ids are prefixed with their restaurant id
+  const rid = itemId.split('::')[0];
   if (state.cart.restaurantId && state.cart.restaurantId !== rid && delta > 0) {
     const other = state.restaurants.find(r => r.id === state.cart.restaurantId);
     if (!confirm(`Your cart has items from ${other.name}. Start a new cart?`)) return;
@@ -527,26 +740,58 @@ function changeQty(itemId, delta) {
   state.cart.lines = state.cart.lines.filter(l => l.qty > 0);
   if (!state.cart.lines.length) state.cart.restaurantId = null;
   store.set('cart', state.cart);
-  if (state.view === 'restaurant' && state.restaurantId === rid) { const y = scrollY; $('#app').innerHTML = restaurantView(state.restaurants.find(r => r.id === state.restaurantId)); scrollTo(0, y); }
+  if (state.view === 'restaurant' && state.restaurantId === rid) { const y = scrollY; $('#app').innerHTML = restaurantView(state.restaurants.find(r => r.id === rid)); scrollTo(0, y); }
   renderCart();
 }
 function openCart(open) {
   $('#cart').classList.toggle('open', open); $('#scrim').classList.toggle('open', open);
   $('#cart').setAttribute('aria-hidden', String(!open));
 }
+async function loadCsvFiles(files) {
+  const got = {};
+  for (const f of files) {
+    const text = await f.text();
+    const header = (parseCSV(text.split(/\r?\n/).slice(0, 2).join('\n'))[0] || {});
+    const cols = Object.keys(header);
+    if (cols.includes('item') || cols.includes('instore_price')) got.menu = text;
+    else if (cols.includes('name') || cols.includes('suburb')) got.restaurants = text;
+  }
+  const prev = store.get('uploadedCsv', {}) || {};
+  const merged = { restaurants: got.restaurants || prev.restaurants, menu: got.menu || prev.menu };
+  if (!merged.restaurants || !merged.menu) {
+    if (got.restaurants || got.menu) store.set('uploadedCsv', merged);
+    return toast(`Got ${got.menu ? 'menu' : 'restaurants'}.csv. Now load ${got.menu ? 'restaurants' : 'menu'}.csv too.`);
+  }
+  const list = restaurantsFromCSV(parseCSV(merged.restaurants), parseCSV(merged.menu));
+  if (!list.length) return toast('No restaurants with menu items found. Check the column names against the template.');
+  store.set('uploadedCsv', merged);
+  state.restaurants = list; state.dataSource = 'uploaded';
+  state.cart = { restaurantId: null, lines: [] }; store.set('cart', state.cart);
+  state.filters = { ...state.filters, cuisine: 'All', suburb: 'All' };
+  toast(`Loaded ${list.length} restaurant${list.length === 1 ? '' : 's'}.`); render();
+}
 
 document.addEventListener('submit', e => {
   if (e.target.id === 'addrForm') { e.preventDefault(); const v = $('#addrInput').value; if (v.trim()) setAddress(v); }
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'csvInput') { if (e.target.files.length) loadCsvFiles([...e.target.files]); return; }
   const k = e.target.dataset.filter; if (!k) return;
   state.filters[k] = e.target.value; $('#app').innerHTML = browseView();
 });
-document.addEventListener('click', e => {
+document.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.id === 'home' || t.id === 'addrPill') { state.view = state.address && t.id === 'home' ? 'browse' : 'landing'; render(); }
+  if (t.id === 'home') { state.view = state.address ? 'browse' : 'landing'; render(); }
+  else if (t.id === 'addrPill') { state.view = 'landing'; render(); }
+  else if (t.dataset.member) {
+    const k = t.dataset.member; state.members[k] = !state.members[k]; store.set('members', state.members); state.choice = null;
+    renderMembers(); renderCart();
+    if (state.view === 'restaurant') { const y = scrollY; $('#app').innerHTML = restaurantView(state.restaurants.find(r => r.id === state.restaurantId)); scrollTo(0, y); }
+    toast(`${MEMBERSHIPS[k].name} ${state.members[k] ? 'on: $0 delivery and lower service fees on orders over ' + money(MEMBERSHIPS[k].minOrder) : 'off'}.`);
+  }
   else if (t.id === 'cartBtn') openCart(true);
   else if (t.id === 'cartClose') openCart(false);
+  else if (t.id === 'clearCsv') { store.set('uploadedCsv', undefined); await init(); toast('Removed uploaded data.'); }
   else if (t.dataset.cuisine) { state.filters.cuisine = t.dataset.cuisine; $('#app').innerHTML = browseView(); }
   else if (t.dataset.open) { state.view = 'restaurant'; state.restaurantId = t.dataset.open; render(); }
   else if (t.dataset.nav) { state.view = t.dataset.nav; render(); }
@@ -555,13 +800,15 @@ document.addEventListener('click', e => {
   else if (t.dataset.choose) { state.choice = t.dataset.choose; renderCart(); }
   else if (t.id === 'checkout' && state.choice) {
     const r = state.restaurants.find(x => x.id === state.cart.restaurantId);
-    toast(`Demo: this would hand your cart off to ${PLATFORMS[state.choice].label} for ${r.name}.`);
+    const url = r.platforms[state.choice]?.url;
+    if (url && /^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener');
+    else toast(`No ${PLATFORMS[state.choice].label} link for ${r.name} yet. Add one in restaurants.csv.`);
   }
 });
 $('#scrim').addEventListener('click', () => openCart(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') openCart(false); });
 
-render();
+init();
 </script>
 </body>
 </html>

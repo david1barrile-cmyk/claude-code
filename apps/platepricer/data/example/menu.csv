@@ -1,0 +1,4 @@
+restaurant_id,section,item,description,instore_price,ubereats_price,doordash_price,direct_price,last_checked
+example-thai,Noodles,Pad Thai,"Rice noodles, egg, peanuts",19.50,23.40,22.90,19.50,
+example-thai,Noodles,Pad See Ew,Wide noodles,19.50,23.40,22.90,19.50,
+example-thai,Curries,Green Curry,Coconut milk,21.00,25.20,,21.00,2026-10-20

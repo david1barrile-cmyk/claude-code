@@ -1,0 +1,2 @@
+restaurant_id,name,suburb,cuisine,price_tier,rating,review_count,price_source,last_checked,fees_checked_from,ubereats_url,ubereats_delivery_fee,ubereats_service_fee_pct,doordash_url,doordash_delivery_fee,doordash_service_fee_pct,direct_url,direct_delivery_fee
+example-thai,Example Thai Kitchen,Newtown,Thai,2,4.5,820,manual,2026-11-03,"King St, Newtown",https://www.ubereats.com/,2.99,15,https://www.doordash.com/,1.99,15,https://example.com/order,5

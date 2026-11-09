@@ -1,40 +1,72 @@
 # PlatePricer (prototype)
 
-A delivery marketplace that shows the **same menu priced three ways**: on Uber Eats, on
-DoorDash, and on the restaurant's own ordering site. The in-store price is shown next to each one.
+A delivery marketplace for **Newtown, Enmore and Marrickville** that shows the same menu
+priced four ways: in-store, Uber Eats, DoorDash, and the restaurant's own ordering site.
 
-Open `index.html` in a browser. There's no build step and nothing to install.
+## Running it
 
-## What it does
+- **Quick look:** open `index.html` in a browser. It shows built-in demo data (fictional
+  restaurants). Use **Load spreadsheets…** at the bottom of the restaurant list to load your
+  own two CSV files. They're remembered in that browser.
+- **With your data files:** fill in `data/restaurants.csv` and `data/menu.csv`, then serve the
+  folder, e.g. `python3 -m http.server` and open http://localhost:8000. Any static host
+  (Netlify, GitHub Pages, Cloudflare Pages) works too. While those files are empty the site
+  shows the demo.
 
-1. **Address entry.** Enter an address to see the restaurants that deliver there.
-2. **Browse.** Filter by cuisine (chips), price range ($ to $$$$) and minimum rating. Sort by
-   rating, price, distance, or *lowest app markup*. Each card shows which platforms carry the
-   restaurant and each app's average markup.
-3. **Restaurant page.** A fee table compares delivery fees, service fees, small-order fees and
-   delivery times. Every menu item shows its in-store price plus the UE, DD and Direct prices,
-   each with its % inflation over in-store. The cheapest price is highlighted.
-4. **Cart.** For the whole cart, it works out the real total on each platform: items, delivery,
-   service fee, small-order fee and tax. Each total has a subtext with the % inflation over the
-   in-store price, both for the whole order and for menu prices alone. The cheapest option is
-   pre-selected, and you choose **Order via Uber Eats / DoorDash / Direct**.
+Data is picked in this order: spreadsheets loaded in the browser, then `data/*.csv`, then the demo.
 
-## Demo data
+## Filling in the spreadsheets
 
-All restaurants and prices are made up by a seeded generator (`buildRestaurants`), so a
-given address always shows the same results. The pricing engine (`quote`) works the same way
-whatever the data source, so swapping in real data only means replacing `buildRestaurants`.
+Keep them as two tabs in Google Sheets or Excel and export each tab as CSV. Column names
+must match the headers in the files. `data/example/` has a filled-in example.
 
-## Getting real data (the hard part)
+### `restaurants.csv`: one row per restaurant
 
-| Source | Realistic options |
+| Column | Example | Notes |
+|---|---|---|
+| `restaurant_id` | `lantern-thai` | Any unique short name. Links menu rows to the restaurant. |
+| `name`, `suburb`, `cuisine` | `Lantern Thai`, `Newtown`, `Thai` | Cuisine becomes a filter chip. |
+| `price_tier` | `2` or `$$` | 1–4 |
+| `rating`, `review_count` | `4.5`, `820` | Optional |
+| `price_source` | `manual` or `pos` | `pos` = connected to the restaurant's system; shows "Live". |
+| `last_checked` | `2026-11-03` or `03/11/2026` | For `pos`, the last sync time (e.g. `2026-11-09T14:05`). |
+| `fees_checked_from` | `King St, Newtown` | The address you checked fees from. |
+| `ubereats_url`, `doordash_url`, `direct_url` | | Where the Order button sends people. |
+| `ubereats_delivery_fee`, `doordash_delivery_fee`, `direct_delivery_fee` | `2.99` | Blank = default estimate. |
+| `ubereats_service_fee_pct`, `doordash_service_fee_pct` | `15` | Blank = default estimate. |
+
+### `menu.csv`: one row per item
+
+| Column | Example | Notes |
+|---|---|---|
+| `restaurant_id` | `lantern-thai` | Must match `restaurants.csv`. |
+| `section`, `item`, `description` | `Noodles`, `Pad Thai`, `Rice noodles…` | Sections appear in sheet order. |
+| `instore_price` | `19.50` | Required. |
+| `ubereats_price`, `doordash_price`, `direct_price` | `23.40` | Leave blank if the item isn't on that platform. |
+| `last_checked` | | Optional. Only fill it in when this item was checked on a different day from the rest. |
+
+A restaurant appears on a platform when at least one of its items has a price there.
+Australian menu prices include GST, so no tax is added.
+
+## Freshness labels
+
+- **Live prices** (green): `price_source` is `pos` and it synced in the last hour.
+- **Checked 3 Nov**: manual prices.
+- **Orange / "may be out of date"**: older than 14 days (`STALE_AFTER_DAYS` in `index.html`).
+- The cart uses the oldest price in it, e.g. "Menu prices checked 3 Nov · fees estimated".
+
+## DashPass and Uber One
+
+The toggles in the header apply member pricing on orders over the minimum: $0 delivery and a
+lower service fee. Below the minimum, the cart says how much more to add. The benefit values are
+**placeholders** in `MEMBERSHIPS` at the top of the script in `index.html`. Check the current
+Australian terms and update them there. Other fee defaults are in `DEFAULT_FEES`.
+
+## Next steps toward real data
+
+| Source | Options |
 |---|---|
-| Restaurant list and location | Google Places API, Yelp Fusion API (cuisine, price tier, rating) |
-| Uber Eats and DoorDash menu prices | No public menu API. Options: affiliate or partner programs, restaurant-authorized POS integrations (Toast, Square, Olo, Deliverect), or a data vendor. Scraping these apps likely breaks their Terms of Service, so get legal advice first. |
-| In-store and direct prices | Restaurant POS or online-ordering integrations, menu photo/OCR submissions, crowdsourced receipts |
-| Hand-off to order | Deep links into each app or site with the restaurant pre-selected. Carrying the cart itself across usually needs a partnership. |
-
-Suggested production shape: a backend (e.g. Node or Python) that ingests menus on a
-schedule, normalizes items across platforms (matching names fuzzily), caches prices per
-restaurant, and exposes `/restaurants?lat&lng` and `/restaurants/:id/menu`. This page
-becomes the frontend.
+| Restaurant list and ratings | Google Places API |
+| UE / DD menu prices | Manual checks now; later, with the restaurant's permission, their POS (Square's API is open) or menu-sync software (Deliverect, Otter, Chowly, Olo) partner programs. Set `price_source` to `pos` for those. |
+| Fees | Depend on address and time; keep showing them as estimates. |
+| Ordering | Links now. Becoming an ordering partner with a menu-sync provider would allow real direct checkout. |
