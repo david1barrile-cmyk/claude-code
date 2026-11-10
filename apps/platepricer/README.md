@@ -146,9 +146,12 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   on Uber's green or DoorDash's red, and colour-blind users lose nothing.
 - **Light, dark and high-contrast** modes (Profile → Appearance). Light and dark follow the
   device by default.
-- **Restaurant cards** lead with the answer: "Cheapest via Direct · saves ~$9 vs Uber Eats", for
-  a typical order (the first item in each menu section). They also show a value label (from
-  markup over in-store), active deals, distance, walking time and how fresh the prices are.
+- **Restaurant cards** are mostly picture: the restaurant's photo (`photo_url`), or a pattern in its
+  cuisine's colours until there is one. A blue badge on the photo gives the answer for a typical
+  order ("Direct · Save $12", "Cheapest", "Only on DD", "Pickup only"), with a Deal tag and a
+  Sponsored label where they apply. Below: name and star rating, then cuisine, price tier, distance,
+  walking time and a dot for how fresh the prices are (blue = live, grey = checked, orange = may be
+  out of date). Screen readers hear the full sentence behind the badge.
 - **Dish search** across all restaurants, cheapest first ("pad thai").
 - **Menu prices:** every item shows its in-store price and every platform's price, with the cheapest highlighted.
 - **Distance:** the address is looked up with OpenStreetMap's Nominatim, falling back to the

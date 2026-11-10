@@ -126,9 +126,30 @@ header.top .wrap { display: flex; align-items: center; gap: 8px; height: 60px; }
 .card:hover { transform: translateY(-2px); }
 .card .open { all: unset; cursor: pointer; display: flex; flex-direction: column; flex: 1; }
 .card .open:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; border-radius: 16px; }
-.banner { height: 110px; display: grid; place-items: center; font-size: 44px; background-size: cover; background-position: center; flex: none; }
-.card .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.card h3 { margin: 0; font-size: 16px; padding-right: 28px; }
+.photo-wrap { position: relative; flex: none; }
+.photo { height: 150px; background-size: cover; background-position: center; }
+.photo.pattern { display: grid; place-items: center; }
+.photo.pattern span { font-size: 52px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.4)); }
+.save-badge { position: absolute; left: 10px; top: 10px; display: inline-flex; gap: 6px; align-items: center; background: var(--brand); color: var(--brand-ink);
+  font-weight: 800; font-size: 14px; padding: 5px 10px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.save-badge .pb { background: var(--brand-ink); color: #fff; border-color: var(--brand-ink); }
+.save-badge.pick .pb { background: var(--brand-ink); color: #fff; border-color: var(--brand-ink); }
+.save-badge.none { background: rgba(10,18,30,.72); color: #fff; font-weight: 700; font-size: 13px; }
+.deal-chip { position: absolute; right: 10px; bottom: 10px; display: inline-flex; gap: 4px; align-items: center; background: var(--warn); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 7px; }
+:root[data-theme="dark"] .deal-chip { color: #1a0d05; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .deal-chip { color: #1a0d05; } }
+.sp-chip { position: absolute; left: 10px; bottom: 10px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: rgba(10,18,30,.72); color: #fff; padding: 3px 8px; border-radius: 6px; }
+.card .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.titlerow { display: flex; align-items: baseline; gap: 8px; }
+.card h3 { margin: 0; font-size: 16px; flex: 1; min-width: 0; }
+.rating { font-weight: 700; font-size: 14px; white-space: nowrap; }
+.iconrow { display: flex; gap: 10px; color: var(--muted); font-size: 13px; align-items: center; white-space: nowrap; min-width: 0; }
+.iconrow > span { display: inline-flex; gap: 4px; align-items: center; flex: none; }
+.iconrow > span:first-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: block; }
+.ico { width: 14px; height: 14px; flex: none; }
+.fresh-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.fresh-dot.live { background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.fresh-dot.stale { background: var(--warn); }
 .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
 .star { color: var(--star); }
 .best-line { font-size: 13px; background: var(--brand-soft); color: var(--brand-text); border-radius: 8px; padding: 6px 8px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -136,11 +157,12 @@ header.top .wrap { display: flex; align-items: center; gap: 8px; height: 60px; }
 .card-foot { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: auto; padding-top: 4px; }
 .tag { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
 .tag.deal { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
-.value { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); }
-.value.great, .value.good { color: var(--brand-text); border-color: var(--brand); }
-.value.fair, .value.poor { color: var(--warn); border-color: var(--warn); }
-.fav { position: absolute; top: 118px; right: 10px; border: 0; background: none; font-size: 20px; padding: 2px; line-height: 1; color: var(--muted); }
+.fav { color: var(--muted); border: 0; background: none; padding: 2px; line-height: 1; }
+.fav svg { width: 20px; height: 20px; display: block; }
 .fav[aria-pressed="true"] { color: #e0457b; }
+.card > .fav { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.92); color: #142033; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.card > .fav svg { width: 18px; height: 18px; }
+.card > .fav[aria-pressed="true"] { color: #e0457b; }
 .empty { text-align: center; color: var(--muted); padding: 48px 0; grid-column: 1 / -1; }
 .dishes { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 20px; overflow: hidden; }
 .dish { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; }
@@ -275,7 +297,6 @@ dialog.modal:has(#customiseForm) { width: min(620px, calc(100% - 32px)); }
 /* Sponsored placements */
 .sp-label { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
 .card.sponsored { border-color: var(--brand); }
-.card.sponsored > .sp-label { position: absolute; top: 8px; left: 8px; z-index: 1; background: var(--surface); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); }
 .sp-banner { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px; margin-bottom: 16px; box-shadow: var(--shadow); }
 .sp-img { width: 64px; height: 64px; border-radius: 12px; flex: none; display: grid; place-items: center; font-size: 30px; background-size: cover; background-position: center; }
 .sp-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 14px; }
@@ -330,6 +351,13 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
 </header>
 
 <div class="demo-ribbon" id="demoRibbon" hidden>Demo: these restaurants and prices are made up. <a href="index.html">Go to the live site</a></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-pin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></symbol>
+  <symbol id="i-walk" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 5.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3A7.3 7.3 0 0 0 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path fill="currentColor" d="M3 12V3h9l9 9-9 9-9-9zm4.5-4.5a1.5 1.5 0 1 0 0-.01zM12 18.2 18.2 12 11.2 5H5v6.2l7 7z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21 10.6 19.7C5.4 15 2 12 2 8.3 2 5.4 4.3 3 7.3 3c1.7 0 3.3.8 4.7 2.1C13.4 3.8 15 3 16.7 3 19.7 3 22 5.4 22 8.3c0 3.7-3.4 6.7-8.6 11.4L12 21zm0-2.7c4.8-4.3 8-7.2 8-10 0-1.8-1.4-3.3-3.3-3.3-1.4 0-2.7.9-3.2 2.1h-3C10 5.9 8.7 5 7.3 5 5.4 5 4 6.5 4 8.3c0 2.8 3.2 5.7 8 10z"/></symbol>
+  <symbol id="i-heart-fill" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21 10.6 19.7C5.4 15 2 12 2 8.3 2 5.4 4.3 3 7.3 3c1.7 0 3.3.8 4.7 2.1C13.4 3.8 15 3 16.7 3 19.7 3 22 5.4 22 8.3c0 3.7-3.4 6.7-8.6 11.4L12 21z"/></symbol>
+</svg>
 <main class="wrap" id="app"></main>
 
 <div class="scrim" id="scrim"></div>
@@ -1061,15 +1089,6 @@ function bestWay(r, lines = typicalLines(r)) {
   const avail = PKEYS.filter(k => quotes[k].available).sort((a, b) => quotes[a].total - quotes[b].total);
   return { quotes, avail, best: avail[0], worst: avail[avail.length - 1], pickup: quotePickup(r, lines) };
 }
-function valueLabel(r) {
-  const b = bestWay(r);
-  if (!b.best) return null;
-  const infl = b.quotes[b.best].totalInflation;
-  if (infl <= 0.10) return ['great', 'Great value'];
-  if (infl <= 0.20) return ['good', 'Good value'];
-  if (infl <= 0.35) return ['fair', 'Fair value'];
-  return ['poor', 'Pricey to deliver'];
-}
 function findItem(r, id) { for (const s of r.menu) for (const it of s.items) if (it.id === id) return it; return null; }
 function findOption(it, oid) { for (const g of it?.groups || []) for (const o of g.options) if (o.id === oid) return o; return null; }
 const lineKey = (itemId, opts) => opts.length ? itemId + '|' + [...opts].sort().join(',') : itemId;
@@ -1267,35 +1286,54 @@ function renderResults() {
   if (banner) seen(banner);
 }
 
-function bestLine(r) {
-  const b = bestWay(r);
-  const km = distTo(r);
-  if (!b.best) return `<div class="best-line none">${r.pickup && km != null ? `No delivery here · pickup ${walkMin(km)} min walk` : 'No delivery to your address'}</div>`;
-  const q = b.quotes[b.best];
-  if (b.avail.length === 1) return `<div class="best-line">${badge(b.best)} Only via ${PLATFORMS[b.best].label} · ~${money(q.total)}</div>`;
+// The answer for a restaurant, as a short badge for the photo plus a full sentence for screen readers.
+function saveBadge(r) {
+  const b = bestWay(r), km = distTo(r);
+  if (!b.best) return r.pickup
+    ? { cls: 'pick', html: `${badge('pickup')} Pickup only`, sr: `No delivery to your address. Pickup${km != null ? `, ${walkMin(km)} minute walk` : ''}.` }
+    : { cls: 'none', html: 'No delivery here', sr: 'No delivery to your address.' };
+  const q = b.quotes[b.best], name = PLATFORMS[b.best].label;
+  if (b.avail.length === 1) return { cls: '', html: `${badge(b.best)} Only on ${PLATFORMS[b.best].short}`, sr: `Only on ${name}, about ${money(q.total)} for a typical order.` };
   const save = b.quotes[b.worst].total - q.total;
-  return `<div class="best-line">${badge(b.best)} Cheapest via ${PLATFORMS[b.best].label}${save >= 0.5 ? ` · saves ~${money(save)} vs ${PLATFORMS[b.worst].label}` : ''}</div>`;
+  if (save >= 0.5) return { cls: '', html: `${badge(b.best)} Save $${Math.round(save)}`, sr: `Cheapest via ${name}: saves about ${money(save)} on a typical order compared with ${PLATFORMS[b.worst].label}.` };
+  return { cls: '', html: `${badge(b.best)} Cheapest`, sr: `Cheapest via ${name}, about the same as the other apps.` };
 }
+// Stand-in until a restaurant has a photo: a pattern in its cuisine's colours, slightly different for each restaurant.
+function cuisinePattern(r) {
+  let h = 0; for (const c of r.id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const rnd = () => { h = (h * 1103515245 + 12345) >>> 0; return h / 4294967296; };
+  const dots = Array.from({ length: 7 }, (_, i) => {
+    const hue = (r.hue + [-14, 8, 22, -4, 30, 14, -20][i] + 360) % 360, x = Math.round(6 + rnd() * 88), y = Math.round(8 + rnd() * 84), size = Math.round(5 + rnd() * 7);
+    return `radial-gradient(circle at ${x}% ${y}%, hsl(${hue} 48% 62% / .55) 0 ${size}%, transparent ${size + 1}%)`;
+  });
+  return `${dots.join(', ')}, linear-gradient(135deg, hsl(${r.hue} 30% 34%), hsl(${(r.hue + 18) % 360} 34% 22%))`;
+}
+const icon = (id, cls = 'ico') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 
 function cardView(r, sponsor) {
-  const km = distTo(r), v = valueLabel(r), deals = userDeals(r);
+  const km = distTo(r), deals = userDeals(r), f = freshness(r.source, r.checkedAt), sb = saveBadge(r), cr = combinedRating(r);
+  const photo = safeUrl(r.photo)
+    ? `<div class="photo" style="background-image:url('${esc(r.photo)}')" role="img" aria-label="${esc(r.name)}"></div>`
+    : `<div class="photo pattern" style="background:${cuisinePattern(r)}" aria-hidden="true"><span>${r.emoji}</span></div>`;
+  const dealPlatforms = [...new Set(deals.map(d => PLATFORMS[d.platform].label))].join(', ');
   return `<div class="card ${sponsor ? 'sponsored' : ''}">
-    ${sponsor ? `<span class="sp-label">Sponsored</span>` : ''}
-    <button class="open" data-open="${esc(r.id)}" ${sponsor ? `data-sponsor="${esc(sponsor.id)}"` : ''} aria-label="${esc(r.name)}${sponsor ? ' (sponsored)' : ''}">
-      ${visual(r, 'banner')}
+    <button class="open" data-open="${esc(r.id)}" ${sponsor ? `data-sponsor="${esc(sponsor.id)}"` : ''} aria-label="${esc(r.name)}${sponsor ? ' (sponsored)' : ''}. ${esc(sb.sr)}">
+      <div class="photo-wrap">
+        ${photo}
+        <span class="save-badge ${sb.cls}" aria-hidden="true">${sb.html}</span>
+        ${deals.length ? `<span class="deal-chip" title="${esc(deals.map(promoLabel).join(' · '))}">${icon('i-tag')} ${deals.length === 1 ? 'Deal' : deals.length + ' deals'}<span class="sr"> on ${esc(dealPlatforms)}</span></span>` : ''}
+        ${sponsor ? '<span class="sp-chip">Sponsored</span>' : ''}
+      </div>
       <div class="body">
-        <h3>${esc(r.name)}</h3>
-        <div class="meta">${ratingHtml(r)}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span></div>
-        <div class="meta"><span>${esc(r.suburb)}</span>${km != null ? `<span>${fmtKm(km)}</span>${r.pickup ? `<span>🚶 ${walkMin(km)} min</span>` : ''}` : ''}</div>
-        ${bestLine(r)}
-        <div class="card-foot">
-          ${v ? `<span class="value ${v[0]}">${v[1]}</span>` : ''}
-          ${deals.length ? `<span class="tag deal">🏷 ${deals.length === 1 ? 'Deal' : deals.length + ' deals'} on ${[...new Set(deals.map(d => PLATFORMS[d.platform].short))].join(', ')}</span>` : ''}
-          ${freshTag(freshness(r.source, r.checkedAt))}
+        <div class="titlerow"><h3>${esc(r.name)}</h3>${cr.rating != null ? `<span class="rating" title="${esc(r.ratings.map(x => `${x.src} ${x.rating.toFixed(1)}${x.count != null ? ` (${x.count})` : ''}`).join(' · '))}"><span class="star">★</span> ${cr.rating.toFixed(1)}${cr.count < 50 ? ' <small class="muted">new</small>' : ''}</span>` : ''}</div>
+        <div class="iconrow">
+          <span>${esc(r.cuisine)} · ${dollars(r.tier)}</span>
+          ${km != null ? `<span title="${esc(r.suburb)}">${icon('i-pin')}${fmtKm(km)}</span>${r.pickup ? `<span title="Walking time for pickup">${icon('i-walk')}${walkMin(km)} min</span>` : ''}` : `<span>${esc(r.suburb)}</span>`}
+          <span class="fresh-dot ${f.cls}" title="${esc(f.long)}"><span class="sr">${esc(f.long)}</span></span>
         </div>
       </div>
     </button>
-    <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${isFav(r) ? '♥' : '♡'}</button>
+    <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${icon(isFav(r) ? 'i-heart-fill' : 'i-heart')}</button>
   </div>`;
 }
 
@@ -1427,7 +1465,7 @@ function restaurantView(r) {
     <div class="r-head">
       ${visual(r, 'logo')}
       <div class="info">
-        <h2>${esc(r.name)} <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${isFav(r) ? '♥' : '♡'}</button></h2>
+        <h2>${esc(r.name)} <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${icon(isFav(r) ? 'i-heart-fill' : 'i-heart')}</button></h2>
         <div class="meta">${ratingHtml(r)}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span><span>${esc(r.address || r.suburb)}</span>${km != null ? `<span>${fmtKm(km)}${r.pickup ? ` · 🚶 ${walkMin(km)} min walk` : ''}</span>` : ''}</div>
         ${r.ratings.length > 1 ? `<div class="ratings">${r.ratings.map(x => `<span>${esc(x.src)} ★ ${x.rating.toFixed(1)}${x.count != null ? ` (${kfmt(x.count)})` : ''}</span>`).join('')}</div>` : ''}
         <span><span class="fresh ${rf.cls}">${rf.long}</span> · <button class="link-btn" data-report-r="${esc(r.id)}">Report a price or deal</button></span>
