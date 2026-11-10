@@ -98,9 +98,21 @@ header.top .wrap { display: flex; align-items: center; gap: 8px; height: 60px; }
 .suburbs { display: flex; justify-content: center; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
 .suburbs span { font-size: 13px; padding: 4px 12px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-text); font-weight: 600; }
 .saved-addrs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
-.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; max-width: 900px; margin: 44px auto 0; text-align: left; }
-.how div { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
-.how b { display: block; color: var(--text); margin-bottom: 2px; font-size: 15px; }
+.tagline { color: var(--brand-text) !important; font-weight: 700; margin: -4px auto 26px !important; font-size: 18px !important; }
+.lp-demo { max-width: 460px; margin: 36px auto 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 9px; }
+.lp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; }
+.lp-head span { color: var(--muted); font-size: 13px; }
+.lp-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) 64px; gap: 10px; align-items: center; font-variant-numeric: tabular-nums; }
+.lp-row .pb { justify-self: start; }
+.lp-m { height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.lp-m span { display: block; height: 100%; border-radius: 6px; background: var(--warn); opacity: .85; width: var(--w); animation: lp-grow 1.2s cubic-bezier(.2,.7,.2,1) var(--d) both; }
+.lp-row.best .lp-m span { background: var(--brand); opacity: 1; }
+.lp-v { text-align: right; font-weight: 800; }
+.lp-row.best .lp-v { color: var(--brand-text); }
+.lp-note { font-size: 12px; color: var(--muted); }
+.lp-note b { color: var(--warn); }
+@keyframes lp-grow { from { width: 0; } to { width: var(--w); } }
+@media (prefers-reduced-motion: reduce) { .lp-m span { animation: none; } }
 .panel { max-width: 520px; margin: 48px auto; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); }
 .panel h2 { margin: 0 0 4px; font-size: 22px; }
 .check { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; margin-top: 10px; cursor: pointer; }
@@ -1282,11 +1294,10 @@ function landingView() {
   return `<section class="hero">
     ${subs.length ? `<div class="suburbs">${subs.map(s => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
     <h1>Same food.<br>See who's <em>charging you more.</em></h1>
-    <p style="margin:-6px auto 14px;font-weight:700;color:var(--brand-text)">Fair dinkum prices for your takeaway.</p>
-    <p>Every menu price on Uber Eats, DoorDash and the restaurant's own site, side by side with the in-store price, including your deals and memberships.</p>
+    <p class="tagline">Fair dinkum prices for your takeaway.</p>
     <form class="addr-form" id="addrForm">
       <label class="sr" for="addrInput">Delivery address</label>
-      <input id="addrInput" name="address" placeholder="Start typing your address, e.g. 120 King St" autocomplete="off" value="${esc(state.loc?.label || '')}" required
+      <input id="addrInput" name="address" placeholder="Start typing your address" autocomplete="off" value="${esc(state.loc?.label || '')}" required
         role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="addrList">
       <button class="btn" type="submit">Find food</button>
       <ul class="suggest" id="addrList" role="listbox" aria-label="Address suggestions" hidden></ul>
@@ -1295,12 +1306,35 @@ function landingView() {
       <button class="pill" id="useLocation">📍 Use my location</button>
       ${profile.addresses.map((a, i) => `<button class="pill" data-saved-addr="${i}">🏠 ${esc(a.label)}</button>`).join('')}
     </div>
-    <div class="how">
-      <div><b>Compare every item</b>In-store vs Uber Eats vs DoorDash vs ordering direct.</div>
-      <div><b>Real cart totals</b>Fees, your DashPass or Uber One, and current deals included.</div>
-      <div><b>Skip the fees</b>See when walking over to pick it up is the cheapest option.</div>
-    </div>
+    ${landingExample()}
   </section>`;
+}
+
+// One dish compared across the apps, delivered (fees included). Taken from the loaded menus: the dish
+// (a main, $14+) with the biggest gap between the cheapest and dearest app. Falls back to a labelled example.
+function landingExample() {
+  let pick = null;
+  for (const r of state.restaurants) for (const sec of r.menu) for (const it of sec.items) {
+    if (it.prices.instore < 14) continue;   // a main, so the example is a realistic order rather than a lone drink
+    const line = { key: lineKey(it.id, defaultOpts(it)), itemId: it.id, opts: defaultOpts(it), qty: 1 };
+    const rows = PKEYS.filter(k => r.platforms[k]).map(k => [k, quote(r, [line], k)]).filter(([, q]) => q.available);
+    if (rows.length < 2) continue;
+    const totals = rows.map(([, q]) => q.total), gap = (Math.max(...totals) - Math.min(...totals)) / it.prices.instore;
+    if (!pick || gap > pick.gap) pick = { r, it, rows, gap };
+  }
+  const rows = pick
+    ? pick.rows.map(([k, q]) => ({ k, total: q.total })).sort((a, b) => a.total - b.total)
+    : [{ k: 'direct', total: 22.50 }, { k: 'doordash', total: 28.20 }, { k: 'ubereats', total: 31.40 }];
+  const title = pick ? `${pick.it.name}, ${pick.r.suburb || pick.r.name}` : 'Pad Thai, Enmore';
+  const hi = Math.max(...rows.map(x => x.total));
+  const label = pick
+    ? `${state.dataSource === 'demo' ? 'From the demo restaurants' : `At ${pick.r.name}`}. One serving, delivered, fees included.`
+    : 'Example. One serving, delivered, fees included.';
+  return `<div class="lp-demo" role="img" aria-label="${esc(`${title}, delivered: ` + rows.map(x => `${PLATFORMS[x.k].label} ${money(x.total)}`).join(', '))}">
+    <div class="lp-head"><b>${esc(title)}</b><span>delivered</span></div>
+    ${rows.map((x, i) => `<div class="lp-row${i === 0 ? ' best' : ''}" aria-hidden="true">${badge(x.k)}<span class="lp-m"><span style="--w:${(x.total / hi * 100).toFixed(1)}%;--d:${i * 0.15}s"></span></span><span class="lp-v">${money(x.total)}</span></div>`).join('')}
+    <div class="lp-note">${esc(label)}${rows.length > 1 ? ` <b>${money(rows[rows.length - 1].total - rows[0].total)}</b> between the cheapest and dearest app.` : ''}</div>
+  </div>`;
 }
 
 function onboardView() {

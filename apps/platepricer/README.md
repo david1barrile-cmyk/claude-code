@@ -170,6 +170,10 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   the usual app or the priciest app), or the cheapest total when the saving is under $1. It replaces
   the header cart button on phones, leaves room at the bottom of the page, and pop-up messages sit
   above it.
+- **Home page:** headline, tagline, address search, and one comparison instead of explainer text: a
+  main dish ($14+) from the loaded menus with the biggest gap between apps, shown as bars that grow
+  when the page opens (one serving, delivered, fees included). With no restaurants yet it shows a
+  labelled example.
 - **Dish search** across all restaurants, cheapest first ("pad thai").
 - **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
   A **price strip** shows the in-store price at the left and one dot per platform, with its price
