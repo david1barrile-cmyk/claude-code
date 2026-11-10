@@ -791,6 +791,21 @@ const LOCAL_STREETS = [
   ['Swanson St', 'Erskineville', -33.9025, 151.1850], ['Parramatta Rd', 'Camperdown', -33.8865, 151.1760], ['Princes Hwy', 'St Peters', -33.9110, 151.1780],
   ['New Canterbury Rd', 'Petersham', -33.8960, 151.1520], ['Marrickville Rd', 'Dulwich Hill', -33.9060, 151.1400],
 ];
+// Apartments and shops: "2/45 King St", "Unit 2, 45 King St", "U2/45", "Shop 3/120 King St".
+// Map searches work best on the street address, so split the unit off and add it back to each suggestion.
+const UNIT_WORDS = { unit: '', apt: '', apartment: '', flat: '', u: '', shop: 'Shop', suite: 'Suite', level: 'Level', lvl: 'Level' };
+function splitUnit(q) {
+  const m = /^\s*(?:(unit|apartment|apt|flat|shop|suite|level|lvl|u)\.?\s*)?([a-z]?\d+[a-z]?)\s*(\/|,|\s)\s*(\d+[a-z]?)\s+(\D.*)$/i.exec(q);
+  if (!m || (!m[1] && m[3].trim() === '')) return { prefix: '', query: q.trim() };   // "2 45 King St" with no word is too ambiguous
+  const word = m[1] ? UNIT_WORDS[m[1].toLowerCase()] : '';
+  return { prefix: word ? `${word} ${m[2]}, ` : `${m[2]}/`, query: `${m[4]} ${m[5]}`.trim() };
+}
+function withUnit(x, prefix, typedNo) {
+  let label = x.label;
+  if (x.noNumber && typedNo) label = `${typedNo} ${label}`;   // the map only knew the street: keep the number they typed
+  if (prefix && /^\d/.test(label)) label = prefix + label;
+  return label === x.label ? x : { ...x, label };
+}
 function localSuggestions(q) {
   const m = /^\s*(\d+[a-z]?(?:\/\d+)?)?\s*(.*)$/i.exec(q); const no = m[1] || '', rest = m[2].toLowerCase().replace(/,/g, ' ').trim();
   if (!rest) return [];
@@ -811,7 +826,7 @@ async function photonSuggestions(q, signal) {
     const line = p.street ? `${p.housenumber ? p.housenumber + ' ' : ''}${p.street}` : p.name;
     const label = [line, sub].filter(Boolean).join(', ');
     return { label, sub: [p.name && p.street && p.name !== line ? p.name : '', [sub, p.state === 'New South Wales' ? 'NSW' : p.state, p.postcode].filter(Boolean).join(' ')].filter(Boolean).join(' · '),
-             lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], approx: !p.housenumber };
+             lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], approx: !p.housenumber, noNumber: !p.housenumber && !!p.street };
   }).filter(x => x.label && !seen.has(x.label) && seen.add(x.label)).slice(0, 6);
 }
 let googleReady = null, gSession = null;
@@ -846,11 +861,15 @@ async function searchAddresses(q) {
   if (addr.ctrl) addr.ctrl.abort();
   addr.ctrl = new AbortController();
   let list = [], source = 'local';
+  // Google understands unit numbers itself; the other sources get the street address only.
+  const { prefix, query } = GOOGLE_MAPS_API_KEY ? { prefix: '', query: q } : splitUnit(q);
+  const typedNo = (/^(\d+[a-z]?)\s+\D/i.exec(query) || [])[1] || '';
   try {
     if (GOOGLE_MAPS_API_KEY) { list = await googleSuggestions(q); source = 'google'; }
-    else { list = await photonSuggestions(q, addr.ctrl.signal); source = 'osm'; }
+    else { list = await photonSuggestions(query, addr.ctrl.signal); source = 'osm'; }
   } catch (e) { if (e.name === 'AbortError') return; list = []; }
-  if (!list.length) { list = localSuggestions(q); source = 'local'; }
+  if (!list.length) { list = localSuggestions(query); source = 'local'; }
+  if (source !== 'google') list = list.map(x => withUnit(x, prefix, typedNo));
   if (seq !== addr.seq) return;   // a newer search has started
   addr.list = list; addr.source = source; addr.active = list.length ? 0 : -1;
   renderSuggestions();
@@ -897,7 +916,7 @@ async function geocode(address) {
   // 1. OpenStreetMap's Nominatim (fine for a prototype; switch to Google Places for production)
   try {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=' + encodeURIComponent(address), { signal: ctrl.signal });
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=' + encodeURIComponent(splitUnit(address).query), { signal: ctrl.signal });
     clearTimeout(t);
     const [hit] = res.ok ? await res.json() : [];
     if (hit) return { label: address, lat: +hit.lat, lng: +hit.lon, approx: false };

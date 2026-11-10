@@ -98,6 +98,12 @@ pick one, and so does a click or tap. The suggestions come from:
 3. **A built-in list** of the area's main streets and suburbs, if neither service can be reached (for
    example inside the shareable demo page). These locations are approximate.
 
+Apartment and shop numbers are understood: `2/45 King St`, `Unit 2, 45 King St`, `U2/45`,
+`Shop 3/120 King St`, `Level 1, 5 Erskineville Rd`. For OpenStreetMap and the built-in list, the
+search runs on the street address (`45 King St`) and the unit is added back to each suggestion, so
+the saved address reads `2/45 King St, Newtown`. When OpenStreetMap only knows the street, the
+suggestion keeps the house number the customer typed. Google handles unit numbers itself.
+
 Pressing Enter without picking a suggestion still works: the typed address is looked up the old way.
 Addresses typed here are sent to Google or OpenStreetMap, so mention this in the privacy policy.
 
