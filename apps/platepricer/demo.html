@@ -1286,17 +1286,37 @@ function renderResults() {
   if (banner) seen(banner);
 }
 
+// Average menu saving: on the platform with the lowest prices across the menu, how much less each item
+// costs than on the customer's usual app (or, if they haven't set one, the priciest app for that item),
+// averaged over every item. Menu prices only: fees are compared in the cart.
+function avgSaving(r) {
+  const km = distTo(r);
+  const ks = PKEYS.filter(k => r.platforms[k] && (km == null || km <= r.platforms[k].radius));
+  if (!ks.length) return { platforms: ks };
+  const items = r.menu.flatMap(sec => sec.items);
+  const index = k => { const v = items.filter(it => it.prices[k] != null).map(it => it.prices[k] / it.prices.instore); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : Infinity; };
+  const best = ks.reduce((a, k) => index(k) < index(a) ? k : a, ks[0]);
+  const usual = profile.usualApp && ks.includes(profile.usualApp) && profile.usualApp !== best ? profile.usualApp : null;
+  const pcts = [];
+  for (const it of items) {
+    const p = it.prices[best]; if (p == null) continue;
+    const ref = usual ? it.prices[usual] : Math.max(...ks.map(k => it.prices[k] ?? -Infinity));
+    if (ref != null && ref > 0 && ref !== -Infinity) pcts.push((ref - p) / ref);
+  }
+  const pct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+  return { platforms: ks, best, pct, vs: usual ? `your usual ${PLATFORMS[usual].label}` : 'the priciest app for each item', count: pcts.length };
+}
 // The answer for a restaurant, as a short badge for the photo plus a full sentence for screen readers.
 function saveBadge(r) {
-  const b = bestWay(r), km = distTo(r);
-  if (!b.best) return r.pickup
+  const km = distTo(r), a = avgSaving(r);
+  if (!a.platforms.length) return r.pickup
     ? { cls: 'pick', html: `${badge('pickup')} Pickup only`, sr: `No delivery to your address. Pickup${km != null ? `, ${walkMin(km)} minute walk` : ''}.` }
     : { cls: 'none', html: 'No delivery here', sr: 'No delivery to your address.' };
-  const q = b.quotes[b.best], name = PLATFORMS[b.best].label;
-  if (b.avail.length === 1) return { cls: '', html: `${badge(b.best)} Only on ${PLATFORMS[b.best].short}`, sr: `Only on ${name}, about ${money(q.total)} for a typical order.` };
-  const save = b.quotes[b.worst].total - q.total;
-  if (save >= 0.5) return { cls: '', html: `${badge(b.best)} Save $${Math.round(save)}`, sr: `Cheapest via ${name}: saves about ${money(save)} on a typical order compared with ${PLATFORMS[b.worst].label}.` };
-  return { cls: '', html: `${badge(b.best)} Cheapest`, sr: `Cheapest via ${name}, about the same as the other apps.` };
+  const name = PLATFORMS[a.best].label;
+  if (a.platforms.length === 1) return { cls: '', html: `${badge(a.best)} Only on ${PLATFORMS[a.best].short}`, sr: `Only on ${name}.` };
+  const pc = Math.round(a.pct * 100);
+  if (pc >= 1) return { cls: '', html: `${badge(a.best)} Save ${pc}%`, sr: `Cheapest via ${name}: menu items cost ${pc}% less on average than on ${a.vs}.` };
+  return { cls: '', html: `${badge(a.best)} Cheapest`, sr: `Cheapest via ${name}, about the same menu prices as the other apps.` };
 }
 // Stand-in until a restaurant has a photo: a pattern in its cuisine's colours, slightly different for each restaurant.
 function cuisinePattern(r) {

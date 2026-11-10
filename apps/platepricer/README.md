@@ -147,8 +147,11 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
 - **Light, dark and high-contrast** modes (Profile → Appearance). Light and dark follow the
   device by default.
 - **Restaurant cards** are mostly picture: the restaurant's photo (`photo_url`), or a pattern in its
-  cuisine's colours until there is one. A blue badge on the photo gives the answer for a typical
-  order ("Direct · Save $12", "Cheapest", "Only on DD", "Pickup only"), with a Deal tag and a
+  cuisine's colours until there is one. A blue badge on the photo names the platform with the lowest menu
+  prices and the **average saving across all its items** ("Direct · Save 14%"), compared with the
+  customer's usual app, or the priciest app for each item if they haven't set one. Menu prices only;
+  fees are compared in the cart. Other badges: "Cheapest" (under 1%), "Only on DD", "Pickup only".
+  The photo also carries a Deal tag and a
   Sponsored label where they apply. Below: name and star rating, then cuisine, price tier, distance,
   walking time and a dot for how fresh the prices are (blue = live, grey = checked, orange = may be
   out of date). Screen readers hear the full sentence behind the badge.
