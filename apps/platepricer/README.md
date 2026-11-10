@@ -165,6 +165,11 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   🏷 −$5 deal") and the cheapest gets a "Cheapest" label. Pickup is a separate line underneath with
   how much less it costs than the cheapest delivery. In the cart, radio dots show the selection and
   the selected bar opens its full breakdown (items, fees, deal, delivery time, hints).
+- **Phone cart bar:** on phones, once the cart has something in it, a bar sits at the bottom of the
+  screen: item count, "View cart" with the restaurant's name, and the best saving ("Save $23", against
+  the usual app or the priciest app), or the cheapest total when the saving is under $1. It replaces
+  the header cart button on phones, leaves room at the bottom of the page, and pop-up messages sit
+  above it.
 - **Dish search** across all restaurants, cheapest first ("pad thai").
 - **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
   A **price strip** shows the in-store price at the left and one dot per platform, with its price

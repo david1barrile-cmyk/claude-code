@@ -415,6 +415,22 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
 .status.pending { color: var(--warn); border-color: var(--warn); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; opacity: 0; transition: .2s; z-index: 60; max-width: calc(100% - 32px); pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
+/* Phone cart bar */
+.cartbar-wrap { display: none; }
+@media (max-width: 640px) {
+  body.has-cartbar .cartbar-wrap { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; pointer-events: none;
+    padding: 0 max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+  .cartbar { pointer-events: auto; width: 100%; border: 0; background: var(--brand); color: var(--brand-ink); border-radius: 16px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px; text-align: left; box-shadow: 0 8px 22px rgba(10,25,50,.28); }
+  .cb-n { background: var(--brand-ink); color: #fff; border-radius: 999px; min-width: 26px; height: 26px; display: grid; place-items: center; font-size: 13px; font-weight: 800; padding: 0 6px; }
+  .cb-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; flex: 1; }
+  .cb-text b { font-size: 16px; font-weight: 800; }
+  .cb-text small { font-size: 12px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cb-save { flex: none; font-size: 13px; font-weight: 800; background: rgba(255,255,255,.6); padding: 4px 10px; border-radius: 999px; }
+  body.has-cartbar main { padding-bottom: 88px; }
+  body.has-cartbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+  body.has-cartbar #cartBtn { display: none; }
+}
 @media (max-width: 640px) {
   .addr-pill, .member { display: none; }
   .brand .name { display: none; }
@@ -474,6 +490,7 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
   </div>
 </aside>
 <dialog class="modal" id="dlg"></dialog>
+<div class="cartbar-wrap" id="cartBarWrap"><button class="cartbar" id="cartBar" aria-label="View cart"></button></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -1808,12 +1825,32 @@ function cartFreshness(r) {
   return `<span class="fresh ${f.cls}">${menu}</span> · fees estimated`;
 }
 
+// Phone only: a bar fixed to the bottom of the screen with the item count, "View cart" and the best saving.
+function renderCartBar(r, count) {
+  const on = !!(r && count);
+  document.body.classList.toggle('has-cartbar', on);
+  const bar = $('#cartBar'); if (!on) { bar.innerHTML = ''; return; }
+  const b = bestWay(r, state.cart.lines);
+  const choose = b.best || (b.pickup.available ? 'pickup' : null);
+  let right = '', sr = '';
+  if (choose) {
+    const total = choose === 'pickup' ? b.pickup.total : b.quotes[choose].total;
+    const base = baselineFor(b, choose), save = base.total - total;
+    if (base.kind !== 'none' && save >= 1) {
+      right = `Save $${Math.round(save)}`;
+      sr = `. Save ${money(save)} ordering via ${choose === 'pickup' ? 'pickup' : PLATFORMS[choose].label} compared with ${base.kind === 'usual' ? `your usual ${PLATFORMS[base.platform].label}` : 'the most expensive app'}`;
+    } else { right = money(total); sr = `. Cheapest ${money(total)}`; }
+  }
+  bar.innerHTML = `<span class="cb-n">${count}</span><span class="cb-text"><b>View cart</b><small>${esc(r.name)}</small></span>${right ? `<span class="cb-save">${right}</span>` : ''}`;
+  bar.setAttribute('aria-label', `View cart: ${count} item${count === 1 ? '' : 's'} from ${r.name}${sr}`);
+}
 function renderCart() {
   const cart = state.cart;
   const count = cart.lines.reduce((a, l) => a + l.qty, 0);
   $('#cartCount').textContent = count;
   const body = $('#cartBody'), btn = $('#checkout'), sav = $('#savings');
   const r = state.restaurants.find(x => x.id === cart.restaurantId);
+  renderCartBar(r, count);
   if (!r || !count) {
     $('#cartTitle').textContent = 'Your cart';
     body.innerHTML = '<p class="empty" style="padding:32px 0">Your cart is empty.<br>Add items from a restaurant to compare prices.</p>';
@@ -1970,7 +2007,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'home') { state.view = state.loc ? 'browse' : 'landing'; render(); }
   else if (t.id === 'addrPill') { state.view = 'landing'; render(); }
   else if (t.id === 'profileBtn') { state.view = 'profile'; render(); }
-  else if (t.id === 'cartBtn') openCart(true);
+  else if (t.id === 'cartBtn' || t.id === 'cartBar') openCart(true);
   else if (t.id === 'cartClose') openCart(false);
   else if (t.id === 'useLocation') {
     if (!navigator.geolocation) return toast('Location isn’t available in this browser.');
