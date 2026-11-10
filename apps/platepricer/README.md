@@ -80,6 +80,27 @@ On the live page, data comes from the Google Sheet, then `data/*.csv`.
 3. Paste it into `REPORT_FORM_PREFILL_URL`. Reports are then submitted in the background, without
    the user leaving the page, and you get an email for each one.
 
+## Address search
+
+The address box suggests addresses as the customer types (from 3 characters). Arrow keys and Enter
+pick one, and so does a click or tap. The suggestions come from:
+
+1. **Google Places**, if `GOOGLE_MAPS_API_KEY` is set at the top of the script. Recommended for
+   launch: best Australian address coverage. Setup:
+   - In Google Cloud, create a project, turn on billing, and enable **Places API (New)** and
+     **Maps JavaScript API**.
+   - Create an API key and restrict it to your website's address (HTTP referrers) and to those two
+     APIs. The key is visible in the page source, so the restriction is what protects it.
+   - Autocomplete uses session tokens (one per address search), which keeps the cost per search low.
+     Check Google's current pricing and free monthly allowance.
+2. **OpenStreetMap (Photon)** when there's no key: free, with no signup, but with less complete address
+   coverage and a fair-use limit. Fine for the pilot.
+3. **A built-in list** of the area's main streets and suburbs, if neither service can be reached (for
+   example inside the shareable demo page). These locations are approximate.
+
+Pressing Enter without picking a suggestion still works: the typed address is looked up the old way.
+Addresses typed here are sent to Google or OpenStreetMap, so mention this in the privacy policy.
+
 ## Sponsored placements
 
 Rows in the `sponsors` tab create paid placements:
