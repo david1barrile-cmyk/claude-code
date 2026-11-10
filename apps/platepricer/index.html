@@ -43,7 +43,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--brand-text); }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
@@ -246,6 +246,21 @@ aside.cart.open { transform: none; visibility: visible; }
 .checkout { width: 100%; border: 0; border-radius: 12px; padding: 14px; font-weight: 800; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
 .checkout:disabled { opacity: .5; cursor: not-allowed; }
 .savings { text-align: center; font-size: 13px; color: var(--brand-text); margin-top: 8px; min-height: 18px; font-weight: 600; }
+dialog.modal { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text); width: min(460px, calc(100% - 32px)); padding: 20px; box-shadow: 0 20px 60px rgba(5,15,30,.3); }
+dialog.modal::backdrop { background: rgba(5,15,30,.45); }
+dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
+.dlg-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.dlg-actions .btn { width: 100%; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; font-size: 14px; }
+.field input, .field select, .field textarea { padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.field textarea { min-height: 64px; resize: vertical; }
+.radios { display: flex; flex-wrap: wrap; gap: 6px; }
+.radios label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.radios input { accent-color: var(--brand); }
+.report-link { color: var(--muted); font-weight: 500; font-size: 12px; margin-top: 6px; }
+.status { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.status.confirmed { color: var(--brand-text); border-color: var(--brand); background: var(--brand-soft); }
+.status.pending { color: var(--warn); border-color: var(--warn); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; opacity: 0; transition: .2s; z-index: 60; max-width: calc(100% - 32px); pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
 @media (max-width: 640px) {
@@ -289,6 +304,7 @@ aside.cart.open { transform: none; visibility: visible; }
     <div class="savings" id="savings"></div>
   </div>
 </aside>
+<dialog class="modal" id="dlg"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -304,6 +320,10 @@ document.querySelector('#home').setAttribute('aria-label', APP_NAME + ' home');
 
 const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', promotions: 'data/promotions.csv' };
 const STALE_AFTER_DAYS = 14;   // manual prices older than this are flagged
+// Where "Wrong price?" reports are emailed. The report opens in the user's own email app, addressed here.
+// Leave empty to only save reports on the device. Note: anything here is visible to anyone who views the page source.
+const REPORT_EMAIL = '';
+const CONFIRM_WINDOW_HOURS = 24;  // after this, an unanswered order counts as an estimate only
 const LIVE_WITHIN_MIN = 60;    // POS-synced prices newer than this read as "Live"
 const RATING_PRIOR = { mean: 4.2, weight: 50 };  // so a 4.9 from 12 reviews doesn't outrank a 4.6 from 2,000
 
@@ -550,8 +570,12 @@ const store = {
   set(k, v) { try { v === undefined ? localStorage.removeItem('pp:' + k) : localStorage.setItem('pp:' + k, JSON.stringify(v)); } catch {} },
 };
 const DEFAULT_PROFILE = { onboarded: false, addresses: [], members: { doordash: false, ubereats: false }, newTo: { doordash: false, ubereats: false },
-  diet: [], favs: [], orders: [], theme: 'system', contrast: false };
+  usualApp: '', diet: [], favs: [], orders: [], reports: [], theme: 'system', contrast: false };
 const profile = Object.assign({}, DEFAULT_PROFILE, store.get('profile', {}));
+// Orders saved before confirmation existed become unconfirmed estimates.
+profile.orders = (profile.orders || []).map(o => o.status ? o : {
+  id: String(o.date), date: o.date, restaurant: o.restaurant, restaurantId: '', platform: o.platform, estTotal: o.total,
+  baseline: { platform: '', total: o.total + (o.saved || 0), kind: 'highest' }, status: 'unconfirmed', paid: null });
 const saveProfile = () => store.set('profile', profile);
 
 const state = {
@@ -595,6 +619,7 @@ async function init() {
   if (!r || state.cart.lines.some(l => !findItem(r, l.itemId))) state.cart = { restaurantId: null, lines: [] };
   if (state.loc) state.view = profile.onboarded ? 'browse' : 'onboard';
   render();
+  setTimeout(askAboutOrder, 800);
 }
 
 /* ==================================================================
@@ -849,6 +874,8 @@ function onboardView() {
     <p class="muted" style="margin:16px 0 0;font-size:14px">New to either app? New customers often get bigger discounts.</p>
     <label class="check"><input type="checkbox" name="n_doordash" ${profile.newTo.doordash ? 'checked' : ''}><span>I've never ordered on DoorDash</span></label>
     <label class="check"><input type="checkbox" name="n_ubereats" ${profile.newTo.ubereats ? 'checked' : ''}><span>I've never ordered on Uber Eats</span></label>
+    <p class="muted" style="margin:16px 0 0;font-size:14px">Which app do you usually order from? We'll show your savings against it.</p>
+    <div class="radios" style="margin-top:8px">${[['ubereats', 'Uber Eats'], ['doordash', 'DoorDash'], ['', 'It varies']].map(([v, l]) => `<label><input type="radio" name="usual" value="${v}" ${profile.usualApp === v ? 'checked' : ''}> ${l}</label>`).join('')}</div>
     <div style="display:flex;gap:10px;margin-top:18px"><button class="btn" type="submit">Show restaurants</button></div>
   </form>`;
 }
@@ -1010,7 +1037,7 @@ function restaurantView(r) {
         <h2>${esc(r.name)} <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${isFav(r) ? '♥' : '♡'}</button></h2>
         <div class="meta">${ratingHtml(r)}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span><span>${esc(r.address || r.suburb)}</span>${km != null ? `<span>${fmtKm(km)}${r.pickup ? ` · 🚶 ${walkMin(km)} min walk` : ''}</span>` : ''}</div>
         ${r.ratings.length > 1 ? `<div class="ratings">${r.ratings.map(x => `<span>${esc(x.src)} ★ ${x.rating.toFixed(1)}${x.count != null ? ` (${kfmt(x.count)})` : ''}</span>`).join('')}</div>` : ''}
-        <span class="fresh ${rf.cls}">${rf.long}</span>
+        <span><span class="fresh ${rf.cls}">${rf.long}</span> · <button class="link-btn" data-report-r="${esc(r.id)}">Report a price or deal</button></span>
       </div>
     </div>
     <div class="summary">
@@ -1067,6 +1094,7 @@ function itemView(r, it, on, q, rf) {
         <span class="price instore">In-store <b>${money(it.prices.instore)}</b></span>
         ${on.map(chip).join('')}
       </div>
+      <button class="link-btn report-link" data-report="${esc(it.id)}">Wrong price?</button>
       ${ownDate || (itf.cls === 'stale' && rf.cls !== 'stale') ? `<div style="margin-top:6px">${freshTag(itf)}</div>` : ''}
     </div>
     <div class="actions">${q
@@ -1077,18 +1105,18 @@ function itemView(r, it, on, q, rf) {
 
 /* ---------- Profile ---------- */
 function profileView() {
-  const saved = profile.orders.reduce((a, o) => a + o.saved, 0);
   const favs = state.restaurants.filter(isFav);
   const radio = (name, v, label) => `<label class="toggle"><input type="radio" name="${name}" value="${v}" ${profile.theme === v ? 'checked' : ''}> ${label}</label>`;
   return `<div class="profile">
     <button class="back" data-nav="${state.loc ? 'browse' : 'landing'}">← Back</button>
     <h2 style="margin:8px 0 0;font-size:26px">Your profile</h2>
     <p class="muted" style="margin:4px 0 0;font-size:14px">Saved on this device. Signing in with Google or Apple to sync across devices comes once there's a backend.</p>
-    <section><h3>Savings</h3>
-      <div class="big-number">${money(saved)}</div>
-      <div class="muted" style="font-size:13px">saved across ${profile.orders.length} order${profile.orders.length === 1 ? '' : 's'}, compared with the most expensive app for the same order</div>
-      ${profile.orders.slice(-5).reverse().map(o => `<div class="row"><span class="grow">${esc(o.restaurant)} · ${badge(o.platform)} <span class="muted">${new Date(o.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></span><b>${money(o.total)}</b><span class="muted" style="font-size:12px">saved ${money(o.saved)}</span></div>`).join('')}
+    ${savingsSection()}
+    <section><h3>Your usual app</h3>
+      <p class="muted" style="margin:0 0 8px;font-size:14px">Savings are measured against what the same order would cost on the app you'd normally use.</p>
+      <div class="radios">${[['ubereats', 'Uber Eats'], ['doordash', 'DoorDash'], ['', 'It varies (compare with the priciest app)']].map(([v, l]) => `<label><input type="radio" name="usualApp" value="${v}" ${profile.usualApp === v ? 'checked' : ''}> ${l}</label>`).join('')}</div>
     </section>
+    ${profile.reports.length ? `<section><h3>Your price reports</h3>${profile.reports.slice(-5).reverse().map(rp => `<div class="row"><span class="grow">${esc(rp.restaurant)} · ${esc(rp.item)} ${rp.platform ? badge(rp.platform) : ''} <span class="muted">${new Date(rp.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></span>${rp.seen != null ? `<span class="muted" style="font-size:13px">saw ${money(rp.seen)}</span>` : ''}</div>`).join('')}</section>` : ''}
     <section><h3>Memberships and offers</h3>
       ${Object.entries(MEMBERSHIPS).map(([k, m]) => `<label class="row"><input type="checkbox" data-pmember="${k}" ${profile.members[k] ? 'checked' : ''}> <span class="grow">I have ${m.name}</span></label>`).join('')}
       ${['doordash', 'ubereats'].map(k => `<label class="row"><input type="checkbox" data-pnew="${k}" ${profile.newTo[k] ? 'checked' : ''}> <span class="grow">I've never ordered on ${PLATFORMS[k].label} (shows new-customer deals)</span></label>`).join('')}
@@ -1175,10 +1203,12 @@ function renderCart() {
 
   if (state.choice) {
     const total = state.choice === 'pickup' ? pk.total : quotes[state.choice].total;
-    const worst = b.worst ? quotes[b.worst].total : total;
+    const base = baselineFor(b, state.choice);
     btn.disabled = false;
     btn.textContent = state.choice === 'pickup' ? `Get directions · pay ${money(total)} in-store` : `Order via ${PLATFORMS[state.choice].label} · ${money(total)}`;
-    sav.textContent = worst - total > 0.005 && (b.avail.length > 1 || state.choice === 'pickup') ? `You save ${money(worst - total)} vs the most expensive app` : '';
+    const diff = base.total - total;
+    sav.textContent = base.kind === 'none' || diff <= 0.005 ? ''
+      : `You save ${money(diff)} vs ${base.kind === 'usual' ? `your usual ${PLATFORMS[base.platform].label}` : 'the most expensive app'}`;
   } else {
     btn.disabled = true; btn.textContent = 'No way to order everything in this cart'; sav.textContent = '';
   }
@@ -1253,10 +1283,17 @@ document.addEventListener('submit', async e => {
     const v = $('#addrInput').value.trim(); if (!v) return;
     const btn = e.target.querySelector('button'); btn.disabled = true; btn.textContent = 'Finding…';
     await setLocation(await geocode(v));
+  } else if (e.target.id === 'paidForm') {
+    const v = num(new FormData(e.target).get('paid'));
+    if (v === null || v <= 0) return toast('Enter the total you paid.');
+    answerOrder(e.target.dataset.oid, 'yes', v);
+  } else if (e.target.id === 'reportForm') {
+    submitReport(new FormData(e.target), e.target.dataset.rid);
   } else if (e.target.id === 'onboardForm') {
     const f = new FormData(e.target);
     profile.members = { doordash: f.has('m_doordash'), ubereats: f.has('m_ubereats') };
     profile.newTo = { doordash: f.has('n_doordash'), ubereats: f.has('n_ubereats') };
+    profile.usualApp = f.get('usual') || '';
     profile.onboarded = true; saveProfile(); state.view = 'browse'; render();
   }
 });
@@ -1272,6 +1309,7 @@ document.addEventListener('change', e => {
   if (t.dataset.pmember) { profile.members[t.dataset.pmember] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
   if (t.dataset.pnew) { profile.newTo[t.dataset.pnew] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
   if (t.dataset.diet) { profile.diet = t.checked ? [...new Set([...profile.diet, t.dataset.diet])] : profile.diet.filter(d => d !== t.dataset.diet); saveProfile(); return; }
+  if (t.name === 'usualApp') { profile.usualApp = t.value; saveProfile(); return; }
   if (t.name === 'theme') { profile.theme = t.value; saveProfile(); applyTheme(); return; }
   if (t.id === 'contrast') { profile.contrast = t.checked; saveProfile(); applyTheme(); }
 });
@@ -1313,16 +1351,157 @@ document.addEventListener('click', async e => {
     const r = state.restaurants.find(x => x.id === state.cart.restaurantId);
     const b = bestWay(r, state.cart.lines);
     const total = state.choice === 'pickup' ? b.pickup.total : b.quotes[state.choice].total;
-    const worst = b.worst ? b.quotes[b.worst].total : total;
-    profile.orders.push({ date: Date.now(), restaurant: r.name, platform: state.choice, total, saved: r2(Math.max(0, worst - total)) }); saveProfile();
+    const order = { id: String(Date.now()), date: Date.now(), restaurantId: r.id, restaurant: r.name, platform: state.choice,
+                    estTotal: total, baseline: baselineFor(b, state.choice), status: 'pending', paid: null, items: state.cart.lines.reduce((a, l) => a + l.qty, 0) };
+    profile.orders.push(order); saveProfile();
     const url = state.choice === 'pickup'
       ? (r.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}` : '')
       : safeUrl(r.platforms[state.choice]?.url);
-    if (url) window.open(url, '_blank', 'noopener');
-    const tracked = worst - total > 0.5 ? `${money(worst - total)} saved, tracked in your profile.` : 'Tracked in your profile.';
-    toast(url ? tracked : `No ${state.choice === 'pickup' ? 'map location' : PLATFORMS[state.choice].label + ' link'} for ${r.name} yet (add one in restaurants.csv). ${tracked}`);
+    if (url) { awaitingReturn = true; window.open(url, '_blank', 'noopener'); toast(`When you're back, tell us if you ordered so we can track your savings.`); }
+    else { toast(`No ${state.choice === 'pickup' ? 'map location' : PLATFORMS[state.choice].label + ' link'} for ${r.name} yet (add one in restaurants.csv).`); setTimeout(askAboutOrder, 1500); }
   }
+  else if (d.oc) answerOrder(d.oid, d.oc);
+  else if (d.report) openReport(d.report.split('::')[0], d.report);
+  else if (d.reportR) openReport(d.reportR, '');
+  else if (d.closeDlg !== undefined) $('#dlg').close();
+  else if (d.confirmOrder) { const o = profile.orders.find(x => x.id === d.confirmOrder); if (o) { o.lastAsked = 0; showConfirm(o); } }
 });
+/* ==================================================================
+ * Order confirmation: did they actually order after leaving for the app?
+ * Savings only count as "confirmed" when the user says yes.
+ * ================================================================== */
+let awaitingReturn = false;
+function baselineFor(b, chosen) {
+  const usual = profile.usualApp;
+  if (usual && b.quotes[usual]?.available) return { platform: usual, total: b.quotes[usual].total, kind: 'usual' };
+  if (b.worst) return { platform: b.worst, total: b.quotes[b.worst].total, kind: 'highest' };
+  return { platform: chosen, total: chosen === 'pickup' ? b.pickup.total : b.quotes[chosen].total, kind: 'none' };
+}
+const orderSaving = o => r2(o.baseline.total - (o.status === 'confirmed' ? o.paid : o.estTotal));
+function expireOrders() {
+  let changed = false;
+  for (const o of profile.orders) if (o.status === 'pending' && Date.now() - o.date > CONFIRM_WINDOW_HOURS * 36e5) { o.status = 'unconfirmed'; changed = true; }
+  if (changed) saveProfile();
+}
+function askAboutOrder() {
+  expireOrders();
+  if ($('#dlg').open) return;
+  const o = [...profile.orders].reverse().find(x => x.status === 'pending' && Date.now() - (x.lastAsked || 0) > 2 * 6e4);
+  if (o) showConfirm(o);
+}
+function showConfirm(o) {
+  o.lastAsked = Date.now(); saveProfile();
+  const how = o.platform === 'pickup' ? 'pick up your order from' : o.platform === 'direct' ? 'order directly from' : 'place your order with';
+  const via = o.platform === 'pickup' || o.platform === 'direct' ? '' : ` on ${PLATFORMS[o.platform].label}`;
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<h2>Did you ${how} ${esc(o.restaurant)}${via}?</h2>
+    <p class="muted" style="margin:0;font-size:14px">This keeps your savings honest. Only confirmed orders count.</p>
+    <div class="dlg-actions">
+      <button class="btn" data-oc="yes" data-oid="${o.id}">Yes, it was ${money(o.estTotal)}</button>
+      <button class="btn secondary" data-oc="diff" data-oid="${o.id}">Yes, but the total was different</button>
+      <form id="paidForm" data-oid="${o.id}" hidden>
+        <label class="field">Total you paid (before tip)<input name="paid" inputmode="decimal" placeholder="e.g. 61.40"></label>
+        <button class="btn" type="submit" style="width:100%;margin-top:8px">Save</button>
+      </form>
+      <button class="btn secondary" data-oc="no" data-oid="${o.id}">No, I didn't order</button>
+      <button class="link-btn" data-oc="later" data-oid="${o.id}" style="align-self:center;margin-top:4px">Ask me later</button>
+    </div>`;
+  if (!dlg.open) dlg.showModal();
+}
+function answerOrder(id, answer, paid) {
+  const o = profile.orders.find(x => x.id === id); if (!o) return;
+  const dlg = $('#dlg');
+  if (answer === 'diff') { dlg.querySelector('#paidForm').hidden = false; dlg.querySelector('#paidForm input').focus(); return; }
+  if (answer === 'later') { dlg.close(); return; }
+  if (answer === 'no') { o.status = 'declined'; saveProfile(); dlg.close(); toast('Thanks. That order won’t count toward your savings.'); }
+  if (answer === 'yes') {
+    o.status = 'confirmed'; o.paid = r2(paid ?? o.estTotal); saveProfile(); dlg.close();
+    const s = orderSaving(o);
+    const vs = o.baseline.kind === 'usual' ? `your usual ${PLATFORMS[o.baseline.platform].label}` : o.baseline.platform && o.baseline.platform !== 'pickup' ? PLATFORMS[o.baseline.platform].label : 'the alternatives';
+    toast(s > 0.005 ? `Confirmed: you saved ${money(s)} vs ${vs}.` : 'Confirmed. Thanks!');
+  }
+  if (state.view === 'profile') rerenderInPlace();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && awaitingReturn) { awaitingReturn = false; setTimeout(askAboutOrder, 600); }
+});
+
+function savingsSection() {
+  expireOrders();
+  const by = st => profile.orders.filter(o => o.status === st);
+  const confirmed = by('confirmed'), est = [...by('pending'), ...by('unconfirmed')];
+  const sum = list => list.reduce((a, o) => a + orderSaving(o), 0);
+  const label = { confirmed: 'Confirmed', pending: 'Waiting for you', unconfirmed: 'Estimate', declined: "Didn't order" };
+  const vs = o => o.baseline.kind === 'usual' ? `vs usual ${PLATFORMS[o.baseline.platform].short}` : o.baseline.kind === 'highest' ? 'vs priciest app' : '';
+  return `<section><h3>Savings</h3>
+    <div class="big-number">${money(sum(confirmed))}</div>
+    <div class="muted" style="font-size:13px">confirmed across ${confirmed.length} order${confirmed.length === 1 ? '' : 's'}${profile.usualApp ? `, compared with ${PLATFORMS[profile.usualApp].label}, your usual app` : ', compared with the priciest app for the same order'}</div>
+    ${est.length ? `<div style="font-size:13px;margin-top:6px">+ ${money(sum(est))} estimated from ${est.length} order${est.length === 1 ? '' : 's'} you haven't confirmed</div>` : ''}
+    ${profile.orders.slice(-8).reverse().map(o => {
+      const s = orderSaving(o);
+      return `<div class="row"><span class="grow">${esc(o.restaurant)} · ${badge(o.platform)} <span class="muted">${new Date(o.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></span>
+        ${o.status === 'pending' ? `<button class="link-btn" data-confirm-order="${o.id}">Confirm</button>` : ''}
+        <span class="status ${o.status}">${label[o.status]}</span>
+        <b>${money(o.status === 'confirmed' ? o.paid : o.estTotal)}</b>
+        ${o.status !== 'declined' ? `<span class="muted" style="font-size:12px;min-width:90px;text-align:right">${s >= 0 ? 'saved ' + money(s) : 'cost ' + money(-s) + ' more'} ${vs(o)}</span>` : '<span style="min-width:90px"></span>'}</div>`;
+    }).join('')}
+  </section>`;
+}
+
+/* ==================================================================
+ * "Wrong price?" reports
+ * ================================================================== */
+function openReport(rid, itemId) {
+  const r = state.restaurants.find(x => x.id === rid); if (!r) return;
+  const on = PKEYS.filter(k => r.platforms[k]);
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form id="reportForm" data-rid="${esc(r.id)}">
+    <h2>Report a price at ${esc(r.name)}</h2>
+    <p class="muted" style="margin:0;font-size:14px">Spotted a different price, fee or deal? Tell us and we'll re-check it.</p>
+    <label class="field">What's wrong?
+      <select name="item">
+        ${r.menu.map(s => `<optgroup label="${esc(s.section)}">${s.items.map(it => `<option value="${esc(it.id)}" ${it.id === itemId ? 'selected' : ''}>${esc(it.name)}</option>`).join('')}</optgroup>`).join('')}
+        <option value="" ${itemId ? '' : 'selected'}>A deal, fee or something else</option>
+      </select></label>
+    <div class="field">Where?
+      <div class="radios">
+        <label><input type="radio" name="platform" value="instore"> In-store</label>
+        ${on.map((k, i) => `<label><input type="radio" name="platform" value="${k}" ${i === 0 ? 'checked' : ''}> ${PLATFORMS[k].label}</label>`).join('')}
+      </div></div>
+    <label class="field">Price you saw (optional)<input name="seen" inputmode="decimal" placeholder="e.g. 21.40"></label>
+    <label class="field">Anything else? (optional)<textarea name="note" placeholder="e.g. New menu, or there's a 20% off deal on DoorDash"></textarea></label>
+    <div class="dlg-actions"><button class="btn" type="submit">Send report</button><button class="btn secondary" type="button" data-close-dlg>Cancel</button></div>
+  </form>`;
+  dlg.showModal();
+}
+function submitReport(f, rid) {
+  const r = state.restaurants.find(x => x.id === rid); if (!r) return;
+  const it = f.get('item') ? findItem(r, f.get('item')) : null;
+  const platform = f.get('platform') || '';
+  const shown = it && platform ? (platform === 'instore' ? it.prices.instore : it.prices[platform]) : null;
+  const rp = { date: Date.now(), restaurantId: r.id, restaurant: r.name, item: it ? it.name : 'Deal, fee or other',
+               platform: platform === 'instore' ? '' : platform, where: platform === 'instore' ? 'In-store' : (PLATFORMS[platform]?.label || ''),
+               shown, seen: num(f.get('seen')), note: (f.get('note') || '').trim() };
+  profile.reports.push(rp); profile.reports = profile.reports.slice(-50); saveProfile();
+  $('#dlg').close();
+  if (REPORT_EMAIL) {
+    const body = [
+      `Restaurant: ${rp.restaurant} (${rp.restaurantId})`,
+      `What: ${rp.item}`,
+      `Where: ${rp.where || 'n/a'}`,
+      `${APP_NAME} shows: ${rp.shown != null ? money(rp.shown) : 'n/a'} (${freshness(r.source, it?.checkedAt || r.checkedAt).long})`,
+      `They saw: ${rp.seen != null ? money(rp.seen) : 'not given'}`,
+      `Note: ${rp.note || '-'}`,
+      `Reported: ${new Date(rp.date).toLocaleString('en-AU')}`,
+    ].join('\n');
+    location.href = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`${APP_NAME} price report: ${rp.restaurant}, ${rp.item}`)}&body=${encodeURIComponent(body)}`;
+    toast('Thanks! Your email app should open with the report ready to send.');
+  } else {
+    toast('Thanks! Report saved. (Reports aren’t sent anywhere until an email address is set up.)');
+  }
+  if (state.view === 'profile') rerenderInPlace();
+}
+
 $('#scrim').addEventListener('click', () => openCart(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#cart').classList.contains('open')) openCart(false); });
 

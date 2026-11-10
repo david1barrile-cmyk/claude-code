@@ -41,10 +41,34 @@ Data is picked in this order: spreadsheets loaded in the browser, then `data/*.c
   beat a 4.6 from 2,000. Under 50 reviews shows "few reviews".
 - **Profile** (stored on this device): memberships, new-customer status, dietary preferences
   (menu filter and V / VG / GF / 🌶 tags), saved addresses, favourites, light/dark and
-  high-contrast settings, and a **savings tracker** (each order vs the most expensive app for the same
-  order).
+  high-contrast settings, your usual app, price reports, and a **savings tracker** (see below).
 - **First-run question** about DashPass / Uber One and new-customer status. The header toggles
   still work.
+
+## Ordering and savings tracking
+
+Uber Eats and DoorDash have no public ordering API, so **Order** opens the restaurant's page
+there (`<platform>_url`), and the user adds the items in that app. Pickup opens Google Maps directions.
+
+Dinkum then asks whether the order went through:
+- When the user comes back to the tab (or opens Dinkum again within 24 hours): "Did you place your
+  order with Lantern Thai on Uber Eats?" → **Yes, it was $58.00** · **Yes, but the total was
+  different** (enter it) · **No** · *Ask me later*.
+- **Confirmed** orders count toward savings. Unanswered ones show separately as **estimates**
+  and stop being asked about after 24 hours (`CONFIRM_WINDOW_HOURS`).
+- Savings are measured against the user's **usual app** (asked during setup, editable in the
+  profile). If they haven't set one, the most expensive app for the same order is used instead.
+
+## "Wrong price?" reports
+
+Every menu item has a **Wrong price?** link, and each restaurant page has **Report a price or
+deal**. The form asks what's wrong, where (in-store / app), the price they saw and a note.
+
+Without a backend, the report is saved in the user's profile and, if `REPORT_EMAIL` is set at the
+top of the script in `index.html`, opens the user's email app with the report filled in and
+addressed to you. The user still has to press send. The address is visible in the page source, so
+use a dedicated inbox (e.g. reports@yourdomain), not a personal one. With a backend, reports go
+straight to a database and your admin screen instead.
 
 ## Deals and discounts
 
