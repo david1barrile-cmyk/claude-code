@@ -156,7 +156,13 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   walking time and a dot for how fresh the prices are (blue = live, grey = checked, orange = may be
   out of date). Screen readers hear the full sentence behind the badge.
 - **Dish search** across all restaurants, cheapest first ("pad thai").
-- **Menu prices:** every item shows its in-store price and every platform's price, with the cheapest highlighted.
+- **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
+  A **price strip** shows the in-store price at the left and one dot per platform, with its price
+  above and its name below; the cheapest is blue. Close prices keep a minimum gap and lift one
+  label a row, and platforms with the same price share a dot. **"up to +18%"** at the end is the
+  dearest app versus in-store (hidden under 5%). One badge gives the recommendation:
+  "Direct = In-store price", or "DD Lowest delivery · +15% vs in-store" plus "Pickup $19.50" when
+  every delivery option costs more. Items an app doesn't sell show "not on this app".
 - **Distance:** the address is looked up with OpenStreetMap's Nominatim, falling back to the
   suburb centre ("Distances are approximate"). There's also "Use my location". Each platform has
   a delivery radius, so a restaurant whose own delivery doesn't reach you says so.
