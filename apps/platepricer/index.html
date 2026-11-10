@@ -246,6 +246,16 @@ aside.cart.open { transform: none; visibility: visible; }
 .checkout { width: 100%; border: 0; border-radius: 12px; padding: 14px; font-weight: 800; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
 .checkout:disabled { opacity: .5; cursor: not-allowed; }
 .savings { text-align: center; font-size: 13px; color: var(--brand-text); margin-top: 8px; min-height: 18px; font-weight: 600; }
+/* Sponsored placements */
+.sp-label { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.card.sponsored { border-color: var(--brand); }
+.card.sponsored > .sp-label { position: absolute; top: 8px; left: 8px; z-index: 1; background: var(--surface); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); }
+.sp-banner { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.sp-img { width: 64px; height: 64px; border-radius: 12px; flex: none; display: grid; place-items: center; font-size: 30px; background-size: cover; background-position: center; }
+.sp-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 14px; }
+.sp-text b { font-size: 16px; }
+.sp-cta { flex: none; font-weight: 700; color: var(--brand-text); font-size: 14px; }
+@media (max-width: 640px) { .sp-banner { flex-wrap: wrap; } .sp-cta { width: 100%; text-align: right; } }
 dialog.modal { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text); width: min(460px, calc(100% - 32px)); padding: 20px; box-shadow: 0 20px 60px rgba(5,15,30,.3); }
 dialog.modal::backdrop { background: rgba(5,15,30,.45); }
 dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
@@ -318,7 +328,18 @@ document.querySelector('#home .name').textContent = APP_NAME;
 document.querySelector('#home .dot').textContent = APP_NAME[0];
 document.querySelector('#home').setAttribute('aria-label', APP_NAME + ' home');
 
-const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', promotions: 'data/promotions.csv' };
+const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', promotions: 'data/promotions.csv', sponsors: 'data/sponsors.csv' };
+// Google Sheet with tabs named restaurants, menu, promotions and sponsors. The sheet must be shared as
+// "Anyone with the link: Viewer". Everything in these tabs is public, so keep private notes elsewhere.
+const GOOGLE_SHEET_ID = '1qpm1Jf8LGJDo-gPqjRYV9fVIO8zGZjNc0pZ6DeTTXYo';
+const sheetCsvUrl = tab => `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+// Google Form for "Wrong price?" reports. Make a pre-filled link with these placeholder answers:
+// RESTAURANT, ITEM, WHERE, SHOWN, SEEN, NOTE, and paste it here. Leave empty to skip.
+const REPORT_FORM_PREFILL_URL = '';
+// Traffic analytics. Fill in one (or both) to switch tracking on. See README "Traffic".
+const ANALYTICS = { plausibleDomain: '', ga4MeasurementId: '' };
+// Where "Advertise on Dinkum" points (a Google Form, email link or page). Leave empty to hide the link.
+const ADVERTISE_URL = '';
 const STALE_AFTER_DAYS = 14;   // manual prices older than this are flagged
 // Where "Wrong price?" reports are emailed. The report opens in the user's own email app, addressed here.
 // Leave empty to only save reports on the device. Note: anything here is visible to anyone who views the page source.
@@ -450,6 +471,15 @@ function promotionsFromCSV(rows) {
     starts: parseDate(p.starts), ends: parseDate(p.ends), desc: p.description || '',
   }));
 }
+function sponsorsFromCSV(rows) {
+  const list = s => (s || '').split(/[;|]/).map(x => x.trim()).filter(Boolean);
+  return rows.filter(r => r.sponsor_id && ['banner', 'featured'].includes((r.placement || '').toLowerCase())).map(r => ({
+    id: r.sponsor_id, placement: r.placement.toLowerCase(), restaurantId: r.restaurant_id || '', advertiser: r.advertiser || '',
+    headline: r.headline || '', body: r.body || '', image: r.image_url || '', link: r.link_url || '', cta: r.cta || '',
+    suburbs: list(r.suburbs), cuisines: list(r.cuisines), starts: parseDate(r.starts), ends: parseDate(r.ends),
+    active: !/^(n|no|false|0|paused)$/i.test((r.active || '').trim()),
+  }));
+}
 function finalize(list) {
   for (const r of list) {
     for (const k of PKEYS) if (r.menu.some(s => s.items.some(it => it.prices[k] !== null))) r.platforms[k] = r.fees[k];
@@ -559,7 +589,14 @@ function demoData() {
   const week = new Date(now + 7 * day);
   const promotions = DEMO_PROMOS.map(([i, platform, type, value, minOrder, maxDiscount, item, membersOnly, newOnly, desc]) =>
     ({ restaurantId: `demo${i}`, platform, type, value, minOrder, maxDiscount, item, membersOnly, newOnly, starts: null, ends: week, desc }));
-  return { restaurants, promotions };
+  const sponsors = [
+    { id: 'demo-banner', placement: 'banner', restaurantId: 'demo0', advertiser: 'Lantern Thai Kitchen', headline: 'Lunch special at Lantern Thai',
+      body: 'Free spring rolls with any curry when you order direct, weekdays 11 to 3.', image: '', link: '', cta: 'See the menu',
+      suburbs: [], cuisines: [], starts: null, ends: week, active: true },
+    { id: 'demo-featured', placement: 'featured', restaurantId: 'demo9', advertiser: 'Cedar & Sumac', headline: '', body: '', image: '', link: '', cta: '',
+      suburbs: [], cuisines: [], starts: null, ends: week, active: true },
+  ];
+  return { restaurants, promotions, sponsors };
 }
 
 /* ==================================================================
@@ -580,7 +617,7 @@ const saveProfile = () => store.set('profile', profile);
 
 const state = {
   loc: store.get('loc', null),          // { label, lat, lng, approx }
-  restaurants: [], promotions: [], dataSource: 'demo',
+  restaurants: [], promotions: [], sponsors: [], dataSource: 'demo', sheetError: false,
   filters: { q: '', cuisine: 'All', suburb: 'All', price: 'any', rating: '0', sort: 'best', favs: false, deals: false },
   layout: 'list', view: 'landing', restaurantId: null, focusItem: null,
   cart: store.get('cart', { restaurantId: null, lines: [] }),
@@ -593,28 +630,38 @@ function applyTheme() {
   if (profile.contrast) el.setAttribute('data-contrast', 'high'); else el.removeAttribute('data-contrast');
 }
 
+async function fetchCsvSet(urls) {
+  const get = u => fetch(u, { cache: 'no-store' }).then(r => r.ok ? r.text() : '').catch(() => '');
+  const [a, b, c, d] = await Promise.all([get(urls.restaurants), get(urls.menu), get(urls.promotions), get(urls.sponsors)]);
+  if (!a || !b) return null;
+  const list = restaurantsFromCSV(parseCSV(a), parseCSV(b));
+  return list.length ? { list, promos: promotionsFromCSV(parseCSV(c)), sponsors: sponsorsFromCSV(parseCSV(d)) } : null;
+}
 async function loadData() {
+  // 1. The Google Sheet (the normal way to manage data)
+  if (GOOGLE_SHEET_ID) {
+    const got = await fetchCsvSet(Object.fromEntries(['restaurants', 'menu', 'promotions', 'sponsors'].map(t => [t, sheetCsvUrl(t)])));
+    if (got) return { ...got, source: 'sheet' };
+    state.sheetError = true;
+  }
   const uploaded = store.get('uploadedCsv', null);
   if (uploaded?.restaurants && uploaded?.menu) {
     const list = restaurantsFromCSV(parseCSV(uploaded.restaurants), parseCSV(uploaded.menu));
-    if (list.length) return { list, promos: promotionsFromCSV(parseCSV(uploaded.promotions)), source: 'uploaded' };
+    if (list.length) return { list, promos: promotionsFromCSV(parseCSV(uploaded.promotions)), sponsors: sponsorsFromCSV(parseCSV(uploaded.sponsors)), source: 'uploaded' };
   }
-  if (location.protocol !== 'file:') try {
-    const [a, b, c] = await Promise.all([fetch(DATA_FILES.restaurants), fetch(DATA_FILES.menu), fetch(DATA_FILES.promotions).catch(() => null)]);
-    if (a.ok && b.ok) {
-      const list = restaurantsFromCSV(parseCSV(await a.text()), parseCSV(await b.text()));
-      const promos = c && c.ok ? promotionsFromCSV(parseCSV(await c.text())) : [];
-      if (list.length) return { list, promos, source: 'files' };
-    }
-  } catch {}
+  if (location.protocol !== 'file:') {
+    const got = await fetchCsvSet(DATA_FILES);
+    if (got) return { ...got, source: 'files' };
+  }
   const demo = demoData();
-  return { list: demo.restaurants, promos: demo.promotions, source: 'demo' };
+  return { list: demo.restaurants, promos: demo.promotions, sponsors: demo.sponsors, source: 'demo' };
 }
 
 async function init() {
   applyTheme();
-  const { list, promos, source } = await loadData();
-  state.restaurants = list; state.promotions = promos; state.dataSource = source;
+  const { list, promos, sponsors, source } = await loadData();
+  state.restaurants = list; state.promotions = promos; state.sponsors = sponsors || []; state.dataSource = source;
+  loadAnalytics();
   const r = list.find(x => x.id === state.cart.restaurantId);
   if (!r || state.cart.lines.some(l => !findItem(r, l.itemId))) state.cart = { restaurantId: null, lines: [] };
   if (state.loc) state.view = profile.onboarded ? 'browse' : 'onboard';
@@ -833,6 +880,7 @@ function render() {
   else if (state.view === 'restaurant') app.innerHTML = restaurantView(state.restaurants.find(r => r.id === state.restaurantId));
   else { app.innerHTML = browseView(); renderResults(); }
   renderCart();
+  trackPage();
   if (state.focusItem) {
     const el = document.getElementById('item-' + CSS.escape(state.focusItem));
     state.focusItem = null;
@@ -942,12 +990,20 @@ function renderResults() {
         <span class="right">${best ? `${badge(best.k)} <b>${money(best.price)}</b>` : '<span class="muted">No delivery</span>'} <span class="muted" style="font-size:12px">in-store ${money(it.prices.instore)}</span></span>
       </button>`; }).join('')}</div>`;
   }
+  const banner = pickSponsor('banner', null);
+  const bannerHtml = banner ? bannerView(banner) : '';
   if (state.layout === 'map') {
-    el.innerHTML = head + dishes + '<div id="map" role="region" aria-label="Map of restaurants"></div>';
+    el.innerHTML = head + bannerHtml + dishes + '<div id="map" role="region" aria-label="Map of restaurants"></div>';
     drawMap(list);
   } else {
-    el.innerHTML = head + dishes + `<div class="grid">${list.map(cardView).join('') || '<div class="empty">No restaurants match those filters.</div>'}</div>`;
+    // A featured sponsor is pinned first, but only if it matches the current filters.
+    const feat = pickSponsor('featured', list);
+    const fr = feat && list.find(r => r.id === feat.restaurantId);
+    const rest = fr ? list.filter(r => r !== fr) : list;
+    el.innerHTML = head + bannerHtml + dishes + `<div class="grid">${fr ? cardView(fr, feat) : ''}${rest.map(r => cardView(r)).join('') || (fr ? '' : '<div class="empty">No restaurants match those filters.</div>')}</div>`;
+    if (fr) seen(feat);
   }
+  if (banner) seen(banner);
 }
 
 function bestLine(r) {
@@ -960,10 +1016,11 @@ function bestLine(r) {
   return `<div class="best-line">${badge(b.best)} Cheapest via ${PLATFORMS[b.best].label}${save >= 0.5 ? ` · saves ~${money(save)} vs ${PLATFORMS[b.worst].label}` : ''}</div>`;
 }
 
-function cardView(r) {
+function cardView(r, sponsor) {
   const km = distTo(r), v = valueLabel(r), deals = userDeals(r);
-  return `<div class="card">
-    <button class="open" data-open="${esc(r.id)}" aria-label="${esc(r.name)}">
+  return `<div class="card ${sponsor ? 'sponsored' : ''}">
+    ${sponsor ? `<span class="sp-label">Sponsored</span>` : ''}
+    <button class="open" data-open="${esc(r.id)}" ${sponsor ? `data-sponsor="${esc(sponsor.id)}"` : ''} aria-label="${esc(r.name)}${sponsor ? ' (sponsored)' : ''}">
       ${visual(r, 'banner')}
       <div class="body">
         <h3>${esc(r.name)}</h3>
@@ -981,9 +1038,75 @@ function cardView(r) {
   </div>`;
 }
 
+/* ==================================================================
+ * Sponsored placements. Always labelled "Sponsored", and they never change
+ * prices, the "cheapest" badges or the order of the other results.
+ * ================================================================== */
+function userSuburb() {
+  if (!state.loc) return null;
+  let best = null, bd = Infinity;
+  for (const [n, [lat, lng]] of Object.entries(SUBURBS)) { const d = distKm(state.loc, { lat, lng }); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+const sessionSeed = Math.floor(Math.random() * 1000);
+function pickSponsor(placement, list) {
+  const now = new Date(), sub = state.filters.suburb !== 'All' ? state.filters.suburb : userSuburb(), cui = state.filters.cuisine;
+  const ok = state.sponsors.filter(s => s.placement === placement && s.active &&
+    (!s.starts || s.starts <= now) && (!s.ends || s.ends >= new Date(now.toDateString())) &&
+    (!s.suburbs.length || (sub && s.suburbs.some(x => x.toLowerCase() === sub.toLowerCase()))) &&
+    (!s.cuisines.length || cui === 'All' || s.cuisines.some(x => x.toLowerCase() === cui.toLowerCase())) &&
+    (placement !== 'featured' || (list && list.some(r => r.id === s.restaurantId))));
+  return ok.length ? ok[sessionSeed % ok.length] : null;   // rotate between sponsors per visit
+}
+function bannerView(s) {
+  const r = state.restaurants.find(x => x.id === s.restaurantId);
+  const img = safeUrl(s.image) ? `<div class="sp-img" style="background-image:url('${esc(s.image)}')" role="img" aria-label=""></div>` : r ? `<div class="sp-img" style="background:hsl(${r.hue} 60% 86% / .6)" aria-hidden="true">${r.emoji}</div>` : '';
+  return `<button class="sp-banner" data-sponsor-banner="${esc(s.id)}">
+    ${img}
+    <span class="sp-text"><span class="sp-label">Sponsored${s.advertiser ? ' · ' + esc(s.advertiser) : ''}</span>
+      <b>${esc(s.headline || s.advertiser)}</b>${s.body ? `<span class="muted">${esc(s.body)}</span>` : ''}</span>
+    <span class="sp-cta">${esc(s.cta || 'Take a look')} →</span>
+  </button>`;
+}
+const seenThisVisit = new Set();
+function seen(s) { if (!seenThisVisit.has(s.id)) { seenThisVisit.add(s.id); track('Sponsor impression', { sponsor: s.id, placement: s.placement }); } }
+
+/* ==================================================================
+ * Traffic analytics (Plausible and/or Google Analytics 4). Does nothing until configured.
+ * ================================================================== */
+function loadAnalytics() {
+  if (loadAnalytics.done) return; loadAnalytics.done = true;
+  if (ANALYTICS.plausibleDomain) {
+    window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments); };
+    const s = document.createElement('script'); s.defer = true; s.dataset.domain = ANALYTICS.plausibleDomain;
+    s.src = 'https://plausible.io/js/script.manual.js'; document.head.appendChild(s);
+  }
+  if (ANALYTICS.ga4MeasurementId) {
+    const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(ANALYTICS.ga4MeasurementId); document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || []; window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date()); gtag('config', ANALYTICS.ga4MeasurementId, { send_page_view: false });
+  }
+}
+function track(name, props = {}) {
+  try {
+    if (window.plausible) window.plausible(name, { props });
+    if (window.gtag) window.gtag('event', name.toLowerCase().replace(/\s+/g, '_'), props);
+  } catch {}
+}
+let lastPage = '';
+function trackPage() {
+  const page = state.view === 'restaurant' ? '/restaurant/' + state.restaurantId : '/' + state.view;
+  if (page === lastPage) return; lastPage = page;
+  try {
+    if (window.plausible) window.plausible('pageview', { u: location.origin + page });
+    if (window.gtag) window.gtag('event', 'page_view', { page_path: page, page_title: state.view });
+  } catch {}
+}
+
 function dataBar() {
-  const label = { demo: 'Showing demo data (fictional restaurants and deals)', files: 'Showing prices from the data/ spreadsheets', uploaded: 'Showing your uploaded spreadsheets' }[state.dataSource];
-  return `<div class="data-bar"><span>${label}</span>
+  const label = { sheet: 'Prices from the Dinkum data sheet', demo: 'Showing demo data (fictional restaurants and deals)', files: 'Showing prices from the data/ spreadsheets', uploaded: 'Showing your uploaded spreadsheets' }[state.dataSource];
+  return `<div class="data-bar"><span>${label}${state.sheetError && state.dataSource !== 'sheet' ? ' · the Google Sheet is empty or not shared yet' : ''}</span>
+    ${safeUrl(ADVERTISE_URL) || /^mailto:/.test(ADVERTISE_URL) ? `<a href="${esc(ADVERTISE_URL)}" target="_blank" rel="noopener">Advertise on ${esc(APP_NAME)}</a>` : ''}
     <label class="mini">Load spreadsheets…<input type="file" id="csvInput" accept=".csv,text/csv" multiple></label>
     ${state.dataSource === 'uploaded' ? '<button id="clearCsv">Remove uploaded data</button>' : ''}
   </div>`;
@@ -1257,23 +1380,26 @@ async function loadCsvFiles(files) {
   for (const f of files) {
     const text = await f.text();
     const cols = Object.keys(parseCSV(text.split(/\r?\n/).slice(0, 2).join('\n'))[0] || {});
-    if (cols.includes('type') && cols.includes('platform')) got.promotions = text;
+    if (cols.includes('placement') && cols.includes('sponsor_id')) got.sponsors = text;
+    else if (cols.includes('type') && cols.includes('platform')) got.promotions = text;
     else if (cols.includes('item') || cols.includes('instore_price')) got.menu = text;
     else if (cols.includes('name') || cols.includes('suburb')) got.restaurants = text;
   }
   const prev = store.get('uploadedCsv', {}) || {};
-  const merged = { restaurants: got.restaurants || prev.restaurants, menu: got.menu || prev.menu, promotions: got.promotions || prev.promotions || '' };
+  const merged = { restaurants: got.restaurants || prev.restaurants, menu: got.menu || prev.menu, promotions: got.promotions || prev.promotions || '', sponsors: got.sponsors || prev.sponsors || '' };
   store.set('uploadedCsv', merged);
   if (!merged.restaurants || !merged.menu) return toast(`Now load ${merged.restaurants ? 'menu' : 'restaurants'}.csv too.`);
   const list = restaurantsFromCSV(parseCSV(merged.restaurants), parseCSV(merged.menu));
   if (!list.length) return toast('No restaurants with menu items found. Check the column names against the template.');
-  state.restaurants = list; state.promotions = promotionsFromCSV(parseCSV(merged.promotions)); state.dataSource = 'uploaded';
+  state.restaurants = list; state.promotions = promotionsFromCSV(parseCSV(merged.promotions)); state.sponsors = sponsorsFromCSV(parseCSV(merged.sponsors)); state.dataSource = 'uploaded';
   state.cart = { restaurantId: null, lines: [] }; store.set('cart', state.cart);
   state.filters = { ...state.filters, cuisine: 'All', suburb: 'All' };
   toast(`Loaded ${list.length} restaurant${list.length === 1 ? '' : 's'}${state.promotions.length ? ` and ${state.promotions.length} deals` : ''}.`); render();
 }
 function openRestaurant(id, itemId) {
   state.view = 'restaurant'; state.restaurantId = id; state.focusItem = itemId || null;
+  const r = state.restaurants.find(x => x.id === id);
+  if (r) track('View restaurant', { restaurant: r.name, suburb: r.suburb });
   render();
 }
 
@@ -1297,9 +1423,10 @@ document.addEventListener('submit', async e => {
     profile.onboarded = true; saveProfile(); state.view = 'browse'; render();
   }
 });
-let searchT;
+let searchT, trackT;
 document.addEventListener('input', e => {
-  if (e.target.id === 'search') { clearTimeout(searchT); searchT = setTimeout(() => { state.filters.q = e.target.value; renderResults(); }, 120); }
+  if (e.target.id === 'search') { clearTimeout(searchT); searchT = setTimeout(() => { state.filters.q = e.target.value; renderResults(); }, 120);
+    clearTimeout(trackT); trackT = setTimeout(() => { const q = state.filters.q.trim().toLowerCase(); if (q.length > 2) track('Search', { query: q.slice(0, 40) }); }, 1500); }
 });
 document.addEventListener('change', e => {
   const t = e.target;
@@ -1342,9 +1469,14 @@ document.addEventListener('click', async e => {
   else if (d.layout) { state.layout = d.layout; document.querySelectorAll('[data-layout]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.layout === state.layout))); renderResults(); }
   else if (d.toggleFilter) { state.filters[d.toggleFilter] = !state.filters[d.toggleFilter]; t.setAttribute('aria-pressed', String(state.filters[d.toggleFilter])); renderResults(); }
   else if (d.cuisine) { state.filters.cuisine = d.cuisine; document.querySelectorAll('[data-cuisine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cuisine === d.cuisine))); renderResults(); }
-  else if (d.open) openRestaurant(d.open, d.item);
+  else if (d.open) { if (d.sponsor) track('Sponsor click', { sponsor: d.sponsor, placement: 'featured' }); openRestaurant(d.open, d.item); }
   else if (d.nav) { state.view = d.nav; render(); }
-  else if (d.inc) changeQty(d.inc, 1);
+  else if (d.sponsorBanner) {
+    const s = state.sponsors.find(x => x.id === d.sponsorBanner); if (!s) return;
+    track('Sponsor click', { sponsor: s.id, placement: 'banner' });
+    if (safeUrl(s.link)) window.open(s.link, '_blank', 'noopener'); else if (s.restaurantId) openRestaurant(s.restaurantId);
+  }
+  else if (d.inc) { changeQty(d.inc, 1); track('Add to cart', {}); }
   else if (d.dec) changeQty(d.dec, -1);
   else if (d.choose) { state.choice = d.choose; renderCart(); }
   else if (t.id === 'checkout' && state.choice) {
@@ -1354,6 +1486,7 @@ document.addEventListener('click', async e => {
     const order = { id: String(Date.now()), date: Date.now(), restaurantId: r.id, restaurant: r.name, platform: state.choice,
                     estTotal: total, baseline: baselineFor(b, state.choice), status: 'pending', paid: null, items: state.cart.lines.reduce((a, l) => a + l.qty, 0) };
     profile.orders.push(order); saveProfile();
+    track('Order click', { platform: state.choice, restaurant: r.name });
     const url = state.choice === 'pickup'
       ? (r.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}` : '')
       : safeUrl(r.platforms[state.choice]?.url);
@@ -1416,6 +1549,7 @@ function answerOrder(id, answer, paid) {
   if (answer === 'no') { o.status = 'declined'; saveProfile(); dlg.close(); toast('Thanks. That order won’t count toward your savings.'); }
   if (answer === 'yes') {
     o.status = 'confirmed'; o.paid = r2(paid ?? o.estTotal); saveProfile(); dlg.close();
+    track('Order confirmed', { platform: o.platform, restaurant: o.restaurant, saved: Math.round(orderSaving(o)) });
     const s = orderSaving(o);
     const vs = o.baseline.kind === 'usual' ? `your usual ${PLATFORMS[o.baseline.platform].label}` : o.baseline.platform && o.baseline.platform !== 'pickup' ? PLATFORMS[o.baseline.platform].label : 'the alternatives';
     toast(s > 0.005 ? `Confirmed: you saved ${money(s)} vs ${vs}.` : 'Confirmed. Thanks!');
@@ -1483,8 +1617,19 @@ function submitReport(f, rid) {
                platform: platform === 'instore' ? '' : platform, where: platform === 'instore' ? 'In-store' : (PLATFORMS[platform]?.label || ''),
                shown, seen: num(f.get('seen')), note: (f.get('note') || '').trim() };
   profile.reports.push(rp); profile.reports = profile.reports.slice(-50); saveProfile();
+  track('Price report', { restaurant: rp.restaurant });
   $('#dlg').close();
-  if (REPORT_EMAIL) {
+  if (REPORT_FORM_PREFILL_URL) {
+    // Submit straight to the Google Form, so the user never leaves Dinkum.
+    try {
+      const u = new URL(REPORT_FORM_PREFILL_URL), map = { RESTAURANT: rp.restaurant, ITEM: rp.item, WHERE: rp.where || 'n/a',
+        SHOWN: rp.shown != null ? money(rp.shown) : 'n/a', SEEN: rp.seen != null ? money(rp.seen) : 'not given', NOTE: rp.note || '-' };
+      const fd = new URLSearchParams();
+      for (const [k, v] of u.searchParams) if (k.startsWith('entry.')) fd.append(k, map[v] ?? v);
+      fetch(REPORT_FORM_PREFILL_URL.split('?')[0].replace(/\/viewform$/, '/formResponse'), { method: 'POST', mode: 'no-cors', body: fd });
+      toast('Thanks! Your report has been sent.');
+    } catch { toast('Thanks! Report saved.'); }
+  } else if (REPORT_EMAIL) {
     const body = [
       `Restaurant: ${rp.restaurant} (${rp.restaurantId})`,
       `What: ${rp.item}`,

@@ -16,7 +16,65 @@ yourself. Cart totals include fees, your memberships and current deals.
   `python3 -m http.server` and open http://localhost:8000. Any static host works too. While the
   files are empty the site shows the demo.
 
-Data is picked in this order: spreadsheets loaded in the browser, then `data/*.csv`, then the demo.
+
+## Managing data in Google Sheets (Stage A)
+
+The site reads its data from the **Dinkum data** Google Sheet (`GOOGLE_SHEET_ID` at the top of the
+script in `index.html`). It has these tabs: `Guide`, `restaurants`, `menu`, `promotions` and `sponsors`.
+
+One-time setup:
+1. Open the sheet → **Share** → General access: **Anyone with the link** → **Viewer**.
+2. Fill in the tabs. Keep row 1 exactly as it is. Type dates as `2026-11-03`.
+
+Edits show on the site the next time someone loads it. Google can take a minute or two to pass
+changes on. Until the sheet has restaurants (or if it isn't shared), the site falls back to the
+demo and says so at the bottom of the restaurant list.
+
+Everything in these tabs is public. Keep sponsor pricing, contacts and invoices in a separate private sheet.
+
+Data is picked in this order: the Google Sheet, then spreadsheets loaded in the browser, then
+`data/*.csv`, then the demo.
+
+### Price reports via Google Form (optional)
+1. Create a Google Form with six short-answer questions: Restaurant, Item, Where, Dinkum price,
+   Price they saw, Note. In **Responses**, link it to the Dinkum data sheet and turn on
+   **Get email notifications for new responses**.
+2. ⋮ menu → **Get pre-filled link**. Type these answers: `RESTAURANT`, `ITEM`, `WHERE`, `SHOWN`,
+   `SEEN`, `NOTE` → **Get link** → copy it.
+3. Paste it into `REPORT_FORM_PREFILL_URL`. Reports are then submitted in the background, without
+   the user leaving the page, and you get an email for each one.
+
+## Sponsored placements
+
+Rows in the `sponsors` tab create paid placements:
+- **banner**: a strip above the results with the headline, text, image and button. It links to
+  `link_url`, or to the restaurant's page if that's blank.
+- **featured**: the restaurant's card pinned first in the list with a blue border.
+
+Both are labelled **Sponsored**. A featured card only appears when the restaurant matches the
+person's current filters. Neither changes prices, the "Cheapest" badges, or the order of the other
+results. Targeting: `suburbs` (the person's suburb or chosen suburb filter) and `cuisines`, each
+separated by `;`. Campaigns run between `starts` and `ends`. Set `active` to `no` to pause one.
+If several sponsors qualify, each visitor sees one, rotating between visits. `ADVERTISE_URL`
+shows an "Advertise on Dinkum" link.
+
+Labelling ads clearly matters under Australian Consumer Law (misleading conduct) as well as for trust.
+
+## Traffic
+
+Set one or both in `ANALYTICS` at the top of the script:
+- `plausibleDomain`: [Plausible](https://plausible.io) is a paid, privacy-friendly service with
+  no cookie banner needed.
+- `ga4MeasurementId`: Google Analytics 4 is free, but uses cookies; mention it in your privacy policy.
+
+Pages tracked: landing, onboarding, browse, profile and each restaurant (`/restaurant/<id>`).
+
+Events tracked: `Search` (query), `View restaurant`, `Add to cart`, `Order click` (platform and
+restaurant), `Order confirmed` (platform, restaurant, rounded saving), `Price report`,
+`Sponsor impression` and `Sponsor click` (by sponsor_id).
+
+Per-sponsor impressions and clicks are the numbers to show advertisers. Order clicks to
+"Direct" by restaurant are the numbers to show restaurants.
 
 ## Features
 

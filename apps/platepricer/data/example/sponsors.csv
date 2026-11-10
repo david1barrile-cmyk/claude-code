@@ -1,0 +1,3 @@
+sponsor_id,placement,restaurant_id,advertiser,headline,body,image_url,link_url,cta,suburbs,cuisines,starts,ends,active,notes
+thai-lunch-nov,banner,example-thai,Example Thai Kitchen,Lunch special,Free spring rolls with any curry when you order direct,,,See the menu,Newtown; Enmore,,2026-11-10,2026-11-24,yes,
+thai-featured-nov,featured,example-thai,Example Thai Kitchen,,,,,,,,2026-11-10,2026-11-24,yes,
