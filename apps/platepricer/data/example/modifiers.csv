@@ -1,0 +1,6 @@
+restaurant_id,applies_to,group,option,required,choose,instore_price,ubereats_price,doordash_price,direct_price,last_checked
+example-thai,Pad Thai,Protein,Chicken,yes,one,0,0,0,0,
+example-thai,Pad Thai,Protein,Prawn,yes,one,4.00,5.00,5.50,4.00,
+example-thai,section:Curries,Rice,Steamed jasmine,yes,one,0,0,0,0,
+example-thai,section:Curries,Rice,Coconut rice,yes,one,2.00,2.50,2.80,2.00,
+example-thai,all,Extras,Fried egg,no,many,2.50,3.20,3.50,2.50,

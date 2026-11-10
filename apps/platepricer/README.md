@@ -17,10 +17,47 @@ yourself. Cart totals include fees, your memberships and current deals.
   files are empty the site shows the demo.
 
 
+## Two pages: live and demo
+
+- **`index.html` (live):** real data only, from the Dinkum data Google Sheet (then `data/*.csv` when
+  hosted). If there's nothing to show yet, it says so. It never shows made-up restaurants.
+- **`demo.html` (demo):** made-up restaurants, prices, deals, options and ads, with a "Demo" ribbon.
+  It keeps its own profile and cart, so test orders never mix with real ones. **Load spreadsheets…**
+  is only available here.
+
+`demo.html` is generated from `index.html`. After editing `index.html`, run `./make-demo.sh`.
+
+## Item options (modifiers)
+
+Sizes, proteins, extras and so on go in the sheet's `modifiers` tab, one row per option:
+
+| Column | Example | Notes |
+|---|---|---|
+| `restaurant_id` | `lantern-thai` | |
+| `applies_to` | `Pad Thai`, `section:Curries`, `all` | An item name, every item in a menu section, or every item |
+| `group` | `Protein` | Options with the same group are shown together |
+| `option` | `Prawn` | |
+| `required` | `yes` | The customer must pick one (set on any row of the group) |
+| `choose` | `one` / `many` | Default: `one` if required, otherwise `many` |
+| `instore_price`, `ubereats_price`, `doordash_price`, `direct_price` | `4.00`, `5.00`, `5.50`, `4.00` | The **extra charge** on each platform. `0` = free; blank = not offered there |
+| `last_checked` | | Only if different from the restaurant's date |
+
+In the `menu` tab, put the item's price with its standard choice (e.g. chicken, regular size) and
+give that option a `0` charge.
+
+On the site:
+- Items with options show their groups and "add-ons up to +36% on Uber Eats".
+- **Choose options** opens a window where every option shows its extra charge in-store and on
+  each app, with the markup %. The item's total on every platform updates as options are picked.
+  A platform that doesn't offer a chosen option shows "not offered".
+- The restaurant summary compares the add-on markup with the item markup per app, e.g. "UE options
+  cost +30% vs in-store (items +16%)".
+- Cart lines list their options, and every total, deal and saving includes them.
+
 ## Managing data in Google Sheets (Stage A)
 
 The site reads its data from the **Dinkum data** Google Sheet (`GOOGLE_SHEET_ID` at the top of the
-script in `index.html`). It has these tabs: `Guide`, `restaurants`, `menu`, `promotions` and `sponsors`.
+script in `index.html`). It has these tabs: `Guide`, `restaurants`, `menu`, `modifiers`, `promotions` and `sponsors`.
 
 One-time setup:
 1. Open the sheet → **Share** → General access: **Anyone with the link** → **Viewer**.
@@ -32,8 +69,7 @@ demo and says so at the bottom of the restaurant list.
 
 Everything in these tabs is public. Keep sponsor pricing, contacts and invoices in a separate private sheet.
 
-Data is picked in this order: the Google Sheet, then spreadsheets loaded in the browser, then
-`data/*.csv`, then the demo.
+On the live page, data comes from the Google Sheet, then `data/*.csv`.
 
 ### Price reports via Google Form (optional)
 1. Create a Google Form with six short-answer questions: Restaurant, Item, Where, Dinkum price,

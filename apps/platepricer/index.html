@@ -246,6 +246,21 @@ aside.cart.open { transform: none; visibility: visible; }
 .checkout { width: 100%; border: 0; border-radius: 12px; padding: 14px; font-weight: 800; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
 .checkout:disabled { opacity: .5; cursor: not-allowed; }
 .savings { text-align: center; font-size: 13px; color: var(--brand-text); margin-top: 8px; min-height: 18px; font-weight: 600; }
+/* Modifiers */
+.mod-sum { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.mod-sum .pct, .addon-insight .pct { color: var(--warn); font-weight: 700; }
+.addon-insight { font-size: 13px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.customise { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+dialog.modal:has(#customiseForm) { width: min(620px, calc(100% - 32px)); }
+.mod-group { border: 0; padding: 0; margin: 16px 0 0; }
+.mod-group legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
+.mod-group legend .muted { font-weight: 400; font-size: 12px; }
+.mod-opt { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.mod-opt input { accent-color: var(--brand); width: 17px; height: 17px; }
+.mod-opt .prices { grid-column: 2; }
+.mod-name { font-weight: 600; }
+.mod-total { margin-top: 14px; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.demo-ribbon { background: var(--warn-soft); color: var(--warn); text-align: center; font-size: 13px; font-weight: 600; padding: 6px 16px; }
 /* Sponsored placements */
 .sp-label { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
 .card.sponsored { border-color: var(--brand); }
@@ -303,6 +318,7 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
   </div>
 </header>
 
+<div class="demo-ribbon" id="demoRibbon" hidden>Demo: these restaurants and prices are made up. <a href="index.html">Go to the live site</a></div>
 <main class="wrap" id="app"></main>
 
 <div class="scrim" id="scrim"></div>
@@ -328,8 +344,11 @@ document.querySelector('#home .name').textContent = APP_NAME;
 document.querySelector('#home .dot').textContent = APP_NAME[0];
 document.querySelector('#home').setAttribute('aria-label', APP_NAME + ' home');
 
-const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', promotions: 'data/promotions.csv', sponsors: 'data/sponsors.csv' };
-// Google Sheet with tabs named restaurants, menu, promotions and sponsors. The sheet must be shared as
+// 'live' reads only real data (the Google Sheet, then data/ files). 'demo' shows only made-up data.
+// demo.html is a copy of this file with DATA_MODE set to 'demo' (run ./make-demo.sh after editing).
+const DATA_MODE = 'live';
+const DATA_FILES = { restaurants: 'data/restaurants.csv', menu: 'data/menu.csv', modifiers: 'data/modifiers.csv', promotions: 'data/promotions.csv', sponsors: 'data/sponsors.csv' };
+// Google Sheet with tabs named restaurants, menu, modifiers, promotions and sponsors. The sheet must be shared as
 // "Anyone with the link: Viewer". Everything in these tabs is public, so keep private notes elsewhere.
 const GOOGLE_SHEET_ID = '1qpm1Jf8LGJDo-gPqjRYV9fVIO8zGZjNc0pZ6DeTTXYo';
 const sheetCsvUrl = tab => `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
@@ -416,7 +435,7 @@ function parseDate(v) {
   return isNaN(d) ? null : d;
 }
 
-function restaurantsFromCSV(restRows, menuRows) {
+function restaurantsFromCSV(restRows, menuRows, modRows = []) {
   const byId = new Map();
   for (const r of restRows) {
     const id = r.restaurant_id || r.name;
@@ -459,7 +478,13 @@ function restaurantsFromCSV(restRows, menuRows) {
     const prices = { instore };
     for (const k of PKEYS) prices[k] = num(m[`${k}_price`]);
     const tags = (m.tags || '').toLowerCase().split(/[;|,]/).map(t => t.trim()).filter(t => DIETS[t]);
-    s.items.push({ id: `${r.id}::${s.section}::${s.items.length}`, name: m.item, desc: m.description || '', prices, tags, photo: m.photo_url || '', checkedAt: parseDate(m.last_checked) });
+    s.items.push({ id: `${r.id}::${s.section}::${s.items.length}`, name: m.item, desc: m.description || '', prices, tags, photo: m.photo_url || '', checkedAt: parseDate(m.last_checked), groups: [] });
+  }
+  for (const m of modRows) {
+    const r = byId.get(m.restaurant_id); if (!r || !m.group || !m.option) continue;
+    const prices = { instore: num(m.instore_price) ?? 0 };
+    for (const k of PKEYS) prices[k] = num(m[`${k}_price`]);
+    addModifier(r, (m.applies_to || 'all').trim(), m.group, m.option, yes(m.required), (m.choose || '').toLowerCase(), prices, parseDate(m.last_checked));
   }
   return finalize([...byId.values()]);
 }
@@ -471,6 +496,20 @@ function promotionsFromCSV(rows) {
     starts: parseDate(p.starts), ends: parseDate(p.ends), desc: p.description || '',
   }));
 }
+// Attach one modifier option to every item it applies to: an item name, "section:Name" or "all".
+function addModifier(r, appliesTo, groupName, optionName, required, choose, prices, checkedAt) {
+  const target = appliesTo.toLowerCase();
+  for (const s of r.menu) for (const it of s.items) {
+    const hit = target === 'all' || target === '*' || (target.startsWith('section:') && target.slice(8).trim() === s.section.toLowerCase()) || target === it.name.toLowerCase();
+    if (!hit) continue;
+    let g = it.groups.find(x => x.name.toLowerCase() === groupName.toLowerCase());
+    if (!g) { g = { name: groupName, required: false, multi: null, options: [] }; it.groups.push(g); }
+    if (required) g.required = true;
+    if (choose === 'one' || choose === 'many') g.multi = choose === 'many';
+    if (g.options.some(o => o.name.toLowerCase() === optionName.toLowerCase())) continue;
+    g.options.push({ id: `${it.id}::o${it.groups.indexOf(g)}.${g.options.length}`, name: optionName, prices: { ...prices }, checkedAt });
+  }
+}
 function sponsorsFromCSV(rows) {
   const list = s => (s || '').split(/[;|]/).map(x => x.trim()).filter(Boolean);
   return rows.filter(r => r.sponsor_id && ['banner', 'featured'].includes((r.placement || '').toLowerCase())).map(r => ({
@@ -481,6 +520,10 @@ function sponsorsFromCSV(rows) {
   }));
 }
 function finalize(list) {
+  for (const r of list) for (const s of r.menu) for (const it of s.items) {
+    it.groups = it.groups || [];
+    for (const g of it.groups) if (g.multi === null) g.multi = !g.required;   // default: required = pick one, optional = tick several
+  }
   for (const r of list) {
     for (const k of PKEYS) if (r.menu.some(s => s.items.some(it => it.prices[k] !== null))) r.platforms[k] = r.fees[k];
     for (const s of r.menu) for (const it of s.items) it.checkedAt = it.checkedAt || r.checkedAt;
@@ -519,6 +562,25 @@ const DEMO_MENUS = {
   Mexican: { Tacos: [['Carnitas Taco', '', 8, ['gluten-free']], ['Fish Taco', 'Battered fish, slaw', 8.5], ['Mushroom Taco', '', 7.5, VGF]],
           Burritos: [['Chicken Burrito', 'Rice, beans, salsa', 19], ['Bean Burrito', 'Black beans, rice, salsa', 17, VG]],
           Sides: [['Corn Chips & Guac', '', 12, VGF], ['Churros', 'Dulce de leche', 10, V]] },
+};
+// Demo options: applies_to, group, option, required, choose, extra in-store charge
+const DEMO_MODS = {
+  Thai: [['section:Noodles', 'Protein', 'Chicken', true, 'one', 0], ['section:Noodles', 'Protein', 'Beef', true, 'one', 2], ['section:Noodles', 'Protein', 'Prawn', true, 'one', 4], ['section:Noodles', 'Protein', 'Tofu', true, 'one', 0],
+         ['section:Curries', 'Rice', 'Steamed jasmine', true, 'one', 0], ['section:Curries', 'Rice', 'Coconut rice', true, 'one', 2],
+         ['all', 'Extras', 'Fried egg', false, 'many', 2.5], ['all', 'Extras', 'Extra vegetables', false, 'many', 3]],
+  Vietnamese: [['section:Pho', 'Size', 'Regular', true, 'one', 0], ['section:Pho', 'Size', 'Large', true, 'one', 3],
+         ['section:Pho', 'Extras', 'Extra beef', false, 'many', 4], ['section:Banh Mi', 'Extras', 'Extra chilli', false, 'many', 0], ['section:Banh Mi', 'Extras', 'Fried egg', false, 'many', 2]],
+  Italian: [['section:Pasta', 'Pasta', 'Regular', true, 'one', 0], ['section:Pasta', 'Pasta', 'Gluten-free', true, 'one', 4],
+         ['section:Pizza', 'Extras', 'Burrata', false, 'many', 8], ['section:Pizza', 'Extras', 'Extra cheese', false, 'many', 3]],
+  Burgers: [['section:Burgers', 'Make it a meal', 'Burger only', true, 'one', 0], ['section:Burgers', 'Make it a meal', 'With chips and drink', true, 'one', 7],
+         ['section:Burgers', 'Extras', 'Bacon', false, 'many', 3], ['section:Burgers', 'Extras', 'Extra patty', false, 'many', 5], ['section:Burgers', 'Extras', 'Extra cheese', false, 'many', 1.5]],
+  Indian: [['section:Curries', 'Rice', 'No rice', true, 'one', 0], ['section:Curries', 'Rice', 'Basmati rice', true, 'one', 4], ['section:Curries', 'Rice', 'Saffron rice', true, 'one', 5],
+         ['section:Curries', 'Heat', 'Mild', true, 'one', 0], ['section:Curries', 'Heat', 'Hot', true, 'one', 0]],
+  Lebanese: [['section:Wraps', 'Extras', 'Extra toum', false, 'many', 1], ['section:Wraps', 'Extras', 'Add halloumi', false, 'many', 4],
+         ['section:Plates', 'Extras', 'Extra meat', false, 'many', 6]],
+  Japanese: [['section:Ramen', 'Toppings', 'Extra chashu', false, 'many', 5], ['section:Ramen', 'Toppings', 'Soft egg', false, 'many', 2.5], ['section:Ramen', 'Toppings', 'Extra noodles', false, 'many', 3]],
+  Chinese: [['section:Mains', 'Rice', 'No rice', true, 'one', 0], ['section:Mains', 'Rice', 'Steamed rice', true, 'one', 3]],
+  Mexican: [['section:Burritos', 'Extras', 'Guacamole', false, 'many', 3.5], ['section:Burritos', 'Extras', 'Sour cream', false, 'many', 1.5], ['section:Tacos', 'Extras', 'Guacamole', false, 'many', 2]],
 };
 const DEMO_RESTAURANTS = [
   // name, suburb, cuisine, tier, source, days since manual check
@@ -573,7 +635,7 @@ function demoData() {
       items: items.map(([n, d, base, tags], j) => {
         const instore = Math.round(base * mult * 2) / 2;
         const mk = m => m === null ? null : (m === 0 ? instore : to10c(instore * (1 + Math.max(0, m + (rand() - 0.5) * 0.06))));
-        return { id: `demo${i}::${section}::${j}`, name: n, desc: d, tags: tags || [], photo: '', checkedAt: null,
+        return { id: `demo${i}::${section}::${j}`, name: n, desc: d, tags: tags || [], photo: '', checkedAt: null, groups: [],
                  prices: { instore, ubereats: mk(ueMark), doordash: mk(ddMark), direct: mk(directMark) } };
       }),
     }));
@@ -581,6 +643,13 @@ function demoData() {
     const ratings = [{ src: 'Google', rating: r2(3.9 + rand() * 1.0), count: gCount }];
     if (ueMark !== null) ratings.push({ src: 'Uber Eats', rating: r2(4.0 + rand() * 0.9), count: Math.floor(rand() * 900) + 8 });
     if (ddMark !== null) ratings.push({ src: 'DoorDash', rating: r2(4.0 + rand() * 0.9), count: Math.floor(rand() * 600) + 5 });
+    const rest = { id: `demo${i}`, menu };
+    // Apps tend to mark add-ons up a bit more than the items themselves.
+    for (const [applies, group, option, required, choose, extra] of DEMO_MODS[cuisine] || []) {
+      const app = m => m === null ? null : (rand() < 0.06 ? null : to10c(extra * (1 + m + 0.04 + rand() * 0.14)));
+      addModifier(rest, applies, group, option, required, choose,
+        { instore: extra, ubereats: app(ueMark), doordash: app(ddMark), direct: directMark === null ? null : to10c(extra * (1 + directMark)) }, null);
+    }
     return { id: `demo${i}`, name, suburb, address: `${10 + Math.floor(rand() * 400)} ${pick(['King St', 'Enmore Rd', 'Marrickville Rd', 'Illawarra Rd', 'Addison Rd'])}, ${suburb}`,
              cuisine, emoji, hue, photo: '', tier, ratings, source, checkedAt, feesFrom: 'King St, Newtown',
              lat: clat + (rand() - 0.5) * 0.008, lng: clng + (rand() - 0.5) * 0.01, pickup: rand() > 0.1,
@@ -603,8 +672,10 @@ function demoData() {
  * Profile + state
  * ================================================================== */
 const store = {
-  get(k, d) { try { const v = localStorage.getItem('pp:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { v === undefined ? localStorage.removeItem('pp:' + k) : localStorage.setItem('pp:' + k, JSON.stringify(v)); } catch {} },
+  // The demo keeps its own profile and cart, so test orders never mix with real ones.
+  prefix: DATA_MODE === 'demo' ? 'ppdemo:' : 'pp:',
+  get(k, d) { try { const v = localStorage.getItem(this.prefix + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { v === undefined ? localStorage.removeItem(this.prefix + k) : localStorage.setItem(this.prefix + k, JSON.stringify(v)); } catch {} },
 };
 const DEFAULT_PROFILE = { onboarded: false, addresses: [], members: { doordash: false, ubereats: false }, newTo: { doordash: false, ubereats: false },
   usualApp: '', diet: [], favs: [], orders: [], reports: [], theme: 'system', contrast: false };
@@ -632,38 +703,46 @@ function applyTheme() {
 
 async function fetchCsvSet(urls) {
   const get = u => fetch(u, { cache: 'no-store' }).then(r => r.ok ? r.text() : '').catch(() => '');
-  const [a, b, c, d] = await Promise.all([get(urls.restaurants), get(urls.menu), get(urls.promotions), get(urls.sponsors)]);
+  const [a, b, c, d, e] = await Promise.all([get(urls.restaurants), get(urls.menu), get(urls.promotions), get(urls.sponsors), get(urls.modifiers)]);
   if (!a || !b) return null;
-  const list = restaurantsFromCSV(parseCSV(a), parseCSV(b));
+  const list = restaurantsFromCSV(parseCSV(a), parseCSV(b), parseCSV(e));
   return list.length ? { list, promos: promotionsFromCSV(parseCSV(c)), sponsors: sponsorsFromCSV(parseCSV(d)) } : null;
 }
 async function loadData() {
-  // 1. The Google Sheet (the normal way to manage data)
+  if (DATA_MODE === 'demo') {
+    // Demo: made-up data, or spreadsheets loaded in this browser for testing.
+    const uploaded = store.get('uploadedCsv', null);
+    if (uploaded?.restaurants && uploaded?.menu) {
+      const list = restaurantsFromCSV(parseCSV(uploaded.restaurants), parseCSV(uploaded.menu), parseCSV(uploaded.modifiers));
+      if (list.length) return { list, promos: promotionsFromCSV(parseCSV(uploaded.promotions)), sponsors: sponsorsFromCSV(parseCSV(uploaded.sponsors)), source: 'uploaded' };
+    }
+    const demo = demoData();
+    return { list: demo.restaurants, promos: demo.promotions, sponsors: demo.sponsors, source: 'demo' };
+  }
+  // Live: 1. the Google Sheet (the normal way to manage data)
   if (GOOGLE_SHEET_ID) {
-    const got = await fetchCsvSet(Object.fromEntries(['restaurants', 'menu', 'promotions', 'sponsors'].map(t => [t, sheetCsvUrl(t)])));
+    const got = await fetchCsvSet(Object.fromEntries(['restaurants', 'menu', 'modifiers', 'promotions', 'sponsors'].map(t => [t, sheetCsvUrl(t)])));
     if (got) return { ...got, source: 'sheet' };
     state.sheetError = true;
   }
-  const uploaded = store.get('uploadedCsv', null);
-  if (uploaded?.restaurants && uploaded?.menu) {
-    const list = restaurantsFromCSV(parseCSV(uploaded.restaurants), parseCSV(uploaded.menu));
-    if (list.length) return { list, promos: promotionsFromCSV(parseCSV(uploaded.promotions)), sponsors: sponsorsFromCSV(parseCSV(uploaded.sponsors)), source: 'uploaded' };
-  }
+  // 2. data/*.csv next to the page (when the site is hosted)
   if (location.protocol !== 'file:') {
     const got = await fetchCsvSet(DATA_FILES);
     if (got) return { ...got, source: 'files' };
   }
-  const demo = demoData();
-  return { list: demo.restaurants, promos: demo.promotions, sponsors: demo.sponsors, source: 'demo' };
+  // Nothing yet: show an empty state, never made-up data.
+  return { list: [], promos: [], sponsors: [], source: 'empty' };
 }
 
 async function init() {
   applyTheme();
+  if (DATA_MODE === 'demo') { $('#demoRibbon').hidden = false; document.title = APP_NAME + ' demo'; }
   const { list, promos, sponsors, source } = await loadData();
   state.restaurants = list; state.promotions = promos; state.sponsors = sponsors || []; state.dataSource = source;
   loadAnalytics();
+  state.cart.lines = state.cart.lines.map(l => l.key ? l : { key: l.itemId, itemId: l.itemId, opts: [], qty: l.qty });
   const r = list.find(x => x.id === state.cart.restaurantId);
-  if (!r || state.cart.lines.some(l => !findItem(r, l.itemId))) state.cart = { restaurantId: null, lines: [] };
+  if (!r || state.cart.lines.some(l => !findItem(r, l.itemId) || l.opts.some(o => !findOption(findItem(r, l.itemId), o)))) state.cart = { restaurantId: null, lines: [] };
   if (state.loc) state.view = profile.onboarded ? 'browse' : 'onboard';
   render();
   setTimeout(askAboutOrder, 800);
@@ -773,7 +852,7 @@ function promoDiscount(p, r, lines, platform, subtotal, delivery) {
   if (p.type === 'free_delivery') return delivery;
   if (p.type === 'bogo') {
     let d = 0;
-    for (const l of lines) { const it = findItem(r, l.itemId); if (it && it.name.toLowerCase() === p.item.toLowerCase()) d += Math.floor(l.qty / 2) * (it.prices[platform] ?? 0); }
+    for (const l of lines) { const it = findItem(r, l.itemId); if (it && it.name.toLowerCase() === p.item.toLowerCase()) d += Math.floor(l.qty / 2) * (unitPrice(r, l, platform).price ?? 0); }
     return d;
   }
   return 0;
@@ -790,10 +869,10 @@ function quote(r, lines, platform) {
   if (km != null && km > p.radius) return { available: false, reason: `Doesn't deliver to you (${fmtKm(km)} away, limit ${p.radius} km)` };
   let subtotal = 0, instore = 0; const missing = [];
   for (const line of lines) {
-    const it = findItem(r, line.itemId);
-    instore += it.prices.instore * line.qty;
-    if (it.prices[platform] === null) { missing.push(it.name); continue; }
-    subtotal += it.prices[platform] * line.qty;
+    instore += unitPrice(r, line, 'instore').price * line.qty;
+    const u = unitPrice(r, line, platform);
+    if (u.missing) { missing.push(u.missing); continue; }
+    subtotal += u.price * line.qty;
   }
   if (missing.length) return { available: false, reason: `Unavailable: ${missing.join(', ')}` };
   const mem = MEMBERSHIPS[platform], isMember = !!(mem && profile.members[platform]);
@@ -820,11 +899,11 @@ function quote(r, lines, platform) {
 }
 function quotePickup(r, lines) {
   if (!r.pickup) return { available: false, reason: 'No pickup at this restaurant' };
-  const instore = lines.reduce((a, l) => a + findItem(r, l.itemId).prices.instore * l.qty, 0);
+  const instore = lines.reduce((a, l) => a + unitPrice(r, l, 'instore').price * l.qty, 0);
   const km = distTo(r);
   return { available: true, total: r2(instore), subtotal: r2(instore), walk: km != null ? walkMin(km) : null, km, totalInflation: 0 };
 }
-const typicalLines = r => r.menu.map(s => ({ itemId: s.items[0].id, qty: 1 }));
+const typicalLines = r => r.menu.map(s => { const it = s.items[0], opts = defaultOpts(it); return { key: lineKey(it.id, opts), itemId: it.id, opts, qty: 1 }; });
 function bestWay(r, lines = typicalLines(r)) {
   const quotes = Object.fromEntries(PKEYS.map(k => [k, quote(r, lines, k)]));
   const avail = PKEYS.filter(k => quotes[k].available).sort((a, b) => quotes[a].total - quotes[b].total);
@@ -840,6 +919,33 @@ function valueLabel(r) {
   return ['poor', 'Pricey to deliver'];
 }
 function findItem(r, id) { for (const s of r.menu) for (const it of s.items) if (it.id === id) return it; return null; }
+function findOption(it, oid) { for (const g of it?.groups || []) for (const o of g.options) if (o.id === oid) return o; return null; }
+const lineKey = (itemId, opts) => opts.length ? itemId + '|' + [...opts].sort().join(',') : itemId;
+// Price of one unit of a cart line (item plus its options) on a platform ('instore' too).
+// Returns { price } or { missing: name } when the item or an option isn't offered there.
+function unitPrice(r, l, platform) {
+  const it = findItem(r, l.itemId);
+  if (it.prices[platform] === null || it.prices[platform] === undefined) return { missing: it.name };
+  let price = it.prices[platform];
+  for (const oid of l.opts) {
+    const o = findOption(it, oid); const d = o?.prices[platform];
+    if (d === null || d === undefined) return { missing: `${it.name} (${o?.name || 'option'})` };
+    price += d;
+  }
+  return { price };
+}
+const optionNames = (r, l) => { const it = findItem(r, l.itemId); return l.opts.map(o => findOption(it, o)?.name).filter(Boolean); };
+const defaultOpts = it => (it.groups || []).filter(g => g.required && g.options.length).map(g => g.options[0].id);
+// Average markup the apps put on paid add-ons, compared with the item markup, per platform.
+function modifierMarkup(r, k) {
+  const add = [], base = [];
+  for (const s of r.menu) for (const it of s.items) {
+    if (it.prices[k] !== null) base.push(it.prices[k] / it.prices.instore - 1);
+    for (const g of it.groups) for (const o of g.options) if (o.prices.instore > 0 && o.prices[k] != null) add.push(o.prices[k] / o.prices.instore - 1);
+  }
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  return { addons: avg(add), items: avg(base), count: add.length };
+}
 function cheapestItemPrice(r, it) {
   let best = null;
   for (const k of PKEYS) {
@@ -973,6 +1079,7 @@ function browseView() {
 
 function renderResults() {
   const el = $('#results'); if (!el) return;
+  if (!state.restaurants.length) { el.innerHTML = emptyState(); return; }
   const list = filteredRestaurants(), q = state.filters.q.trim().toLowerCase();
   const head = `<div class="results-head"><h2>${list.length} restaurant${list.length === 1 ? '' : 's'}${state.loc ? ' near you' : ''}</h2>
     ${state.loc?.approx ? `<span class="muted" style="font-size:13px">Distances are approximate${state.loc.unknown ? ' (address not found)' : ''}</span>` : ''}</div>`;
@@ -1103,11 +1210,20 @@ function trackPage() {
   } catch {}
 }
 
+function emptyState() {
+  return `<div class="panel" style="text-align:center">
+    <h2>No restaurants yet</h2>
+    <p class="muted">${state.sheetError
+      ? 'The Dinkum data sheet couldn’t be read. Check it’s shared as “Anyone with the link: Viewer” and has at least one restaurant with menu items.'
+      : 'Add restaurants and menu items to the Dinkum data sheet, then reload this page.'}</p>
+    <p><a href="demo.html">See the demo with example restaurants →</a></p>
+  </div>`;
+}
 function dataBar() {
-  const label = { sheet: 'Prices from the Dinkum data sheet', demo: 'Showing demo data (fictional restaurants and deals)', files: 'Showing prices from the data/ spreadsheets', uploaded: 'Showing your uploaded spreadsheets' }[state.dataSource];
+  const label = { sheet: 'Prices from the Dinkum data sheet', demo: 'Demo: fictional restaurants, prices and deals', files: 'Showing prices from the data/ spreadsheets', uploaded: 'Demo: showing your uploaded spreadsheets', empty: 'No restaurants yet' }[state.dataSource];
   return `<div class="data-bar"><span>${label}${state.sheetError && state.dataSource !== 'sheet' ? ' · the Google Sheet is empty or not shared yet' : ''}</span>
     ${safeUrl(ADVERTISE_URL) || /^mailto:/.test(ADVERTISE_URL) ? `<a href="${esc(ADVERTISE_URL)}" target="_blank" rel="noopener">Advertise on ${esc(APP_NAME)}</a>` : ''}
-    <label class="mini">Load spreadsheets…<input type="file" id="csvInput" accept=".csv,text/csv" multiple></label>
+    ${DATA_MODE === 'demo' ? '<a href="index.html">Go to the live site</a><label class="mini">Load spreadsheets…<input type="file" id="csvInput" accept=".csv,text/csv" multiple></label>' : '<a href="demo.html">See the demo</a>'}
     ${state.dataSource === 'uploaded' ? '<button id="clearCsv">Remove uploaded data</button>' : ''}
   </div>`;
 }
@@ -1144,7 +1260,7 @@ async function drawMap(list) {
 /* ---------- Restaurant ---------- */
 function restaurantView(r) {
   if (!r) { state.view = 'browse'; return browseView(); }
-  const qtyOf = id => state.cart.restaurantId === r.id ? (state.cart.lines.find(l => l.itemId === id)?.qty || 0) : 0;
+  const qtyOf = id => state.cart.restaurantId === r.id ? state.cart.lines.filter(l => l.itemId === id).reduce((a, l) => a + l.qty, 0) : 0;
   const on = PKEYS.filter(k => r.platforms[k]);
   const km = distTo(r);
   const rf = freshness(r.source, r.checkedAt);
@@ -1171,6 +1287,7 @@ function restaurantView(r) {
         ${b.pickup.available ? `<span class="o">${badge('pickup')} ${money(b.pickup.total)}${b.pickup.walk ? ` · ${b.pickup.walk} min walk` : ''}</span>` : ''}
         ${PKEYS.filter(k => r.platforms[k] && !b.quotes[k].available).map(k => `<span class="o na">${badge(k)} ${esc(b.quotes[k].reason)}</span>`).join('')}
       </div>
+      ${addonInsight(r, on)}
     </div>
     ${allPromos.length ? `<div class="deals">${allPromos.map(p => { const bl = promoBlocker(p); return `<div class="deal-row">🏷 ${badge(p.platform)} <span>${esc(promoLabel(p))}</span><span class="why">${bl ? esc(bl) : p.ends ? 'Until ' + fmtDate(p.ends) : ''}</span></div>`; }).join('')}</div>` : ''}
     <details class="fees"><summary>Fees and delivery area${r.feesFrom ? ` (checked from ${esc(r.feesFrom)})` : ''}</summary>
@@ -1198,6 +1315,20 @@ function restaurantView(r) {
     <div style="height:32px"></div>`;
 }
 
+function worstAddon(it, on) {
+  let w = null;
+  for (const g of it.groups) for (const o of g.options) for (const k of on) {
+    if (k === 'direct' || !(o.prices.instore > 0) || o.prices[k] == null) continue;
+    const m = o.prices[k] / o.prices.instore - 1;
+    if (m > 0.004 && (!w || m > w.m)) w = { k, m };
+  }
+  return w;
+}
+function addonInsight(r, on) {
+  const rows = on.filter(k => k !== 'direct').map(k => [k, modifierMarkup(r, k)]).filter(([, m]) => m.count && m.addons != null);
+  if (!rows.length) return '';
+  return `<div class="addon-insight"><b>Add-ons:</b> ${rows.map(([k, m]) => `${badge(k)} options cost <span class="pct">${pct(m.addons)}</span> vs in-store${m.items != null && m.addons - m.items > 0.02 ? ` <span class="muted">(items ${pct(m.items)})</span>` : ''}`).join(' · ')}</div>`;
+}
 function itemView(r, it, on, q, rf) {
   const best = cheapestItemPrice(r, it);
   const itf = freshness(r.source, it.checkedAt);
@@ -1217,10 +1348,13 @@ function itemView(r, it, on, q, rf) {
         <span class="price instore">In-store <b>${money(it.prices.instore)}</b></span>
         ${on.map(chip).join('')}
       </div>
+      ${it.groups.length ? `<div class="mod-sum">${esc(it.groups.map(g => g.name).join(' · '))}${(() => { const w = worstAddon(it, on); return w ? ` · <span class="pct">add-ons up to ${pct(w.m)} on ${PLATFORMS[w.k].label}</span>` : ''; })()}</div>` : ''}
       <button class="link-btn report-link" data-report="${esc(it.id)}">Wrong price?</button>
       ${ownDate || (itf.cls === 'stale' && rf.cls !== 'stale') ? `<div style="margin-top:6px">${freshTag(itf)}</div>` : ''}
     </div>
-    <div class="actions">${q
+    <div class="actions">${it.groups.length
+      ? `<button class="btn secondary customise" data-customise="${esc(it.id)}">${q ? `${q} in cart · ` : ''}Choose options</button>`
+      : q
       ? `<div class="qty"><button data-dec="${esc(it.id)}" aria-label="Remove one ${esc(it.name)}">−</button><b>${q}</b><button data-inc="${esc(it.id)}" aria-label="Add one ${esc(it.name)}">+</button></div>`
       : `<button class="add" data-inc="${esc(it.id)}" aria-label="Add ${esc(it.name)} to cart">+</button>`}</div>
   </div>`;
@@ -1284,7 +1418,7 @@ function renderCart() {
   $('#cartTitle').textContent = r.name;
   const b = bestWay(r, cart.lines), quotes = b.quotes, pk = b.pickup;
   if (!state.choice || (state.choice === 'pickup' ? !pk.available : !quotes[state.choice]?.available)) state.choice = b.best || (pk.available ? 'pickup' : null);
-  const instore = cart.lines.reduce((a, l) => a + findItem(r, l.itemId).prices.instore * l.qty, 0);
+  const instore = cart.lines.reduce((a, l) => a + unitPrice(r, l, 'instore').price * l.qty, 0);
 
   const optView = k => {
     const q = quotes[k];
@@ -1307,9 +1441,9 @@ function renderCart() {
   };
   const cheapestDelivery = b.best ? quotes[b.best].total : null;
   body.innerHTML = `
-    ${cart.lines.map(l => { const it = findItem(r, l.itemId); return `<div class="line">
-      <div class="qty"><button data-dec="${esc(it.id)}" aria-label="Remove one ${esc(it.name)}">−</button><b>${l.qty}</b><button data-inc="${esc(it.id)}" aria-label="Add one ${esc(it.name)}">+</button></div>
-      <span style="flex:1">${esc(it.name)}</span><span>${money(it.prices.instore * l.qty)} <small class="muted">in-store</small></span></div>`; }).join('')}
+    ${cart.lines.map(l => { const it = findItem(r, l.itemId), on = optionNames(r, l); return `<div class="line">
+      <div class="qty"><button data-dec="${esc(l.key)}" aria-label="Remove one ${esc(it.name)}">−</button><b>${l.qty}</b><button data-inc="${esc(l.key)}" aria-label="Add one ${esc(it.name)}">+</button></div>
+      <span style="flex:1">${esc(it.name)}${on.length ? `<br><small class="muted">${esc(on.join(', '))}</small>` : ''}</span><span>${money(unitPrice(r, l, 'instore').price * l.qty)} <small class="muted">in-store</small></span></div>`; }).join('')}
     <h3 class="compare-title">Compare this order</h3>
     <div class="cart-fresh">${cartFreshness(r)}</div>
     <div class="instore-ref"><span>In-store price</span><b>${money(r2(instore))}</b></div>
@@ -1346,7 +1480,8 @@ async function setLocation(loc, save = true) {
   state.view = profile.onboarded ? 'browse' : 'onboard';
   render();
 }
-function changeQty(itemId, delta) {
+function changeQty(key, delta, opts) {
+  const itemId = key.split('|')[0];
   const rid = itemId.split('::')[0];
   if (state.cart.restaurantId && state.cart.restaurantId !== rid && delta > 0) {
     const other = state.restaurants.find(r => r.id === state.cart.restaurantId);
@@ -1354,8 +1489,8 @@ function changeQty(itemId, delta) {
     state.cart = { restaurantId: null, lines: [] };
   }
   state.cart.restaurantId = rid;
-  let line = state.cart.lines.find(l => l.itemId === itemId);
-  if (!line) { line = { itemId, qty: 0 }; state.cart.lines.push(line); }
+  let line = state.cart.lines.find(l => l.key === key);
+  if (!line) { line = { key, itemId, opts: opts || [], qty: 0 }; state.cart.lines.push(line); }
   line.qty += delta;
   state.cart.lines = state.cart.lines.filter(l => l.qty > 0);
   if (!state.cart.lines.length) state.cart.restaurantId = null;
@@ -1381,15 +1516,16 @@ async function loadCsvFiles(files) {
     const text = await f.text();
     const cols = Object.keys(parseCSV(text.split(/\r?\n/).slice(0, 2).join('\n'))[0] || {});
     if (cols.includes('placement') && cols.includes('sponsor_id')) got.sponsors = text;
+    else if (cols.includes('option') && cols.includes('group')) got.modifiers = text;
     else if (cols.includes('type') && cols.includes('platform')) got.promotions = text;
     else if (cols.includes('item') || cols.includes('instore_price')) got.menu = text;
     else if (cols.includes('name') || cols.includes('suburb')) got.restaurants = text;
   }
   const prev = store.get('uploadedCsv', {}) || {};
-  const merged = { restaurants: got.restaurants || prev.restaurants, menu: got.menu || prev.menu, promotions: got.promotions || prev.promotions || '', sponsors: got.sponsors || prev.sponsors || '' };
+  const merged = { restaurants: got.restaurants || prev.restaurants, menu: got.menu || prev.menu, promotions: got.promotions || prev.promotions || '', sponsors: got.sponsors || prev.sponsors || '', modifiers: got.modifiers || prev.modifiers || '' };
   store.set('uploadedCsv', merged);
   if (!merged.restaurants || !merged.menu) return toast(`Now load ${merged.restaurants ? 'menu' : 'restaurants'}.csv too.`);
-  const list = restaurantsFromCSV(parseCSV(merged.restaurants), parseCSV(merged.menu));
+  const list = restaurantsFromCSV(parseCSV(merged.restaurants), parseCSV(merged.menu), parseCSV(merged.modifiers));
   if (!list.length) return toast('No restaurants with menu items found. Check the column names against the template.');
   state.restaurants = list; state.promotions = promotionsFromCSV(parseCSV(merged.promotions)); state.sponsors = sponsorsFromCSV(parseCSV(merged.sponsors)); state.dataSource = 'uploaded';
   state.cart = { restaurantId: null, lines: [] }; store.set('cart', state.cart);
@@ -1413,6 +1549,14 @@ document.addEventListener('submit', async e => {
     const v = num(new FormData(e.target).get('paid'));
     if (v === null || v <= 0) return toast('Enter the total you paid.');
     answerOrder(e.target.dataset.oid, 'yes', v);
+  } else if (e.target.id === 'customiseForm') {
+    const sel = customiseSelection(), r = state.restaurants.find(x => x.id === sel.itemId.split('::')[0]), it = findItem(r, sel.itemId);
+    const missingGroup = it.groups.find((g, gi) => g.required && !e.target.querySelector(`input[name="g${gi}"]:checked`));
+    if (missingGroup) return toast(`Choose a ${missingGroup.name.toLowerCase()} first.`);
+    $('#dlg').close();
+    changeQty(lineKey(sel.itemId, sel.opts), sel.qty, sel.opts);
+    track('Add to cart', { options: sel.opts.length });
+    toast(`Added ${sel.qty} × ${it.name} to your cart.`);
   } else if (e.target.id === 'reportForm') {
     submitReport(new FormData(e.target), e.target.dataset.rid);
   } else if (e.target.id === 'onboardForm') {
@@ -1494,6 +1638,8 @@ document.addEventListener('click', async e => {
     else { toast(`No ${state.choice === 'pickup' ? 'map location' : PLATFORMS[state.choice].label + ' link'} for ${r.name} yet (add one in restaurants.csv).`); setTimeout(askAboutOrder, 1500); }
   }
   else if (d.oc) answerOrder(d.oid, d.oc);
+  else if (d.customise) openCustomise(d.customise);
+  else if (d.mq) { const q = $('#modQty'); q.textContent = Math.max(1, (+q.textContent || 1) + +d.mq); }
   else if (d.report) openReport(d.report.split('::')[0], d.report);
   else if (d.reportR) openReport(d.reportR, '');
   else if (d.closeDlg !== undefined) $('#dlg').close();
@@ -1581,6 +1727,60 @@ function savingsSection() {
     }).join('')}
   </section>`;
 }
+
+/* ==================================================================
+ * Item options (modifiers): choose them, and see what each costs on every platform.
+ * ================================================================== */
+function openCustomise(itemId) {
+  const rid = itemId.split('::')[0], r = state.restaurants.find(x => x.id === rid), it = r && findItem(r, itemId);
+  if (!it) return;
+  const on = PKEYS.filter(k => r.platforms[k]);
+  const chip = (k, o) => {
+    const d = o.prices[k];
+    if (d === null || d === undefined) return `<span class="price na">${badge(k)} n/a</span>`;
+    const m = o.prices.instore > 0 ? d / o.prices.instore - 1 : (d > 0 ? 1 : 0);
+    return `<span class="price">${badge(k)} <b>${d ? '+' + money(d) : 'free'}</b>${o.prices.instore > 0 && m > 0.004 ? `<span class="pct">${pct(m)}</span>` : !o.prices.instore && d > 0 ? '<span class="pct">free in-store</span>' : ''}</span>`;
+  };
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form id="customiseForm" data-item="${esc(it.id)}">
+    <h2>${esc(it.name)}</h2>
+    <p class="muted" style="margin:0;font-size:14px">${esc(it.desc)}</p>
+    ${it.groups.map((g, gi) => `<fieldset class="mod-group">
+      <legend>${esc(g.name)} <span class="muted">${g.multi ? 'choose any' : 'choose one'}${g.required ? ' · required' : ''}</span></legend>
+      ${g.options.map((o, oi) => `<label class="mod-opt">
+        <input type="${g.multi ? 'checkbox' : 'radio'}" name="g${gi}" value="${esc(o.id)}" ${g.required && !g.multi && oi === 0 ? 'checked' : ''}>
+        <span class="mod-name">${esc(o.name)}</span>
+        <span class="prices"><span class="price instore">In-store <b>${o.prices.instore ? '+' + money(o.prices.instore) : 'free'}</b></span>${on.map(k => chip(k, o)).join('')}</span>
+      </label>`).join('')}
+    </fieldset>`).join('')}
+    <div class="mod-total" id="modTotal"></div>
+    <div class="dlg-actions" style="flex-direction:row;align-items:center">
+      <div class="qty"><button type="button" data-mq="-1" aria-label="One fewer">−</button><b id="modQty">1</b><button type="button" data-mq="1" aria-label="One more">+</button></div>
+      <button class="btn" type="submit" style="flex:1">Add to cart</button>
+    </div>
+    <button class="link-btn" type="button" data-close-dlg style="display:block;margin:10px auto 0">Cancel</button>
+  </form>`;
+  updateCustomiseTotal();
+  dlg.showModal();
+}
+function customiseSelection() {
+  const f = $('#customiseForm'); if (!f) return null;
+  return { itemId: f.dataset.item, opts: [...f.querySelectorAll('input:checked')].map(i => i.value), qty: +($('#modQty').textContent) || 1 };
+}
+function updateCustomiseTotal() {
+  const sel = customiseSelection(); if (!sel) return;
+  const r = state.restaurants.find(x => x.id === sel.itemId.split('::')[0]);
+  const line = { itemId: sel.itemId, opts: sel.opts, qty: 1 };
+  const inst = unitPrice(r, line, 'instore').price;
+  const rows = PKEYS.filter(k => r.platforms[k]).map(k => [k, unitPrice(r, line, k)]);
+  const avail = rows.filter(([, u]) => !u.missing);
+  const best = avail.length ? Math.min(...avail.map(([, u]) => u.price)) : null;
+  $('#modTotal').innerHTML = `<div class="muted" style="font-size:13px;margin-bottom:6px">This item as chosen, each</div>
+    <div class="prices"><span class="price instore">In-store <b>${money(inst)}</b></span>
+    ${rows.map(([k, u]) => u.missing ? `<span class="price na">${badge(k)} not offered</span>`
+      : `<span class="price ${u.price === best ? 'best' : ''}">${badge(k)} <b>${money(u.price)}</b>${u.price / inst - 1 > 0.004 ? `<span class="pct">${pct(u.price / inst - 1)}</span>` : ''}</span>`).join('')}</div>`;
+}
+document.addEventListener('change', e => { if (e.target.closest('#customiseForm')) updateCustomiseTotal(); });
 
 /* ==================================================================
  * "Wrong price?" reports
