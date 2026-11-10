@@ -180,6 +180,17 @@ Dinkum then asks whether the order went through:
 - Savings are measured against the user's **usual app** (asked during setup, editable in the
   profile). If they haven't set one, the most expensive app for the same order is used instead.
 
+## When the real total is different
+
+If a customer confirms an order but enters a total that's at least $1 (or 3%) different from the
+estimate, Dinkum asks what was different: item prices, delivery fee, service or other fees, a deal,
+the tip, or not sure. It's one tap, and they can skip. If they tick **Item prices**, their order's
+items are listed with the price Dinkum showed, and they can type the price they saw for any of them.
+
+Each answer is sent like a price report (see below): one report for the order total, with the
+reasons and the estimate's breakdown, plus one per item they corrected. The `Order total differed`
+analytics event also counts these per restaurant and platform, even when the customer skips.
+
 ## "Wrong price?" reports
 
 Every menu item has a **Wrong price?** link, and each restaurant page has **Report a price or

@@ -254,6 +254,9 @@ aside.cart.open { transform: none; visibility: visible; }
 .checkout { width: 100%; border: 0; border-radius: 12px; padding: 14px; font-weight: 800; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
 .checkout:disabled { opacity: .5; cursor: not-allowed; }
 .savings { text-align: center; font-size: 13px; color: var(--brand-text); margin-top: 8px; min-height: 18px; font-weight: 600; }
+/* Order-total follow-up */
+.mm-line { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.mm-line input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
 /* Modifiers */
 .mod-sum { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .mod-sum .pct, .addon-insight .pct { color: var(--warn); font-weight: 700; }
@@ -1709,6 +1712,9 @@ document.addEventListener('submit', async e => {
     changeQty(lineKey(sel.itemId, sel.opts), sel.qty, sel.opts);
     track('Add to cart', { options: sel.opts.length });
     toast(`Added ${sel.qty} × ${it.name} to your cart.`);
+  } else if (e.target.id === 'mismatchForm') {
+    const o = profile.orders.find(x => x.id === e.target.dataset.oid);
+    if (o) submitMismatch(new FormData(e.target), o);
   } else if (e.target.id === 'reportForm') {
     submitReport(new FormData(e.target), e.target.dataset.rid);
   } else if (e.target.id === 'onboardForm') {
@@ -1780,7 +1786,10 @@ document.addEventListener('click', async e => {
     const b = bestWay(r, state.cart.lines);
     const total = state.choice === 'pickup' ? b.pickup.total : b.quotes[state.choice].total;
     const order = { id: String(Date.now()), date: Date.now(), restaurantId: r.id, restaurant: r.name, platform: state.choice,
-                    estTotal: total, baseline: baselineFor(b, state.choice), status: 'pending', paid: null, items: state.cart.lines.reduce((a, l) => a + l.qty, 0) };
+                    estTotal: total, baseline: baselineFor(b, state.choice), status: 'pending', paid: null, items: state.cart.lines.reduce((a, l) => a + l.qty, 0),
+                    lines: state.cart.lines.map(l => ({ itemId: l.itemId, name: findItem(r, l.itemId).name, opts: optionNames(r, l), qty: l.qty,
+                      price: unitPrice(r, l, state.choice === 'pickup' ? 'instore' : state.choice).price ?? null })),
+                    est: state.choice === 'pickup' ? { subtotal: total } : (({ subtotal, delivery, service, small, discount }) => ({ subtotal, delivery, service, small, discount }))(b.quotes[state.choice]) };
     profile.orders.push(order); saveProfile();
     track('Order click', { platform: state.choice, restaurant: r.name });
     const url = state.choice === 'pickup'
@@ -1795,6 +1804,7 @@ document.addEventListener('click', async e => {
   else if (d.report) openReport(d.report.split('::')[0], d.report);
   else if (d.reportR) openReport(d.reportR, '');
   else if (d.closeDlg !== undefined) $('#dlg').close();
+  else if (d.skipMismatch !== undefined) { $('#dlg').close(); toast('Saved. Thanks for confirming your order.'); if (state.view === 'profile') rerenderInPlace(); }
   else if (d.confirmOrder) { const o = profile.orders.find(x => x.id === d.confirmOrder); if (o) { o.lastAsked = 0; showConfirm(o); } }
 });
 /* ==================================================================
@@ -1846,13 +1856,57 @@ function answerOrder(id, answer, paid) {
   if (answer === 'later') { dlg.close(); return; }
   if (answer === 'no') { o.status = 'declined'; saveProfile(); dlg.close(); toast('Thanks. That order won’t count toward your savings.'); }
   if (answer === 'yes') {
-    o.status = 'confirmed'; o.paid = r2(paid ?? o.estTotal); saveProfile(); dlg.close();
+    o.status = 'confirmed'; o.paid = r2(paid ?? o.estTotal); saveProfile();
     track('Order confirmed', { platform: o.platform, restaurant: o.restaurant, saved: Math.round(orderSaving(o)) });
+    const diff = o.paid - o.estTotal;
+    if (Math.abs(diff) >= Math.max(1, o.estTotal * 0.03)) {
+      track('Order total differed', { platform: o.platform, restaurant: o.restaurant, difference: Math.round(diff) });
+      return showMismatch(o, diff);
+    }
+    dlg.close();
     const s = orderSaving(o);
     const vs = o.baseline.kind === 'usual' ? `your usual ${PLATFORMS[o.baseline.platform].label}` : o.baseline.platform && o.baseline.platform !== 'pickup' ? PLATFORMS[o.baseline.platform].label : 'the alternatives';
     toast(s > 0.005 ? `Confirmed: you saved ${money(s)} vs ${vs}.` : 'Confirmed. Thanks!');
   }
   if (state.view === 'profile') rerenderInPlace();
+}
+// When the real total differs from the estimate, ask what was different (optional, one tap),
+// and send it to the owner like a price report so the sheet can be fixed.
+const MISMATCH_REASONS = [['items', 'Item prices'], ['delivery', 'Delivery fee'], ['fees', 'Service or other fees'], ['deal', 'A deal or discount'], ['tip', 'The tip was included'], ['unsure', 'Not sure']];
+const whereLabel = k => k === 'pickup' ? 'In-store (pickup)' : PLATFORMS[k]?.label || k;
+function showMismatch(o, diff) {
+  const e = o.est || {};
+  const parts = [['Items', e.subtotal], ['Delivery', e.delivery], ['Service fee', e.service], ['Small-order fee', e.small], ['Deal', e.discount ? -e.discount : null]].filter(([, v]) => v);
+  $('#dlg').innerHTML = `<form id="mismatchForm" data-oid="${o.id}">
+    <h2>Thanks! Your total was ${money(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than our estimate</h2>
+    <p class="muted" style="margin:0;font-size:14px">We estimated ${money(o.estTotal)} on ${esc(whereLabel(o.platform))}${parts.length ? ` (${parts.map(([k, v]) => `${k} ${v < 0 ? '−' : ''}${money(Math.abs(v))}`).join(' · ')})` : ''}. What was different? This helps us fix the prices. It’s optional.</p>
+    <div class="radios" style="margin-top:12px">${MISMATCH_REASONS.map(([v, l]) => `<label><input type="checkbox" name="reason" value="${v}"> ${l}</label>`).join('')}</div>
+    ${(o.lines || []).length ? `<div id="mmItems" hidden>
+      <p class="muted" style="margin:14px 0 4px;font-size:13px">Which items? Type the price you saw for any that were different (each, before fees).</p>
+      ${o.lines.map((l, i) => `<label class="mm-line"><span><b>${l.qty} × ${esc(l.name)}</b>${l.opts.length ? `<br><small class="muted">${esc(l.opts.join(', '))}</small>` : ''}<br><small class="muted">We showed ${l.price != null ? money(l.price) : 'n/a'} each</small></span>
+        <input name="seen${i}" inputmode="decimal" placeholder="Price you saw" aria-label="Price you saw for ${esc(l.name)}"></label>`).join('')}
+    </div>` : ''}
+    <div class="dlg-actions"><button class="btn" type="submit">Send</button><button class="btn secondary" type="button" data-skip-mismatch>Skip</button></div>
+  </form>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.name === 'reason' && e.target.value === 'items' && $('#mmItems')) $('#mmItems').hidden = !e.target.checked;
+});
+function submitMismatch(f, o) {
+  const reasons = f.getAll('reason');
+  const r = state.restaurants.find(x => x.id === o.restaurantId);
+  const reasonText = reasons.map(v => MISMATCH_REASONS.find(([k]) => k === v)?.[1]).filter(Boolean).join(', ') || 'not given';
+  const e = o.est || {};
+  const breakdown = `Estimate: items ${money(e.subtotal ?? 0)}${e.delivery ? `, delivery ${money(e.delivery)}` : ''}${e.service ? `, service ${money(e.service)}` : ''}${e.small ? `, small-order ${money(e.small)}` : ''}${e.discount ? `, deal -${money(e.discount)}` : ''}`;
+  const base = { date: Date.now(), restaurantId: o.restaurantId, restaurant: o.restaurant, platform: o.platform === 'pickup' ? '' : o.platform, where: whereLabel(o.platform) };
+  const reports = [{ ...base, item: 'Order total', shown: o.estTotal, seen: o.paid, note: `Different: ${reasonText}. ${breakdown}`, kind: 'order' }];
+  if (reasons.includes('items')) (o.lines || []).forEach((l, i) => {
+    const seen = num(f.get('seen' + i));
+    if (seen != null) reports.push({ ...base, item: l.name + (l.opts.length ? ` (${l.opts.join(', ')})` : ''), shown: l.price, seen, note: `After an order of ${money(o.paid)}`, kind: 'order' });
+  });
+  $('#dlg').close();
+  deliverReports(reports, r);
+  track('Order difference explained', { platform: o.platform, restaurant: o.restaurant, reasons: reasonText });
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && awaitingReturn) { awaitingReturn = false; setTimeout(askAboutOrder, 600); }
@@ -1968,33 +2022,35 @@ function submitReport(f, rid) {
   const rp = { date: Date.now(), restaurantId: r.id, restaurant: r.name, item: it ? it.name : 'Deal, fee or other',
                platform: platform === 'instore' ? '' : platform, where: platform === 'instore' ? 'In-store' : (PLATFORMS[platform]?.label || ''),
                shown, seen: num(f.get('seen')), note: (f.get('note') || '').trim() };
-  profile.reports.push(rp); profile.reports = profile.reports.slice(-50); saveProfile();
-  track('Price report', { restaurant: rp.restaurant });
   $('#dlg').close();
+  track('Price report', { restaurant: rp.restaurant });
+  deliverReports([rp], r);
+}
+// Every report (a "Wrong price?" report, or a different order total) goes the same way:
+// to the Google Form if one is set up (you get an email per response), else to an email draft, else it stays on the device.
+function deliverReports(reports, r) {
+  profile.reports.push(...reports); profile.reports = profile.reports.slice(-50); saveProfile();
+  const fresh = r ? freshness(r.source, r.checkedAt).long : '';
   if (REPORT_FORM_PREFILL_URL) {
-    // Submit straight to the Google Form, so the user never leaves Dinkum.
     try {
-      const u = new URL(REPORT_FORM_PREFILL_URL), map = { RESTAURANT: rp.restaurant, ITEM: rp.item, WHERE: rp.where || 'n/a',
-        SHOWN: rp.shown != null ? money(rp.shown) : 'n/a', SEEN: rp.seen != null ? money(rp.seen) : 'not given', NOTE: rp.note || '-' };
-      const fd = new URLSearchParams();
-      for (const [k, v] of u.searchParams) if (k.startsWith('entry.')) fd.append(k, map[v] ?? v);
-      fetch(REPORT_FORM_PREFILL_URL.split('?')[0].replace(/\/viewform$/, '/formResponse'), { method: 'POST', mode: 'no-cors', body: fd });
-      toast('Thanks! Your report has been sent.');
-    } catch { toast('Thanks! Report saved.'); }
+      const u = new URL(REPORT_FORM_PREFILL_URL), action = REPORT_FORM_PREFILL_URL.split('?')[0].replace(/\/viewform$/, '/formResponse');
+      for (const rp of reports) {
+        const map = { RESTAURANT: rp.restaurant, ITEM: rp.item, WHERE: rp.where || 'n/a', SHOWN: rp.shown != null ? money(rp.shown) : 'n/a',
+          SEEN: rp.seen != null ? money(rp.seen) : 'not given', NOTE: [rp.note, fresh].filter(Boolean).join(' | ') || '-' };
+        const fd = new URLSearchParams();
+        for (const [k, v] of u.searchParams) if (k.startsWith('entry.')) fd.append(k, map[v] ?? v);
+        fetch(action, { method: 'POST', mode: 'no-cors', body: fd });
+      }
+      toast('Thanks! Sent to the Dinkum team.');
+    } catch { toast('Thanks! Saved.'); }
   } else if (REPORT_EMAIL) {
-    const body = [
-      `Restaurant: ${rp.restaurant} (${rp.restaurantId})`,
-      `What: ${rp.item}`,
-      `Where: ${rp.where || 'n/a'}`,
-      `${APP_NAME} shows: ${rp.shown != null ? money(rp.shown) : 'n/a'} (${freshness(r.source, it?.checkedAt || r.checkedAt).long})`,
-      `They saw: ${rp.seen != null ? money(rp.seen) : 'not given'}`,
-      `Note: ${rp.note || '-'}`,
-      `Reported: ${new Date(rp.date).toLocaleString('en-AU')}`,
-    ].join('\n');
-    location.href = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`${APP_NAME} price report: ${rp.restaurant}, ${rp.item}`)}&body=${encodeURIComponent(body)}`;
+    const body = reports.map(rp => [`Restaurant: ${rp.restaurant} (${rp.restaurantId})`, `What: ${rp.item}`, `Where: ${rp.where || 'n/a'}`,
+      `${APP_NAME} shows: ${rp.shown != null ? money(rp.shown) : 'n/a'}${fresh ? ` (${fresh})` : ''}`, `They saw: ${rp.seen != null ? money(rp.seen) : 'not given'}`,
+      `Note: ${rp.note || '-'}`].join('\n')).join('\n\n') + `\n\nReported: ${new Date().toLocaleString('en-AU')}`;
+    location.href = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`${APP_NAME} price report: ${reports[0].restaurant}, ${reports[0].item}`)}&body=${encodeURIComponent(body)}`;
     toast('Thanks! Your email app should open with the report ready to send.');
   } else {
-    toast('Thanks! Report saved. (Reports aren’t sent anywhere until an email address is set up.)');
+    toast('Thanks! Saved. (Reports aren’t sent anywhere until the report form is set up.)');
   }
   if (state.view === 'profile') rerenderInPlace();
 }
