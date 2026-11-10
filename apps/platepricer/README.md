@@ -155,6 +155,16 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   Sponsored label where they apply. Below: name and star rating, then cuisine, price tier, distance,
   walking time and a dot for how fresh the prices are (blue = live, grey = checked, orange = may be
   out of date). Screen readers hear the full sentence behind the badge.
+- **Restaurant page:** photo across the top with back, report and favourite buttons; name, a ★ button
+  that shows Google / Uber Eats / DoorDash ratings, and one icon row (cuisine, price tier, distance,
+  walk time, freshness). Deals are slim tags. **Typical order** (or **Your order** once the cart has
+  items from that restaurant) is shown as ranked bars. "Fees & area" (with the address) and the
+  dietary filter are small buttons beside the first menu heading.
+- **Ranked bars** (restaurant page and cart): delivery options cheapest first; blue = in-store price,
+  orange = what that option adds. Each bar has a short reason ("menu +18% · fees $9.43 · ✓ DashPass ·
+  🏷 −$5 deal") and the cheapest gets a "Cheapest" label. Pickup is a separate line underneath with
+  how much less it costs than the cheapest delivery. In the cart, radio dots show the selection and
+  the selected bar opens its full breakdown (items, fees, deal, delivery time, hints).
 - **Dish search** across all restaurants, cheapest first ("pad thai").
 - **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
   A **price strip** shows the in-store price at the left and one dot per platform, with its price

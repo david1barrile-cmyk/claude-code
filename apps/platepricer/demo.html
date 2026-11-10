@@ -315,6 +315,63 @@ aside.cart.open { transform: none; visibility: visible; }
 .checkout { width: 100%; border: 0; border-radius: 12px; padding: 14px; font-weight: 800; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
 .checkout:disabled { opacity: .5; cursor: not-allowed; }
 .savings { text-align: center; font-size: 13px; color: var(--brand-text); margin-top: 8px; min-height: 18px; font-weight: 600; }
+/* Restaurant page top */
+.rp-hero { position: relative; height: 190px; border-radius: 18px; margin-top: 14px; background-size: cover; background-position: center; display: grid; place-items: center; overflow: hidden; }
+.rp-hero.pattern > span { font-size: 64px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.4)); }
+.rp-hero-btns { position: absolute; inset: 12px 12px auto 12px; display: flex; gap: 8px; }
+.rp-hero-btns .grow { flex: 1; }
+.round { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); color: #142033; display: grid; place-items: center; font-size: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.round svg { width: 17px; height: 17px; }
+.round.fav[aria-pressed="true"] { color: #e0457b; }
+.rp-main { display: flex; flex-direction: column; gap: 10px; padding: 14px 0 4px; }
+.rp-name { display: flex; align-items: center; gap: 10px; }
+.rp-name h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; flex: 1; min-width: 0; }
+.starbtn { font-weight: 700; font-size: 14px; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--surface); white-space: nowrap; }
+.rp-icons { font-size: 14px; }
+.stale-note { color: var(--warn); font-size: 12px; font-weight: 600; }
+.rp-deals { display: flex; flex-wrap: wrap; gap: 6px; }
+.dealtag { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 4px 8px; }
+.dealtag.blocked { opacity: .7; font-weight: 600; }
+.rp-best { display: flex; flex-direction: column; gap: 8px; max-width: 620px; }
+.typ { font-size: 13px; color: var(--muted); min-width: 0; flex: 1; }
+.typ-row { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+.typ b { color: var(--text); }
+.secrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 22px 0 10px; }
+.secrow h3 { margin: 0 auto 0 0 !important; font-size: 17px; }
+.rp-tools { display: inline-flex; gap: 6px; }
+.minibtn { font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 12px; }
+.minibtn.on, .minibtn[aria-expanded="true"] { border-color: var(--brand); color: var(--brand-text); background: var(--brand-soft); }
+.rp-fees { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; }
+.rp-fees p { margin: 4px 0; }
+/* Ranked bars (restaurant page and cart) */
+.ob-legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); }
+.ob-legend span { display: inline-flex; gap: 5px; align-items: center; }
+.ob-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.lg-base { background: var(--brand); }
+.lg-extra { background: var(--warn); }
+.ob-list { display: flex; flex-direction: column; gap: 6px; }
+.ob { width: 100%; text-align: left; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 8px 10px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-variant-numeric: tabular-nums; }
+button.ob, button.ob-pick { cursor: pointer; }
+.ob.sel, .ob-pick.sel { border-color: var(--brand); }
+.ob-who { display: inline-flex; gap: 8px; align-items: center; min-width: 52px; }
+.ob .radio, .ob-pick .radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); flex: none; }
+.ob.sel .radio, .ob-pick.sel .radio { border: 5px solid var(--brand); }
+.ob-meter { height: 10px; border-radius: 5px; background: var(--surface-2); position: relative; overflow: hidden; }
+.ob-meter .base { position: absolute; inset: 0 auto 0 0; background: var(--brand); opacity: .55; }
+.ob.sel .ob-meter .base { opacity: 1; }
+.ob-meter .extra { position: absolute; top: 0; bottom: 0; background: var(--warn); opacity: .85; }
+.ob-amt { font-weight: 800; text-align: right; }
+.ob-why { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.ob-why .cheap { font-size: 10.5px; font-weight: 800; color: var(--brand-ink); background: var(--brand); border-radius: 5px; padding: 0 6px; }
+.ob-why .chev { margin-left: auto; color: var(--muted); }
+.ob.sel .ob-why .chev { transform: rotate(180deg); }
+.ob-detail { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 12px; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 2px; }
+.ob-detail .disc { color: var(--brand-text); font-weight: 600; }
+.ob-detail .hint { color: var(--warn); }
+.ob-na { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; padding: 2px 4px; }
+.ob-pick { width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; background: var(--surface); border: 2px dashed var(--border); border-radius: 12px; padding: 8px 10px; font-size: 13px; margin-top: 2px; }
+.ob-pick .save { color: var(--brand-text); font-weight: 700; }
+.pick-text { min-width: 0; }
 /* Order-total follow-up */
 .mm-line { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .mm-line input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
@@ -363,8 +420,14 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
   .brand .name { display: none; }
   .item.v2 { grid-template-columns: 52px minmax(0, 1fr) auto; grid-template-areas: "thumb top add" "strip strip strip" "meta meta meta"; row-gap: 6px; }
   .item.v2 .thumb { width: 52px; height: 52px; }
-  .r-head h2 { font-size: 21px; }
-  .r-head .logo { width: 64px; height: 64px; font-size: 32px; }
+  .rp-hero { height: 112px; margin-top: 8px; border-radius: 14px; }
+  .rp-main { gap: 8px; padding-top: 10px; }
+  .ob { padding: 6px 9px; gap: 2px 8px; }
+  .ob-list { gap: 5px; }
+  .ob-pick { padding: 6px 9px; }
+  .secrow { margin: 16px 0 8px; }
+  .rp-hero.pattern > span { font-size: 48px; }
+  .rp-name h2 { font-size: 22px; }
   #map { height: 420px; }
   .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .toolbar .search { grid-column: 1 / -1; }
@@ -1148,16 +1211,6 @@ function unitPrice(r, l, platform) {
 }
 const optionNames = (r, l) => { const it = findItem(r, l.itemId); return l.opts.map(o => findOption(it, o)?.name).filter(Boolean); };
 const defaultOpts = it => (it.groups || []).filter(g => g.required && g.options.length).map(g => g.options[0].id);
-// Average markup the apps put on paid add-ons, compared with the item markup, per platform.
-function modifierMarkup(r, k) {
-  const add = [], base = [];
-  for (const s of r.menu) for (const it of s.items) {
-    if (it.prices[k] !== null) base.push(it.prices[k] / it.prices.instore - 1);
-    for (const g of it.groups) for (const o of g.options) if (o.prices.instore > 0 && o.prices[k] != null) add.push(o.prices[k] / o.prices.instore - 1);
-  }
-  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
-  return { addons: avg(add), items: avg(base), count: add.length };
-}
 function cheapestItemPrice(r, it) {
   let best = null;
   for (const k of PKEYS) {
@@ -1511,39 +1564,78 @@ async function drawMap(list) {
 }
 
 /* ---------- Restaurant ---------- */
+/* ---------- Ranked bars: the same picture on the restaurant page and in the cart ----------
+ * Delivery options are ranked cheapest first. Each bar's blue part is the in-store price, the orange
+ * part is what that option adds. A short line says why (menu markup, fees, membership, deal).
+ * Pickup sits on its own line underneath, with how much less it costs than the cheapest delivery. */
+function orderBars(r, b, lines, mode) {
+  const quotes = b.quotes, cart = mode === 'cart';
+  const inst = lines.reduce((a, l) => a + unitPrice(r, l, 'instore').price * l.qty, 0);
+  const hi = Math.max(inst, ...b.avail.map(k => quotes[k].total));
+  const bar = k => {
+    const q = quotes[k], fees = r2(q.delivery + q.service + q.small);
+    const why = [];
+    if (q.menuInflation > 0.004) why.push(`menu ${pct(q.menuInflation)}`);
+    why.push(fees ? `fees ${money(fees)}` : 'no fees');
+    if (q.memberApplied) why.push(`✓ ${q.memberName}`);
+    if (q.discount) why.push(`🏷 −${money(q.discount)} deal`);
+    const bw = Math.min(inst, q.total) / hi * 100, ew = Math.max(0, q.total - inst) / hi * 100;
+    const cheapest = k === b.best && b.avail.length > 1, sel = cart && state.choice === k;
+    const body = `<span class="ob-who">${cart ? '<span class="radio" aria-hidden="true"></span>' : ''}${badge(k)}</span>
+      <span class="ob-meter" aria-hidden="true"><span class="base" style="width:${bw.toFixed(1)}%"></span>${ew > 0.05 ? `<span class="extra" style="left:${bw.toFixed(1)}%;width:${ew.toFixed(1)}%"></span>` : ''}</span>
+      <span class="ob-amt">${money(q.total)}</span>
+      <span class="ob-why">${cheapest ? '<span class="cheap">Cheapest</span>' : ''}${esc(why.join(' · '))}<span class="sr"> on ${PLATFORMS[k].label}</span>${cart ? '<span class="chev" aria-hidden="true">▾</span>' : ''}</span>
+      ${sel ? `<span class="ob-detail">
+        <span>Items</span><span>${money(q.subtotal)}</span>
+        <span>Delivery${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${q.delivery ? money(q.delivery) : 'Free'}</span>
+        ${q.service ? `<span>Service fee${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${money(q.service)}</span>` : ''}
+        ${q.small ? `<span>Small-order fee (est.)</span><span>${money(q.small)}</span>` : ''}
+        ${q.discount ? `<span class="disc">${esc(promoLabel(q.promo))}</span><span class="disc">−${money(q.discount)}</span>` : ''}
+        <span>Delivery time</span><span>${q.eta}</span>
+        ${q.memberShortBy ? `<span class="hint" style="grid-column:1/-1">Add ${money(q.memberShortBy)} for ${q.memberName} benefits</span>` : ''}
+        ${q.hints.slice(0, 2).map(h => `<span class="hint" style="grid-column:1/-1">${esc(h)}</span>`).join('')}
+      </span>` : ''}`;
+    return cart
+      ? `<button class="ob${sel ? ' sel' : ''}" role="radio" aria-checked="${sel}" data-choose="${k}">${body}</button>`
+      : `<div class="ob">${body}</div>`;
+  };
+  const na = PKEYS.filter(k => r.platforms[k] && !quotes[k].available)
+    .map(k => `<div class="ob-na">${badge(k)} ${esc(quotes[k].reason)}</div>`).join('');
+  const pk = b.pickup, cheapestDel = b.best ? quotes[b.best].total : null;
+  const pickText = pk.available ? `<span class="ob-who">${cart ? '<span class="radio" aria-hidden="true"></span>' : ''}${badge('pickup')}</span>
+      <span class="pick-text"><b>${money(pk.total)}</b>${pk.walk ? ` · ${pk.walk} min walk` : ''}${cheapestDel != null && cheapestDel - pk.total >= 0.5 ? ` · <span class="save">${money(cheapestDel - pk.total)} less than the cheapest delivery</span>` : ''}</span>` : '';
+  const pick = !pk.available ? '' : cart
+    ? `<button class="ob-pick${state.choice === 'pickup' ? ' sel' : ''}" role="radio" aria-checked="${state.choice === 'pickup'}" data-choose="pickup">${pickText}</button>`
+    : `<div class="ob-pick">${pickText}</div>`;
+  const legend = `<div class="ob-legend" aria-hidden="true"><span><i class="lg-base"></i>In-store</span><span><i class="lg-extra"></i>Extra you pay</span></div>`;
+  return `${mode === 'cart' ? legend : ''}
+    <div class="ob-list"${cart ? ' role="radiogroup" aria-label="How to order"' : ''}>${b.avail.map(bar).join('')}${na}${pick}</div>`;
+}
+
 function restaurantView(r) {
   if (!r) { state.view = 'browse'; return browseView(); }
   const qtyOf = id => state.cart.restaurantId === r.id ? state.cart.lines.filter(l => l.itemId === id).reduce((a, l) => a + l.qty, 0) : 0;
   const on = PKEYS.filter(k => r.platforms[k]);
   const km = distTo(r);
   const rf = freshness(r.source, r.checkedAt);
-  const b = bestWay(r);
-  const typical = typicalLines(r).map(l => findItem(r, l.itemId).name);
   const feeRow = (label, fn) => `<tr><td>${label}</td>${on.map(k => `<td>${fn(r.platforms[k], k)}</td>`).join('')}</tr>`;
   const allPromos = PKEYS.flatMap(k => promosFor(r, k));
   const diet = profile.diet;
-  return `<button class="back" data-nav="browse">← All restaurants</button>
-    <div class="r-head">
-      ${visual(r, 'logo')}
-      <div class="info">
-        <h2>${esc(r.name)} <button class="fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${icon(isFav(r) ? 'i-heart-fill' : 'i-heart')}</button></h2>
-        <div class="meta">${ratingHtml(r)}<span>${dollars(r.tier)}</span><span>${esc(r.cuisine)}</span><span>${esc(r.address || r.suburb)}</span>${km != null ? `<span>${fmtKm(km)}${r.pickup ? ` · 🚶 ${walkMin(km)} min walk` : ''}</span>` : ''}</div>
-        ${r.ratings.length > 1 ? `<div class="ratings">${r.ratings.map(x => `<span>${esc(x.src)} ★ ${x.rating.toFixed(1)}${x.count != null ? ` (${kfmt(x.count)})` : ''}</span>`).join('')}</div>` : ''}
-        <span><span class="fresh ${rf.cls}">${rf.long}</span> · <button class="link-btn" data-report-r="${esc(r.id)}">Report a price or deal</button></span>
-      </div>
-    </div>
-    <div class="summary">
-      <h3>Best way to order</h3>
-      <div class="muted" style="font-size:13px">For a typical order: ${esc(typical.join(', '))}</div>
-      <div class="opts">
-        ${b.avail.map(k => `<span class="o ${k === b.best ? 'best' : ''}">${badge(k)} ${money(b.quotes[k].total)}${b.quotes[k].discount ? ' <span title="Includes a deal">🏷</span>' : ''}</span>`).join('')}
-        ${b.pickup.available ? `<span class="o">${badge('pickup')} ${money(b.pickup.total)}${b.pickup.walk ? ` · ${b.pickup.walk} min walk` : ''}</span>` : ''}
-        ${PKEYS.filter(k => r.platforms[k] && !b.quotes[k].available).map(k => `<span class="o na">${badge(k)} ${esc(b.quotes[k].reason)}</span>`).join('')}
-      </div>
-      ${addonInsight(r, on)}
-    </div>
-    ${allPromos.length ? `<div class="deals">${allPromos.map(p => { const bl = promoBlocker(p); return `<div class="deal-row">🏷 ${badge(p.platform)} <span>${esc(promoLabel(p))}</span><span class="why">${bl ? esc(bl) : p.ends ? 'Until ' + fmtDate(p.ends) : ''}</span></div>`; }).join('')}</div>` : ''}
-    <details class="fees"><summary>Fees and delivery area${r.feesFrom ? ` (checked from ${esc(r.feesFrom)})` : ''}</summary>
+  const cartLines = state.cart.restaurantId === r.id && state.cart.lines.length ? state.cart.lines : null;
+  const lines = cartLines || typicalLines(r);
+  const ob = bestWay(r, lines);
+  const cr = combinedRating(r);
+  const hero = safeUrl(r.photo)
+    ? `<div class="rp-hero" style="background-image:url('${esc(r.photo)}')" role="img" aria-label="${esc(r.name)}">`
+    : `<div class="rp-hero pattern" style="background:${cuisinePattern(r)}"><span aria-hidden="true">${r.emoji}</span>`;
+  const firstSection = r.menu.findIndex(sec => sec.items.some(it => !state.dietOnly || diet.every(d => it.tags.includes(d))));
+  const tools = `<span class="rp-tools">
+      <button class="minibtn" data-toggle-fees aria-expanded="${!!state.showFees}">Fees &amp; area</button>
+      <button class="minibtn${state.dietOnly ? ' on' : ''}" data-diet-toggle aria-pressed="${!!state.dietOnly}">${diet.length ? `${state.dietOnly ? '✓ ' : ''}${esc(diet.map(d => d[0].toUpperCase() + d.slice(1)).join(' & '))}` : 'Dietary'}</button>
+    </span>`;
+  const feesPanel = state.showFees ? `<div class="rp-fees">
+      ${r.address ? `<p><b>Address:</b> ${esc(r.address)}</p>` : ''}
+      ${r.feesFrom ? `<p class="muted">Fees checked from ${esc(r.feesFrom)}.</p>` : ''}
       <div class="fee-wrap"><table class="fee-table">
         <thead><tr><th>Estimated</th>${on.map(k => `<th>${badge(k)} ${PLATFORMS[k].label}</th>`).join('')}</tr></thead>
         <tbody>
@@ -1555,16 +1647,38 @@ function restaurantView(r) {
           ${feeRow('Est. delivery time', () => { const [a, z] = deliveryEta(km); return `${a}–${z} min`; })}
         </tbody>
       </table></div>
-    </details>
-    <div class="menu-tools">
-      <span class="grow"></span>
-      ${diet.length ? `<label class="toggle"><input type="checkbox" id="dietOnly" ${state.dietOnly ? 'checked' : ''}> Only ${esc(diet.join(' & '))}</label>` : '<button class="link-btn" data-nav="profile">Set dietary preferences</button>'}
+    </div>` : '';
+  return `${hero}
+      <span class="rp-hero-btns">
+        <button class="round" data-nav="browse" aria-label="Back to all restaurants">←</button>
+        <span class="grow"></span>
+        <button class="round" data-report-r="${esc(r.id)}" aria-label="Report a wrong price or deal">${icon('i-flag')}</button>
+        <button class="round fav" data-fav="${esc(r.id)}" aria-pressed="${isFav(r)}" aria-label="${isFav(r) ? 'Remove from' : 'Add to'} favourites">${icon(isFav(r) ? 'i-heart-fill' : 'i-heart')}</button>
+      </span>
+    </div>
+    <div class="rp-main">
+      <div class="rp-name"><h2>${esc(r.name)}</h2>
+        ${cr.rating != null ? `<button class="starbtn" data-toggle-ratings aria-expanded="${!!state.showRatings}" aria-label="Rating ${cr.rating.toFixed(1)}. Show ratings by source"><span class="star">★</span> ${cr.rating.toFixed(1)} ▾</button>` : ''}</div>
+      ${state.showRatings ? `<div class="ratings">${r.ratings.map(x => `<span>${esc(x.src)} ★ ${x.rating.toFixed(1)}${x.count != null ? ` (${kfmt(x.count)})` : ''}</span>`).join('')}</div>` : ''}
+      <div class="iconrow rp-icons">
+        <span>${esc(r.cuisine)} · ${dollars(r.tier)}</span>
+        ${km != null ? `<span title="${esc(r.suburb)}">${icon('i-pin')}${fmtKm(km)}</span>${r.pickup ? `<span title="Walking time for pickup">${icon('i-walk')}${walkMin(km)} min</span>` : ''}` : `<span>${esc(r.suburb)}</span>`}
+        <span class="fresh-dot ${rf.cls}" title="${esc(rf.long)}"><span class="sr">${esc(rf.long)}</span></span>
+        ${rf.cls === 'stale' ? '<span class="stale-note">Prices may be out of date</span>' : ''}
+      </div>
+      ${allPromos.length ? `<div class="rp-deals">${allPromos.map(p => { const bl = promoBlocker(p); return `<span class="dealtag${bl ? ' blocked' : ''}">${icon('i-tag')}${badge(p.platform)} ${esc(promoLabel(p))}${bl ? ` · ${esc(bl.toLowerCase())}` : p.ends ? ` · until ${fmtDate(p.ends)}` : ''}</span>`; }).join('')}</div>` : ''}
+      <div class="rp-best">
+        <div class="typ-row"><div class="typ"><b>${cartLines ? 'Your order' : 'Typical order'}</b> · ${esc(lines.map(l => (l.qty > 1 ? l.qty + ' × ' : '') + findItem(r, l.itemId).name).join(', '))}</div>
+          <div class="ob-legend" aria-hidden="true"><span><i class="lg-base"></i>In-store</span><span><i class="lg-extra"></i>Extra</span></div></div>
+        ${orderBars(r, ob, lines, 'summary')}
+      </div>
     </div>
     ${r.menu.map(s => {
       const items = s.items.filter(it => !state.dietOnly || diet.every(d => it.tags.includes(d)));
       if (!items.length) return '';
-      return `<section class="menu-section"><h3>${esc(s.section)}</h3>${items.map(it => itemView(r, it, on, qtyOf(it.id), rf)).join('')}</section>`;
-    }).join('')}
+      const idx = r.menu.indexOf(s);
+      return `<section class="menu-section">${idx === firstSection ? `<div class="secrow"><h3>${esc(s.section)}</h3>${tools}</div>${feesPanel}` : `<h3>${esc(s.section)}</h3>`}${items.map(it => itemView(r, it, on, qtyOf(it.id), rf)).join('')}</section>`;
+    }).join('') || `<div class="secrow"><h3>Menu</h3>${tools}</div>${feesPanel}<p class="muted">No dishes match your dietary filter.</p>`}
     <div style="height:32px"></div>`;
 }
 
@@ -1576,11 +1690,6 @@ function worstAddon(it, on) {
     if (m > 0.004 && (!w || m > w.m)) w = { k, m };
   }
   return w;
-}
-function addonInsight(r, on) {
-  const rows = on.filter(k => k !== 'direct').map(k => [k, modifierMarkup(r, k)]).filter(([, m]) => m.count && m.addons != null);
-  if (!rows.length) return '';
-  return `<div class="addon-insight"><b>Add-ons:</b> ${rows.map(([k, m]) => `${badge(k)} options cost <span class="pct">${pct(m.addons)}</span> vs in-store${m.items != null && m.addons - m.items > 0.02 ? ` <span class="muted">(items ${pct(m.items)})</span>` : ''}`).join(' · ')}</div>`;
 }
 const DIET_ICON = { vegetarian: ['i-leaf', 'Vegetarian'], spicy: ['i-chili', 'Spicy'] };
 const dietMarks = it => it.tags.map(t => DIET_ICON[t]
@@ -1716,42 +1825,13 @@ function renderCart() {
   if (!state.choice || (state.choice === 'pickup' ? !pk.available : !quotes[state.choice]?.available)) state.choice = b.best || (pk.available ? 'pickup' : null);
   const instore = cart.lines.reduce((a, l) => a + unitPrice(r, l, 'instore').price * l.qty, 0);
 
-  const optView = k => {
-    const q = quotes[k];
-    if (!q.available) return `<button class="opt" disabled aria-checked="false"><span class="radio"></span>
-      <div><div class="pname">${badge(k)} ${PLATFORMS[k].label}</div><div class="sub">${esc(q.reason)}</div></div><div></div></button>`;
-    return `<button class="opt" role="radio" data-choose="${k}" aria-checked="${state.choice === k}"><span class="radio"></span>
-      <div><div class="pname">${badge(k)} ${PLATFORMS[k].label} ${k === b.best && b.avail.length > 1 ? '<span class="badge">Cheapest delivery</span>' : ''}</div>
-        <div class="sub"><span class="infl">${pct(q.totalInflation)}</span> vs in-store · menu ${pct(q.menuInflation)} · ${q.eta}</div>
-        ${q.memberApplied ? `<div class="note">✓ ${q.memberName} applied</div>` : q.memberShortBy ? `<div class="hint">Add ${money(q.memberShortBy)} for ${q.memberName} benefits</div>` : ''}
-        ${q.promo ? `<div class="note">🏷 ${esc(promoLabel(q.promo))}</div>` : ''}
-        ${q.hints.slice(0, 2).map(h => `<div class="hint">${esc(h)}</div>`).join('')}</div>
-      <div class="total">${money(q.total)}</div>
-      <div class="breakdown">
-        <span>Items</span><span>${money(q.subtotal)}</span>
-        <span>Delivery${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${q.delivery ? money(q.delivery) : 'Free'}</span>
-        ${q.service ? `<span>Service fee${q.memberApplied ? ` (${q.memberName})` : ' (est.)'}</span><span>${money(q.service)}</span>` : ''}
-        ${q.small ? `<span>Small-order fee (est.)</span><span>${money(q.small)}</span>` : ''}
-        ${q.discount ? `<span class="disc">Deal</span><span class="disc">−${money(q.discount)}</span>` : ''}
-      </div></button>`;
-  };
-  const cheapestDelivery = b.best ? quotes[b.best].total : null;
   body.innerHTML = `
     ${cart.lines.map(l => { const it = findItem(r, l.itemId), on = optionNames(r, l); return `<div class="line">
       <div class="qty"><button data-dec="${esc(l.key)}" aria-label="Remove one ${esc(it.name)}">−</button><b>${l.qty}</b><button data-inc="${esc(l.key)}" aria-label="Add one ${esc(it.name)}">+</button></div>
       <span style="flex:1">${esc(it.name)}${on.length ? `<br><small class="muted">${esc(on.join(', '))}</small>` : ''}</span><span>${money(unitPrice(r, l, 'instore').price * l.qty)} <small class="muted">in-store</small></span></div>`; }).join('')}
     <h3 class="compare-title">Compare this order</h3>
-    <div class="cart-fresh">${cartFreshness(r)}</div>
-    <div class="instore-ref"><span>In-store price</span><b>${money(r2(instore))}</b></div>
-    <div role="radiogroup" aria-label="How to order">
-      ${[...b.avail, ...PKEYS.filter(k => !quotes[k].available && r.platforms[k])].map(optView).join('')}
-      ${pk.available ? `<div class="or">or skip the fees</div>
-      <button class="opt" role="radio" data-choose="pickup" aria-checked="${state.choice === 'pickup'}"><span class="radio"></span>
-        <div><div class="pname">${badge('pickup')} Pick it up yourself</div>
-          <div class="sub">In-store price${pk.walk ? ` · 🚶 ${pk.walk} min walk (${fmtKm(pk.km)})` : ''}</div>
-          ${cheapestDelivery != null && cheapestDelivery - pk.total >= 0.5 ? `<div class="note">${money(cheapestDelivery - pk.total)} less than the cheapest delivery</div>` : ''}</div>
-        <div class="total">${money(pk.total)}</div></button>` : ''}
-    </div>
+    <div class="cart-fresh">${cartFreshness(r)} · in-store ${money(r2(instore))}</div>
+    ${orderBars(r, b, cart.lines, 'cart')}
     <p style="font-size:12px" class="muted">Prices include GST. Before tip. Fees and deals change with your address and the time of day; check the total at checkout.</p>`;
 
   if (state.choice) {
@@ -1941,6 +2021,9 @@ document.addEventListener('click', async e => {
     else { toast(`No ${state.choice === 'pickup' ? 'map location' : PLATFORMS[state.choice].label + ' link'} for ${r.name} yet (add one in restaurants.csv).`); setTimeout(askAboutOrder, 1500); }
   }
   else if (d.oc) answerOrder(d.oid, d.oc);
+  else if (d.toggleRatings !== undefined) { state.showRatings = !state.showRatings; rerenderInPlace(); }
+  else if (d.toggleFees !== undefined) { state.showFees = !state.showFees; rerenderInPlace(); }
+  else if (d.dietToggle !== undefined) { if (profile.diet.length) { state.dietOnly = !state.dietOnly; rerenderInPlace(); } else { state.view = 'profile'; render(); } }
   else if (d.customise) openCustomise(d.customise);
   else if (d.mq) { const q = $('#modQty'); q.textContent = Math.max(1, (+q.textContent || 1) + +d.mq); }
   else if (d.report) openReport(d.report.split('::')[0], d.report);
