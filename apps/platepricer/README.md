@@ -178,7 +178,8 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   only (fees stay in the cart). A summary gives the number of restaurants, the in-store price range,
   how much the apps add on average (shown once 3+ restaurants have the dish) and the lowest app
   price. Each restaurant gets a row with the menu's price strip, a "Lowest app price" badge, the
-  pickup price and a + to add it to the cart. Sort by lowest app price, lowest in-store, smallest
+  pickup price and **View menu →**, which opens that restaurant's page at the dish (highlighted). Rows
+  don't add to the cart directly, because a cart holds one restaurant. Sort by lowest app price, lowest in-store, smallest
   markup, closest or top rated; filter by suburb, pickup or vegetarian. Spellings are matched
   ("phad" = "pad", accents ignored, "parma" = "parmigiana", see `DISH_SYNONYMS`) and labelled, and a
   dish with a protein you didn't search for is flagged ("with prawn"). Popular dishes (on 2+ menus)

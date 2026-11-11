@@ -407,7 +407,10 @@ button.ob, button.ob-pick { cursor: pointer; }
 .ds-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .ds-chip { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 0 5px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
 .ds-chip.warn { background: var(--warn-soft); color: var(--warn); }
-.ds-row .add { flex: none; width: 34px; height: 34px; font-size: 18px; }
+.ds-row { cursor: pointer; transition: border-color .12s; }
+.ds-row:hover { border-color: var(--brand); }
+.ds-go { margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--brand-text); font-weight: 700; font-size: 12.5px; border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+.ds-go:hover { border-color: var(--brand); background: var(--brand-soft); }
 .dishes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
 .dishes-head h2 { margin: 0; font-size: 17px; }
 .lp-dishes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
@@ -1318,7 +1321,7 @@ function render() {
   renderCart();
   trackPage();
   if (state.focusItem) {
-    const el = document.getElementById('item-' + CSS.escape(state.focusItem));
+    const el = document.getElementById('item-' + state.focusItem);
     state.focusItem = null;
     if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); return; }
   }
@@ -1936,21 +1939,18 @@ function dishView() {
   const list = rows.map(({ r, it, best, spelled, extra }) => {
     const on = PKEYS.filter(k => r.platforms[k]);
     const km = distTo(r), cr = combinedRating(r);
-    const q = state.cart.restaurantId === r.id ? state.cart.lines.filter(l => l.itemId === it.id).reduce((a, l) => a + l.qty, 0) : 0;
-    const add = it.groups.length
-      ? `<button class="add" data-customise="${esc(it.id)}" aria-label="Choose options for ${esc(it.name)} from ${esc(r.name)}">+${q ? `<span class="qbubble">${q}</span>` : ''}</button>`
-      : `<button class="add" data-inc="${esc(it.id)}" aria-label="Add ${esc(it.name)} from ${esc(r.name)} to cart">+${q ? `<span class="qbubble">${q}</span>` : ''}</button>`;
-    return `<div class="ds-row" id="item-${esc(it.id)}">
+    const inCart = state.cart.restaurantId === r.id && state.cart.lines.some(l => l.itemId === it.id);
+    return `<div class="ds-row" data-row-open="${esc(r.id)}" data-row-item="${esc(it.id)}">
       <div class="ds-top">
         <button class="ds-open" data-open="${esc(r.id)}" data-item="${esc(it.id)}" aria-label="Open ${esc(r.name)}">
           <span class="ds-thumb" style="background:${safeUrl(r.photo) ? `url('${esc(r.photo)}') center/cover` : cuisinePattern(r)}" aria-hidden="true"></span>
           <span class="ds-names"><b>${esc(r.name)}</b><span class="muted">${esc(it.name)}${spelled ? ` <span class="ds-chip">matched “${esc(it.name.replace(/\s*\(.*?\)\s*/g, ''))}”</span>` : ''}${extra ? ` <span class="ds-chip warn">with ${esc(extra)}</span>` : ''}</span></span>
         </button>
         <span class="ds-meta">${km != null ? fmtKm(km) + ' · ' : ''}${cr.rating != null ? `<span class="star">★</span> ${cr.rating.toFixed(1)}` : esc(r.suburb)}</span>
-        ${add}
       </div>
       ${priceStrip(r, it, on, best)}
-      <div class="meta2">${recommendation(r, it, on, best, 'app')}</div>
+      <div class="meta2">${recommendation(r, it, on, best, 'app')}${inCart ? '<span class="ds-chip">In your cart</span>' : ''}
+        <button class="ds-go" data-open="${esc(r.id)}" data-item="${esc(it.id)}" aria-label="View ${esc(it.name)} on ${esc(r.name)}'s menu">View menu →</button></div>
     </div>`;
   }).join('');
   const empty = all.length
@@ -2502,6 +2502,11 @@ function deliverReports(reports, r) {
 }
 
 $('#scrim').addEventListener('click', () => openCart(false));
+document.addEventListener('click', e => {
+  if (e.target.closest('button, a, select, input')) return;
+  const row = e.target.closest('[data-row-open]');
+  if (row) openRestaurant(row.dataset.rowOpen, row.dataset.rowItem);
+});
 window.addEventListener('hashchange', () => {
   const h = (location.hash || '').slice(1);
   if (h.startsWith('dish-') && (state.view !== 'dish' || dishSlug(state.dish?.q || '') !== h.slice(5))) openDish(h.slice(5).replace(/-/g, ' '));
