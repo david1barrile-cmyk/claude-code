@@ -176,8 +176,8 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   labelled example.
 - **Search with suggestions** (home page, restaurant list and dish page) replaces the cuisine and
   popular-dish tag rows. On the home page it sits under the address box ("or compare prices"); an
-  empty box there lists popular dishes and cuisines, and Enter opens the dish comparison. As you type, it suggests **Cuisines**, **Dishes** (with how many restaurants have them)
-  and **Restaurants**; an empty box lists all cuisines (restaurant list) or popular dishes (dish page).
+  empty box there lists the cuisines, and Enter opens the dish comparison. As you type, it suggests **Cuisines**, **Dishes** (with how many restaurants have them)
+  and **Restaurants**; an empty box lists all cuisines (restaurant list); on the dish page nothing shows until you type.
   Picking a cuisine filters the list and shows a removable chip ("🍜 Thai ×"), a dish opens its dish
   search page, a restaurant opens its menu. Typing without picking still filters. Arrow keys, Enter
   and Escape work.
@@ -189,9 +189,8 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   don't add to the cart directly, because a cart holds one restaurant. Sort by lowest app price, lowest in-store, smallest
   markup, closest or top rated; filter by suburb, pickup or vegetarian. Spellings are matched
   ("phad" = "pad", accents ignored, "parma" = "parmigiana", see `DISH_SYNONYMS`) and labelled, and a
-  dish with a protein you didn't search for is flagged ("with prawn"). Popular dishes (on 2+ menus)
-  appear as chips here and on the home page; the restaurant search links to it ("Compare every pad
-  thai →").
+  dish with a protein you didn't search for is flagged ("with prawn"). The home page search and the
+  restaurant search link to it ("Compare every pad thai →").
 - **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
   A **price strip** shows the in-store price at the left and one dot per platform, with its price
   above and its name below; the cheapest is blue. Close prices keep a minimum gap and lift one

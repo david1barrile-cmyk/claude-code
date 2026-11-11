@@ -1882,7 +1882,6 @@ function itemView(r, it, on, q, rf) {
 // Same dish, different spellings. Keys and values are compared after lower-casing and removing accents.
 const DISH_SYNONYMS = { phad: 'pad', parmi: 'parmigiana', parma: 'parmigiana', parmy: 'parmigiana', chiko: 'chicko', 'xiaolongbao': 'xiao long bao', burgers: 'burger' };
 const OTHER_PROTEINS = ['prawn', 'prawns', 'shrimp', 'beef', 'lamb', 'pork', 'duck', 'seafood', 'salmon', 'tofu', 'vegetable', 'veggie', 'mushroom', 'fish', 'squid'];
-const POPULAR_FALLBACK = ['Pad Thai', 'Pho', 'Burger', 'Butter Chicken', 'Margherita'];
 const normDish = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ')
   .split(/\s+/).filter(Boolean).map(w => DISH_SYNONYMS[w] || w).join(' ');
 const dishSlug = q => normDish(q).replace(/\s+/g, '-');
@@ -1898,18 +1897,6 @@ function dishMatches(q) {
     out.push({ r, it, best: cheapestItemPrice(r, it), spelled, extra: extra[0] ? extra[0].replace(/s$/, '') : '' });
   }
   return out;
-}
-// Dishes on the menus of several restaurants, most common first.
-function popularDishes() {
-  const seen = new Map();
-  for (const r of state.restaurants) for (const sec of r.menu) for (const it of sec.items) {
-    const key = normDish(it.name.replace(/\(.*?\)/g, ''));
-    if (!key) continue;
-    const e = seen.get(key) || { name: it.name.replace(/\s*\(.*?\)\s*/g, '').trim(), rs: new Set() };
-    e.rs.add(r.id); seen.set(key, e);
-  }
-  const found = [...seen.values()].filter(e => e.rs.size >= 2).sort((a, b) => b.rs.size - a.rs.size).map(e => e.name).slice(0, 6);
-  return found.length >= 3 ? found : POPULAR_FALLBACK;
 }
 function openDish(q) {
   state.dish = { q: q.trim(), sort: state.dish?.sort || 'app', suburb: 'All', pickup: false, veg: false };
@@ -1928,7 +1915,7 @@ function dishView() {
           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="dishList"></form>
       <ul class="suggest" id="dishList" role="listbox" aria-label="Suggestions" hidden></ul>
     </div>`;
-  if (!d.q) return head + '<p class="muted">Type a dish to compare its price at every restaurant, or tap the search box for popular dishes.</p>';
+  if (!d.q) return head + '<p class="muted">Type a dish to compare its price at every restaurant.</p>';
   const all = dishMatches(d.q);
   let rows = all.filter(x => (d.suburb === 'All' || x.r.suburb === d.suburb) && (!d.pickup || x.r.pickup) && (!d.veg || x.it.tags.includes('vegetarian')));
   const appPrice = x => x.best ? x.best.price : Infinity;
@@ -1984,7 +1971,7 @@ function dishView() {
 }
 
 /* ---------- Search suggestions (restaurant list and dish page) ----------
- * One box for cuisines, dishes and restaurants. Empty box: all cuisines (list) or popular dishes (dish page). */
+ * One box for cuisines, dishes and restaurants. Empty box: all cuisines (home and restaurant list), nothing on the dish page. */
 const SG_INPUTS = { search: { list: 'searchList', mode: 'browse' }, dishInput: { list: 'dishList', mode: 'dish' }, homeSearch: { list: 'homeList', mode: 'home' } };
 const sg = { list: [], active: -1, input: null };
 function dishIndex() {
@@ -2003,12 +1990,8 @@ function searchSuggest(q, mode) {
   const rCount = c => state.restaurants.filter(r => r.cuisine === c).length;
   const cu = c => ({ type: 'cuisine', val: c, label: `${styleFor(c)[0]} ${c}`, sub: `${rCount(c)} restaurant${rCount(c) === 1 ? '' : 's'}` });
   const di = e => ({ type: 'dish', val: e.name, label: e.name, sub: `at ${e.rs.size} restaurant${e.rs.size === 1 ? '' : 's'} · compare prices` });
-  if (!words.length) {
-    if (mode === 'browse') return [['Cuisines', cuisines.map(cu)]];
-    const idx = new Map(dishIndex().map(e => [e.key, e]));
-    const popular = ['Popular dishes', popularDishes().map(n => idx.get(normDish(n)) || { name: n, rs: new Set() }).map(di)];
-    return mode === 'home' ? [popular, ['Cuisines', cuisines.map(cu)]] : [popular];
-  }
+  // Empty box: cuisines on the home page and restaurant list; nothing on the dish page until you type.
+  if (!words.length) return mode === 'dish' ? [] : [['Cuisines', cuisines.map(cu)]];
   const hit = t => words.every(w => normDish(t).split(' ').some(x => x.startsWith(w)));
   const cus = cuisines.filter(hit).map(cu).slice(0, 3);
   const dishes = dishIndex().filter(e => hit(e.name)).sort((a, b) => b.rs.size - a.rs.size || a.name.localeCompare(b.name)).slice(0, 5).map(di);
