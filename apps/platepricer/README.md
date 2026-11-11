@@ -174,6 +174,12 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   main dish ($14+) from the loaded menus with the biggest gap between apps, shown as bars that grow
   when the page opens (one serving, delivered, fees included). With no restaurants yet it shows a
   labelled example.
+- **Search with suggestions** (restaurant list and dish page) replaces the cuisine and popular-dish
+  tag rows. As you type, it suggests **Cuisines**, **Dishes** (with how many restaurants have them)
+  and **Restaurants**; an empty box lists all cuisines (restaurant list) or popular dishes (dish page).
+  Picking a cuisine filters the list and shows a removable chip ("🍜 Thai ×"), a dish opens its dish
+  search page, a restaurant opens its menu. Typing without picking still filters. Arrow keys, Enter
+  and Escape work.
 - **Dish search page** (`#dish-pad-thai`, shareable): one dish across every restaurant, menu prices
   only (fees stay in the cart). A summary gives the number of restaurants, the in-store price range,
   how much the apps add on average (shown once 3+ restaurants have the dish) and the lowest app

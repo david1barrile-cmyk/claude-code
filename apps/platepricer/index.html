@@ -121,7 +121,7 @@ header.top .wrap { display: flex; align-items: center; gap: 8px; height: 60px; }
 
 /* Browse */
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 20px 0 8px; }
-.search { flex: 1 1 260px; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; }
+.search { flex: 1 1 260px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; }
 .search input { flex: 1; border: 0; background: transparent; padding: 10px 0; outline: none; min-width: 0; }
 .ctl { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
 .ctl select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
@@ -415,6 +415,13 @@ button.ob, button.ob-pick { cursor: pointer; }
 .dishes-head h2 { margin: 0; font-size: 17px; }
 .lp-dishes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
 @media (max-width: 640px) { .ds-stats { grid-template-columns: 1fr 1fr; } .ds-stats div:last-child { grid-column: 1 / -1; } }
+/* Search suggestions */
+.sg-wrap { position: relative; flex: 1 1 280px; min-width: 0; }
+.sg-wrap .search { width: 100%; }
+.sg-wrap.ds-form { max-width: 620px; margin: 12px 0 10px; }
+.sg-wrap .suggest { z-index: 26; }
+.sg-head { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 8px 10px 2px; }
+.sg-wrap .suggest .sug-sub { padding-left: 0; }
 /* Order-total follow-up */
 .mm-line { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .mm-line input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
@@ -489,7 +496,7 @@ dialog.modal h2 { margin: 0 0 4px; font-size: 19px; }
   .rp-name h2 { font-size: 22px; }
   #map { height: 420px; }
   .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .toolbar .search { grid-column: 1 / -1; }
+  .toolbar .search, .toolbar .sg-wrap { grid-column: 1 / -1; }
   .toolbar .ctl { min-width: 0; }
   .toolbar .ctl select { flex: 1; min-width: 0; }
   .toolbar .seg { justify-self: start; }
@@ -1416,10 +1423,13 @@ function filteredRestaurants() {
 function browseView() {
   const f = state.filters;
   const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === String(v) ? 'selected' : ''}>${esc(l)}</option>`;
-  const cuisines = ['All', ...[...new Set(state.restaurants.map(r => r.cuisine))].sort()];
   return `<div class="toolbar">
-      <label class="search"><span aria-hidden="true">🔍</span><span class="sr">Search</span>
-        <input id="search" type="search" placeholder="Search dishes or restaurants, e.g. pad thai" value="${esc(f.q)}"></label>
+      <div class="sg-wrap">
+        <label class="search"><span aria-hidden="true">🔍</span><span class="sr">Search cuisines, dishes or restaurants</span>
+          <input id="search" type="search" placeholder="Search a cuisine, dish or restaurant" value="${esc(f.q)}" autocomplete="off"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchList"></label>
+        <ul class="suggest" id="searchList" role="listbox" aria-label="Suggestions" hidden></ul>
+      </div>
       <label class="ctl">Sort <select data-filter="sort">${[['best', 'Top rated'], ['cheapest', 'Cheapest to order'], ['closest', 'Closest'], ['priceLow', 'Price: $ to $$$$'], ['priceHigh', 'Price: $$$$ to $'], ['fresh', 'Freshest prices']].map(([v, l]) => opt(v, l, f.sort)).join('')}</select></label>
       <label class="ctl">Suburb <select data-filter="suburb">${opt('All', 'All', f.suburb)}${suburbs().map(s => opt(s, s, f.suburb)).join('')}</select></label>
       <label class="ctl">Price <select data-filter="price">${opt('any', 'Any', f.price)}${[1, 2, 3, 4].map(t => opt(t, dollars(t), f.price)).join('')}</select></label>
@@ -1429,7 +1439,7 @@ function browseView() {
     <div class="chips" role="toolbar" aria-label="Filters">
       <button class="chip" data-toggle-filter="favs" aria-pressed="${f.favs}">♥ Favourites</button>
       <button class="chip" data-toggle-filter="deals" aria-pressed="${f.deals}">🏷 Deals</button>
-      ${cuisines.map(c => `<button class="chip" data-cuisine="${esc(c)}" aria-pressed="${f.cuisine === c}">${c === 'All' ? 'All cuisines' : styleFor(c)[0] + ' ' + esc(c)}</button>`).join('')}
+      ${f.cuisine !== 'All' ? `<button class="chip" data-clear-cuisine aria-pressed="true" aria-label="Remove ${esc(f.cuisine)} filter">${styleFor(f.cuisine)[0]} ${esc(f.cuisine)} ×</button>` : ''}
     </div>
     <div id="results"></div>
     ${dataBar()}`;
@@ -1901,10 +1911,13 @@ function dishView() {
   const d = state.dish || { q: '', sort: 'app' };
   const chip = (attr, val, label, on) => `<button class="chip" ${attr}="${esc(val)}" aria-pressed="${!!on}">${esc(label)}</button>`;
   const head = `<button class="back" data-nav="${state.loc ? 'browse' : 'landing'}">← ${state.loc ? 'All restaurants' : 'Home'}</button>
-    <form class="search ds-form" id="dishForm" role="search"><span aria-hidden="true">🔍</span><label class="sr" for="dishInput">Search a dish</label>
-      <input id="dishInput" type="search" value="${esc(d.q)}" placeholder="Search a dish, e.g. pad thai" autocomplete="off"></form>
-    <div class="chips ds-pop" role="toolbar" aria-label="Popular dishes"><span class="chip-lbl">Popular</span>${popularDishes().map(n => chip('data-dish-q', n, n, normDish(n) === normDish(d.q))).join('')}</div>`;
-  if (!d.q) return head + '<p class="muted">Type a dish to compare its price at every restaurant.</p>';
+    <div class="sg-wrap ds-form">
+      <form class="search" id="dishForm" role="search"><span aria-hidden="true">🔍</span><label class="sr" for="dishInput">Search a dish</label>
+        <input id="dishInput" type="search" value="${esc(d.q)}" placeholder="Search a dish, e.g. pad thai" autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="dishList"></form>
+      <ul class="suggest" id="dishList" role="listbox" aria-label="Suggestions" hidden></ul>
+    </div>`;
+  if (!d.q) return head + '<p class="muted">Type a dish to compare its price at every restaurant, or tap the search box for popular dishes.</p>';
   const all = dishMatches(d.q);
   let rows = all.filter(x => (d.suburb === 'All' || x.r.suburb === d.suburb) && (!d.pickup || x.r.pickup) && (!d.veg || x.it.tags.includes('vegetarian')));
   const appPrice = x => x.best ? x.best.price : Infinity;
@@ -1958,6 +1971,87 @@ function dishView() {
     : `<div class="panel" style="text-align:center"><h2>No ${esc(title)} found</h2><p class="muted">Try a shorter name, or one of the popular dishes above.</p></div>`;
   return head + summary + (all.length ? tools : '') + (list || empty) + '<div style="height:32px"></div>';
 }
+
+/* ---------- Search suggestions (restaurant list and dish page) ----------
+ * One box for cuisines, dishes and restaurants. Empty box: all cuisines (list) or popular dishes (dish page). */
+const SG_INPUTS = { search: { list: 'searchList', mode: 'browse' }, dishInput: { list: 'dishList', mode: 'dish' } };
+const sg = { list: [], active: -1, input: null };
+function dishIndex() {
+  const m = new Map();
+  for (const r of state.restaurants) for (const sec of r.menu) for (const it of sec.items) {
+    const name = it.name.replace(/\s*\(.*?\)\s*/g, ' ').trim(), key = normDish(name);
+    if (!key) continue;
+    const e = m.get(key) || { name, key, rs: new Set() };
+    e.rs.add(r.id); m.set(key, e);
+  }
+  return [...m.values()];
+}
+function searchSuggest(q, mode) {
+  const nq = normDish(q), words = nq.split(' ').filter(Boolean);
+  const cuisines = [...new Set(state.restaurants.map(r => r.cuisine))].sort();
+  const rCount = c => state.restaurants.filter(r => r.cuisine === c).length;
+  const cu = c => ({ type: 'cuisine', val: c, label: `${styleFor(c)[0]} ${c}`, sub: `${rCount(c)} restaurant${rCount(c) === 1 ? '' : 's'}` });
+  const di = e => ({ type: 'dish', val: e.name, label: e.name, sub: `at ${e.rs.size} restaurant${e.rs.size === 1 ? '' : 's'} · compare prices` });
+  if (!words.length) {
+    if (mode === 'browse') return [['Cuisines', cuisines.map(cu)]];
+    const idx = new Map(dishIndex().map(e => [e.key, e]));
+    return [['Popular dishes', popularDishes().map(n => idx.get(normDish(n)) || { name: n, rs: new Set() }).map(di)]];
+  }
+  const hit = t => words.every(w => normDish(t).split(' ').some(x => x.startsWith(w)));
+  const cus = cuisines.filter(hit).map(cu).slice(0, 3);
+  const dishes = dishIndex().filter(e => hit(e.name)).sort((a, b) => b.rs.size - a.rs.size || a.name.localeCompare(b.name)).slice(0, 5).map(di);
+  const rests = state.restaurants.filter(r => hit(r.name)).slice(0, 3)
+    .map(r => ({ type: 'restaurant', val: r.id, label: r.name, sub: `${r.cuisine} · ${r.suburb}` }));
+  const groups = mode === 'dish'
+    ? [['Dishes', dishes], ['Cuisines', cus], ['Restaurants', rests]]
+    : [['Cuisines', cus], ['Dishes', dishes], ['Restaurants', rests]];
+  return groups.filter(([, l]) => l.length);
+}
+function showSuggest(input) {
+  const cfg = SG_INPUTS[input.id]; if (!cfg) return;
+  const groups = searchSuggest(input.value, cfg.mode);
+  sg.list = groups.flatMap(([, l]) => l); sg.active = -1; sg.input = input.id;
+  const box = document.getElementById(cfg.list); if (!box) return;
+  let i = 0;
+  box.innerHTML = groups.map(([h, l]) => `<li class="sg-head" role="presentation">${esc(h)}</li>` + l.map(x => { const n = i++;
+    return `<li role="option" id="sg-${n}" data-sg="${n}" aria-selected="false"><span class="sug-main">${esc(x.label)}</span>${x.sub ? `<span class="sug-sub">${esc(x.sub)}</span>` : ''}</li>`; }).join('')).join('');
+  box.hidden = !sg.list.length;
+  input.setAttribute('aria-expanded', String(!!sg.list.length));
+}
+function closeSuggest() {
+  for (const [id, cfg] of Object.entries(SG_INPUTS)) {
+    const box = document.getElementById(cfg.list), inp = document.getElementById(id);
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+    if (inp) { inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); }
+  }
+  sg.list = []; sg.active = -1;
+}
+function markSuggest() {
+  const cfg = SG_INPUTS[sg.input]; const box = cfg && document.getElementById(cfg.list); if (!box) return;
+  box.querySelectorAll('[data-sg]').forEach(li => li.setAttribute('aria-selected', String(+li.dataset.sg === sg.active)));
+  const inp = document.getElementById(sg.input);
+  if (sg.active >= 0) { inp.setAttribute('aria-activedescendant', 'sg-' + sg.active); document.getElementById('sg-' + sg.active)?.scrollIntoView({ block: 'nearest' }); }
+}
+function pickSuggest(i) {
+  const x = sg.list[i]; if (!x) return;
+  closeSuggest();
+  track('Search pick', { type: x.type, value: x.type === 'restaurant' ? '' : x.val });
+  if (x.type === 'cuisine') { state.filters.cuisine = x.val; state.filters.q = ''; state.view = 'browse'; render(); }
+  else if (x.type === 'dish') openDish(x.val);
+  else openRestaurant(x.val);
+}
+document.addEventListener('focusin', e => { if (SG_INPUTS[e.target.id]) showSuggest(e.target); });
+document.addEventListener('input', e => { if (SG_INPUTS[e.target.id]) showSuggest(e.target); });
+document.addEventListener('keydown', e => {
+  if (!SG_INPUTS[e.target.id] || !sg.list.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); const n = sg.list.length;
+    sg.active = sg.active < 0 ? (e.key === 'ArrowDown' ? 0 : n - 1) : (sg.active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n; markSuggest();
+  } else if (e.key === 'Enter' && sg.active >= 0) { e.preventDefault(); pickSuggest(sg.active); }
+  else if (e.key === 'Escape') { e.stopPropagation(); closeSuggest(); }
+});
+document.addEventListener('mousedown', e => { const li = e.target.closest('[data-sg]'); if (li) { e.preventDefault(); pickSuggest(+li.dataset.sg); } });
+document.addEventListener('focusout', e => { if (SG_INPUTS[e.target.id]) setTimeout(() => { if (!SG_INPUTS[document.activeElement?.id]) closeSuggest(); }, 150); });
 
 /* ---------- Profile ---------- */
 function profileView() {
@@ -2210,7 +2304,7 @@ document.addEventListener('click', async e => {
   }
   else if (d.layout) { state.layout = d.layout; document.querySelectorAll('[data-layout]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.layout === state.layout))); renderResults(); }
   else if (d.toggleFilter) { state.filters[d.toggleFilter] = !state.filters[d.toggleFilter]; t.setAttribute('aria-pressed', String(state.filters[d.toggleFilter])); renderResults(); }
-  else if (d.cuisine) { state.filters.cuisine = d.cuisine; document.querySelectorAll('[data-cuisine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cuisine === d.cuisine))); renderResults(); }
+  else if (d.clearCuisine !== undefined) { state.filters.cuisine = 'All'; $('#app').innerHTML = browseView(); renderResults(); }
   else if (d.open) { if (d.sponsor) track('Sponsor click', { sponsor: d.sponsor, placement: 'featured' }); openRestaurant(d.open, d.item); }
   else if (d.nav) { state.view = d.nav; render(); }
   else if (d.sponsorBanner) {
