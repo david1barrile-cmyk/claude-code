@@ -174,8 +174,9 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   main dish ($14+) from the loaded menus with the biggest gap between apps, shown as bars that grow
   when the page opens (one serving, delivered, fees included). With no restaurants yet it shows a
   labelled example.
-- **Search with suggestions** (restaurant list and dish page) replaces the cuisine and popular-dish
-  tag rows. As you type, it suggests **Cuisines**, **Dishes** (with how many restaurants have them)
+- **Search with suggestions** (home page, restaurant list and dish page) replaces the cuisine and
+  popular-dish tag rows. On the home page it sits under the address box ("or compare prices"); an
+  empty box there lists popular dishes and cuisines, and Enter opens the dish comparison. As you type, it suggests **Cuisines**, **Dishes** (with how many restaurants have them)
   and **Restaurants**; an empty box lists all cuisines (restaurant list) or popular dishes (dish page).
   Picking a cuisine filters the list and shows a removable chip ("🍜 Thai ×"), a dish opens its dish
   search page, a restaurant opens its menu. Typing without picking still filters. Arrow keys, Enter

@@ -413,7 +413,10 @@ button.ob, button.ob-pick { cursor: pointer; }
 .ds-go:hover { border-color: var(--brand); background: var(--brand-soft); }
 .dishes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
 .dishes-head h2 { margin: 0; font-size: 17px; }
-.lp-dishes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+.lp-search { max-width: 580px; margin: 22px auto 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.lp-or { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: center; }
+.lp-search .search { background: var(--surface); }
+.lp-search .sg-wrap { flex: none; }
 @media (max-width: 640px) { .ds-stats { grid-template-columns: 1fr 1fr; } .ds-stats div:last-child { grid-column: 1 / -1; } }
 /* Search suggestions */
 .sg-wrap { position: relative; flex: 1 1 280px; min-width: 0; }
@@ -1352,7 +1355,15 @@ function landingView() {
       <button class="pill" id="useLocation">📍 Use my location</button>
       ${profile.addresses.map((a, i) => `<button class="pill" data-saved-addr="${i}">🏠 ${esc(a.label)}</button>`).join('')}
     </div>
-    ${state.restaurants.length ? `<div class="lp-dishes"><span>Or compare a dish:</span>${popularDishes().slice(0, 5).map(n => `<button class="chip" data-dish-q="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+    ${state.restaurants.length ? `<div class="lp-search">
+      <span class="lp-or">or compare prices</span>
+      <div class="sg-wrap">
+        <form class="search" id="homeSearchForm" role="search"><span aria-hidden="true">🔍</span><label class="sr" for="homeSearch">Search a cuisine, dish or restaurant</label>
+          <input id="homeSearch" type="search" placeholder="Search a cuisine, dish or restaurant" autocomplete="off"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="homeList"></form>
+        <ul class="suggest" id="homeList" role="listbox" aria-label="Suggestions" hidden></ul>
+      </div>
+    </div>` : ''}
     ${landingExample()}
   </section>`;
 }
@@ -1974,7 +1985,7 @@ function dishView() {
 
 /* ---------- Search suggestions (restaurant list and dish page) ----------
  * One box for cuisines, dishes and restaurants. Empty box: all cuisines (list) or popular dishes (dish page). */
-const SG_INPUTS = { search: { list: 'searchList', mode: 'browse' }, dishInput: { list: 'dishList', mode: 'dish' } };
+const SG_INPUTS = { search: { list: 'searchList', mode: 'browse' }, dishInput: { list: 'dishList', mode: 'dish' }, homeSearch: { list: 'homeList', mode: 'home' } };
 const sg = { list: [], active: -1, input: null };
 function dishIndex() {
   const m = new Map();
@@ -1995,14 +2006,15 @@ function searchSuggest(q, mode) {
   if (!words.length) {
     if (mode === 'browse') return [['Cuisines', cuisines.map(cu)]];
     const idx = new Map(dishIndex().map(e => [e.key, e]));
-    return [['Popular dishes', popularDishes().map(n => idx.get(normDish(n)) || { name: n, rs: new Set() }).map(di)]];
+    const popular = ['Popular dishes', popularDishes().map(n => idx.get(normDish(n)) || { name: n, rs: new Set() }).map(di)];
+    return mode === 'home' ? [popular, ['Cuisines', cuisines.map(cu)]] : [popular];
   }
   const hit = t => words.every(w => normDish(t).split(' ').some(x => x.startsWith(w)));
   const cus = cuisines.filter(hit).map(cu).slice(0, 3);
   const dishes = dishIndex().filter(e => hit(e.name)).sort((a, b) => b.rs.size - a.rs.size || a.name.localeCompare(b.name)).slice(0, 5).map(di);
   const rests = state.restaurants.filter(r => hit(r.name)).slice(0, 3)
     .map(r => ({ type: 'restaurant', val: r.id, label: r.name, sub: `${r.cuisine} · ${r.suburb}` }));
-  const groups = mode === 'dish'
+  const groups = mode !== 'browse'
     ? [['Dishes', dishes], ['Cuisines', cus], ['Restaurants', rests]]
     : [['Cuisines', cus], ['Dishes', dishes], ['Restaurants', rests]];
   return groups.filter(([, l]) => l.length);
@@ -2243,6 +2255,8 @@ document.addEventListener('submit', async e => {
     changeQty(lineKey(sel.itemId, sel.opts), sel.qty, sel.opts);
     track('Add to cart', { options: sel.opts.length });
     toast(`Added ${sel.qty} × ${it.name} to your cart.`);
+  } else if (e.target.id === 'homeSearchForm') {
+    const v = $('#homeSearch').value.trim(); if (v) openDish(v);
   } else if (e.target.id === 'dishForm') {
     const v = $('#dishInput').value.trim(); if (v) openDish(v);
   } else if (e.target.id === 'mismatchForm') {
