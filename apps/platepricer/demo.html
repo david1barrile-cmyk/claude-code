@@ -384,6 +384,34 @@ button.ob, button.ob-pick { cursor: pointer; }
 .ob-pick { width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; background: var(--surface); border: 2px dashed var(--border); border-radius: 12px; padding: 8px 10px; font-size: 13px; margin-top: 2px; }
 .ob-pick .save { color: var(--brand-text); font-weight: 700; }
 .pick-text { min-width: 0; }
+/* Dish search */
+.ds-form { margin: 12px 0 4px; max-width: 620px; }
+.chip-lbl { flex: none; align-self: center; font-size: 13px; font-weight: 600; color: var(--muted); padding-right: 2px; }
+.ds-pop { padding-top: 6px; }
+.ds-sum { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; max-width: 620px; margin: 4px 0 6px; }
+.ds-sum h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+.ds-sum h2 span { font-weight: 500; color: var(--muted); font-size: 14px; }
+.ds-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ds-stats div { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ds-stats b { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+.ds-stats .warnv { color: var(--warn); }
+.ds-stats .brandv { color: var(--brand-text); }
+.ds-note { font-size: 12px; color: var(--muted); }
+.ds-row { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; max-width: 620px; scroll-margin-top: 80px; }
+.ds-top { display: flex; gap: 10px; align-items: center; }
+.ds-open { all: unset; cursor: pointer; display: flex; gap: 10px; align-items: center; flex: 1; min-width: 0; border-radius: 8px; }
+.ds-open:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.ds-thumb { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+.ds-names { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ds-names .muted { font-size: 13px; }
+.ds-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.ds-chip { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 0 5px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.ds-chip.warn { background: var(--warn-soft); color: var(--warn); }
+.ds-row .add { flex: none; width: 34px; height: 34px; font-size: 18px; }
+.dishes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+.dishes-head h2 { margin: 0; font-size: 17px; }
+.lp-dishes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+@media (max-width: 640px) { .ds-stats { grid-template-columns: 1fr 1fr; } .ds-stats div:last-child { grid-column: 1 / -1; } }
 /* Order-total follow-up */
 .mm-line { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .mm-line input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
@@ -776,6 +804,7 @@ const DEMO_RESTAURANTS = [
   ['Mama Rosa’s', 'Marrickville', 'Italian', 2, 'manual', 4],
   ['Smoky Shed Burgers', 'Marrickville', 'Burgers', 2, 'manual', 30],
   ['Jade Garden Canteen', 'Marrickville', 'Chinese', 2, 'manual', 8],
+  ['Basil & Lime', 'Marrickville', 'Thai', 2, 'manual', 2],
 ];
 const DEMO_PROMOS = [
   // restaurant index, platform, type, value, min order, max discount, item, members only, new customers only, description
@@ -833,6 +862,10 @@ function demoData() {
              lat: clat + (rand() - 0.5) * 0.008, lng: clng + (rand() - 0.5) * 0.01, pickup: rand() > 0.1,
              fees, platforms: {}, menu };
   }));
+  // Show the dish search's spelling match: one demo restaurant spells it "Phad Thai".
+  const bl = restaurants.find(r => r.name === 'Basil & Lime');
+  const pt = bl && bl.menu.flatMap(sec => sec.items).find(it => it.name === 'Pad Thai');
+  if (pt) pt.name = 'Phad Thai (chicken)';
   const week = new Date(now + 7 * day);
   const promotions = DEMO_PROMOS.map(([i, platform, type, value, minOrder, maxDiscount, item, membersOnly, newOnly, desc]) =>
     ({ restaurantId: `demo${i}`, platform, type, value, minOrder, maxDiscount, item, membersOnly, newOnly, starts: null, ends: week, desc }));
@@ -922,7 +955,8 @@ async function init() {
   const r = list.find(x => x.id === state.cart.restaurantId);
   if (!r || state.cart.lines.some(l => !findItem(r, l.itemId) || l.opts.some(o => !findOption(findItem(r, l.itemId), o)))) state.cart = { restaurantId: null, lines: [] };
   if (state.loc) state.view = profile.onboarded ? 'browse' : 'onboard';
-  render();
+  const h = (location.hash || '').slice(1);
+  if (h.startsWith('dish-')) { openDish(h.slice(5).replace(/-/g, ' ')); } else render();
   setTimeout(askAboutOrder, 800);
 }
 
@@ -1278,7 +1312,9 @@ function render() {
   else if (state.view === 'onboard') app.innerHTML = onboardView();
   else if (state.view === 'profile') app.innerHTML = profileView();
   else if (state.view === 'restaurant') app.innerHTML = restaurantView(state.restaurants.find(r => r.id === state.restaurantId));
+  else if (state.view === 'dish') app.innerHTML = dishView();
   else { app.innerHTML = browseView(); renderResults(); }
+  try { if (state.view !== 'dish' && location.hash.startsWith('#dish-')) location.hash = ''; } catch {}
   renderCart();
   trackPage();
   if (state.focusItem) {
@@ -1306,6 +1342,7 @@ function landingView() {
       <button class="pill" id="useLocation">📍 Use my location</button>
       ${profile.addresses.map((a, i) => `<button class="pill" data-saved-addr="${i}">🏠 ${esc(a.label)}</button>`).join('')}
     </div>
+    ${state.restaurants.length ? `<div class="lp-dishes"><span>Or compare a dish:</span>${popularDishes().slice(0, 5).map(n => `<button class="chip" data-dish-q="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
     ${landingExample()}
   </section>`;
 }
@@ -1404,11 +1441,12 @@ function renderResults() {
   let dishes = '';
   if (q.length >= 2) {
     const hits = [];
-    for (const r of list) for (const s of r.menu) for (const it of s.items) if (it.name.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q)) {
+    const nq = normDish(q).split(' ').filter(Boolean);
+    for (const r of list) for (const s of r.menu) for (const it of s.items) if (nq.every(w => normDish(it.name).split(' ').some(x => x.startsWith(w))) || it.desc.toLowerCase().includes(q)) {
       const best = cheapestItemPrice(r, it); hits.push({ r, it, best });
     }
     hits.sort((a, b) => (a.best?.price ?? a.it.prices.instore + 1000) - (b.best?.price ?? b.it.prices.instore + 1000));
-    if (hits.length) dishes = `<h2 style="font-size:17px;margin:4px 0 10px">Dishes · cheapest first</h2><div class="dishes">${hits.slice(0, 12).map(({ r, it, best }) => {
+    if (hits.length) dishes = `<div class="dishes-head"><h2>Dishes · cheapest first</h2><button class="link-btn" data-dish-q="${esc(state.filters.q.trim())}">Compare every ${esc(state.filters.q.trim())} →</button></div><div class="dishes">${hits.slice(0, 12).map(({ r, it, best }) => {
       const km = distTo(r);
       return `<button class="dish" data-open="${esc(r.id)}" data-item="${esc(it.id)}">
         <span><b>${esc(it.name)}</b> <span class="muted">· ${esc(r.name)}${km != null ? ` · ${fmtKm(km)}` : ''}</span></span>
@@ -1778,12 +1816,12 @@ function priceStrip(r, it, on, best) {
     ${worst >= 0.05 ? `<span class="upto" title="The most expensive app charges this much more than in-store">up to<b>${pct(worst)}</b></span>` : '<span></span>'}
   </div>`;
 }
-function recommendation(r, it, on, best) {
+function recommendation(r, it, on, best, mode = 'menu') {
   const inst = it.prices.instore;
   const pick = r.pickup ? `<span class="pickchip">${badge('pickup')} ${money(inst)}<span class="sr"> if you pick it up</span></span>` : '';
   if (!best) return `<span class="recbadge muted-badge">No delivery to you</span>${pick}`;
   if (best.price <= inst + 0.005) return `<span class="recbadge">${badge(best.k)}<span class="eq" aria-hidden="true">=</span> In-store price<span class="sr">: ${PLATFORMS[best.k].label} charges the same as in-store</span></span>`;
-  return `<span class="recbadge">${badge(best.k)} Lowest delivery · <span class="pct">${pct(best.price / inst - 1)} vs in-store</span><span class="sr">: ${PLATFORMS[best.k].label}, ${money(best.price)}</span></span>${pick}`;
+  return `<span class="recbadge">${badge(best.k)} ${mode === 'app' ? 'Lowest app price' : 'Lowest delivery'} · <span class="pct">${pct(best.price / inst - 1)} vs in-store</span><span class="sr">: ${PLATFORMS[best.k].label}, ${money(best.price)}</span></span>${pick}`;
 }
 function itemView(r, it, on, q, rf) {
   const best = cheapestItemPrice(r, it);
@@ -1814,6 +1852,111 @@ function itemView(r, it, on, q, rf) {
       ? `<div class="qty"><button data-dec="${esc(it.id)}" aria-label="Remove one ${esc(it.name)}">−</button><b>${q}</b><button data-inc="${esc(it.id)}" aria-label="Add one ${esc(it.name)}">+</button></div>`
       : `<button class="add" data-inc="${esc(it.id)}" aria-label="Add ${esc(it.name)} to cart">+</button>`}</div>
   </div>`;
+}
+
+/* ---------- Dish search: one dish across every restaurant (menu prices only) ---------- */
+// Same dish, different spellings. Keys and values are compared after lower-casing and removing accents.
+const DISH_SYNONYMS = { phad: 'pad', parmi: 'parmigiana', parma: 'parmigiana', parmy: 'parmigiana', chiko: 'chicko', 'xiaolongbao': 'xiao long bao', burgers: 'burger' };
+const OTHER_PROTEINS = ['prawn', 'prawns', 'shrimp', 'beef', 'lamb', 'pork', 'duck', 'seafood', 'salmon', 'tofu', 'vegetable', 'veggie', 'mushroom', 'fish', 'squid'];
+const POPULAR_FALLBACK = ['Pad Thai', 'Pho', 'Burger', 'Butter Chicken', 'Margherita'];
+const normDish = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ')
+  .split(/\s+/).filter(Boolean).map(w => DISH_SYNONYMS[w] || w).join(' ');
+const dishSlug = q => normDish(q).replace(/\s+/g, '-');
+function dishMatches(q) {
+  const want = normDish(q).split(' ').filter(Boolean);
+  if (!want.length) return [];
+  const out = [];
+  for (const r of state.restaurants) for (const sec of r.menu) for (const it of sec.items) {
+    const words = normDish(it.name).split(' ');
+    if (!want.every(w => words.some(x => x.startsWith(w)))) continue;
+    const spelled = !it.name.toLowerCase().includes(q.trim().toLowerCase());
+    const extra = words.filter(x => OTHER_PROTEINS.includes(x) && !want.includes(x));
+    out.push({ r, it, best: cheapestItemPrice(r, it), spelled, extra: extra[0] ? extra[0].replace(/s$/, '') : '' });
+  }
+  return out;
+}
+// Dishes on the menus of several restaurants, most common first.
+function popularDishes() {
+  const seen = new Map();
+  for (const r of state.restaurants) for (const sec of r.menu) for (const it of sec.items) {
+    const key = normDish(it.name.replace(/\(.*?\)/g, ''));
+    if (!key) continue;
+    const e = seen.get(key) || { name: it.name.replace(/\s*\(.*?\)\s*/g, '').trim(), rs: new Set() };
+    e.rs.add(r.id); seen.set(key, e);
+  }
+  const found = [...seen.values()].filter(e => e.rs.size >= 2).sort((a, b) => b.rs.size - a.rs.size).map(e => e.name).slice(0, 6);
+  return found.length >= 3 ? found : POPULAR_FALLBACK;
+}
+function openDish(q) {
+  state.dish = { q: q.trim(), sort: state.dish?.sort || 'app', suburb: 'All', pickup: false, veg: false };
+  state.view = 'dish';
+  try { if (location.hash !== '#dish-' + dishSlug(q)) location.hash = 'dish-' + dishSlug(q); } catch {}
+  track('Dish search', { query: normDish(q).slice(0, 40) });
+  render();
+}
+function dishView() {
+  const d = state.dish || { q: '', sort: 'app' };
+  const chip = (attr, val, label, on) => `<button class="chip" ${attr}="${esc(val)}" aria-pressed="${!!on}">${esc(label)}</button>`;
+  const head = `<button class="back" data-nav="${state.loc ? 'browse' : 'landing'}">← ${state.loc ? 'All restaurants' : 'Home'}</button>
+    <form class="search ds-form" id="dishForm" role="search"><span aria-hidden="true">🔍</span><label class="sr" for="dishInput">Search a dish</label>
+      <input id="dishInput" type="search" value="${esc(d.q)}" placeholder="Search a dish, e.g. pad thai" autocomplete="off"></form>
+    <div class="chips ds-pop" role="toolbar" aria-label="Popular dishes"><span class="chip-lbl">Popular</span>${popularDishes().map(n => chip('data-dish-q', n, n, normDish(n) === normDish(d.q))).join('')}</div>`;
+  if (!d.q) return head + '<p class="muted">Type a dish to compare its price at every restaurant.</p>';
+  const all = dishMatches(d.q);
+  let rows = all.filter(x => (d.suburb === 'All' || x.r.suburb === d.suburb) && (!d.pickup || x.r.pickup) && (!d.veg || x.it.tags.includes('vegetarian')));
+  const appPrice = x => x.best ? x.best.price : Infinity;
+  const sorters = {
+    app: (a, b) => appPrice(a) - appPrice(b),
+    instore: (a, b) => a.it.prices.instore - b.it.prices.instore,
+    markup: (a, b) => (appPrice(a) / a.it.prices.instore) - (appPrice(b) / b.it.prices.instore),
+    closest: (a, b) => (distTo(a.r) ?? 99) - (distTo(b.r) ?? 99),
+    rated: (a, b) => rankScore(b.r) - rankScore(a.r),
+  };
+  rows.sort(sorters[d.sort] || sorters.app);
+  const title = d.q.replace(/\b\w/g, c => c.toUpperCase());
+  const restCount = new Set(rows.map(x => x.r.id)).size;
+  const ins = rows.map(x => x.it.prices.instore);
+  const marks = rows.flatMap(x => ['ubereats', 'doordash'].filter(k => x.it.prices[k] != null).map(k => x.it.prices[k] / x.it.prices.instore - 1));
+  const low = rows.filter(x => x.best).sort((a, b) => a.best.price - b.best.price)[0];
+  const subs = [...new Set(all.map(x => x.r.suburb).filter(Boolean))].sort();
+  const summary = rows.length ? `<div class="ds-sum">
+      <h2>${esc(title)} near you <span>· ${restCount} restaurant${restCount === 1 ? '' : 's'}</span></h2>
+      <div class="ds-stats">
+        <div>In-store<b>${money(Math.min(...ins))}${Math.max(...ins) - Math.min(...ins) > 0.005 ? `–${money(Math.max(...ins))}` : ''}</b></div>
+        <div>Apps add${restCount >= 3 && marks.length ? `<b class="warnv">${pct(marks.reduce((a, b) => a + b, 0) / marks.length)}</b>on average` : '<b>—</b>shown from 3 restaurants'}</div>
+        <div>Lowest app price${low ? `<b class="brandv">${money(low.best.price)}</b>${esc(low.r.name)} · ${PLATFORMS[low.best.k].label}` : '<b>—</b>no delivery to you'}</div>
+      </div>
+      <span class="ds-note">Menu prices only. Delivery and service fees are compared in the cart.</span>
+    </div>` : '';
+  const tools = `<div class="chips" role="toolbar" aria-label="Sort"><span class="chip-lbl">Sort</span>
+      ${[['app', 'Lowest app price'], ['instore', 'Lowest in-store'], ['markup', 'Smallest markup'], ['closest', 'Closest'], ['rated', 'Top rated']].map(([v, l]) => chip('data-dish-sort', v, l, d.sort === v)).join('')}</div>
+    <div class="chips" role="toolbar" aria-label="Filter"><span class="chip-lbl">Filter</span>
+      ${subs.length > 1 ? `<label class="ctl"><span class="sr">Suburb</span><select data-dish-suburb>${['All', ...subs].map(x => `<option value="${esc(x)}" ${d.suburb === x ? 'selected' : ''}>${x === 'All' ? 'All suburbs' : esc(x)}</option>`).join('')}</select></label>` : ''}
+      ${chip('data-dish-toggle', 'pickup', 'Pickup', d.pickup)}${chip('data-dish-toggle', 'veg', 'Vegetarian', d.veg)}</div>`;
+  const list = rows.map(({ r, it, best, spelled, extra }) => {
+    const on = PKEYS.filter(k => r.platforms[k]);
+    const km = distTo(r), cr = combinedRating(r);
+    const q = state.cart.restaurantId === r.id ? state.cart.lines.filter(l => l.itemId === it.id).reduce((a, l) => a + l.qty, 0) : 0;
+    const add = it.groups.length
+      ? `<button class="add" data-customise="${esc(it.id)}" aria-label="Choose options for ${esc(it.name)} from ${esc(r.name)}">+${q ? `<span class="qbubble">${q}</span>` : ''}</button>`
+      : `<button class="add" data-inc="${esc(it.id)}" aria-label="Add ${esc(it.name)} from ${esc(r.name)} to cart">+${q ? `<span class="qbubble">${q}</span>` : ''}</button>`;
+    return `<div class="ds-row" id="item-${esc(it.id)}">
+      <div class="ds-top">
+        <button class="ds-open" data-open="${esc(r.id)}" data-item="${esc(it.id)}" aria-label="Open ${esc(r.name)}">
+          <span class="ds-thumb" style="background:${safeUrl(r.photo) ? `url('${esc(r.photo)}') center/cover` : cuisinePattern(r)}" aria-hidden="true"></span>
+          <span class="ds-names"><b>${esc(r.name)}</b><span class="muted">${esc(it.name)}${spelled ? ` <span class="ds-chip">matched “${esc(it.name.replace(/\s*\(.*?\)\s*/g, ''))}”</span>` : ''}${extra ? ` <span class="ds-chip warn">with ${esc(extra)}</span>` : ''}</span></span>
+        </button>
+        <span class="ds-meta">${km != null ? fmtKm(km) + ' · ' : ''}${cr.rating != null ? `<span class="star">★</span> ${cr.rating.toFixed(1)}` : esc(r.suburb)}</span>
+        ${add}
+      </div>
+      ${priceStrip(r, it, on, best)}
+      <div class="meta2">${recommendation(r, it, on, best, 'app')}</div>
+    </div>`;
+  }).join('');
+  const empty = all.length
+    ? `<div class="panel" style="text-align:center"><h2>No ${esc(title)} matches these filters</h2><p class="muted">${all.length} found in total. Turn a filter off to see them.</p></div>`
+    : `<div class="panel" style="text-align:center"><h2>No ${esc(title)} found</h2><p class="muted">Try a shorter name, or one of the popular dishes above.</p></div>`;
+  return head + summary + (all.length ? tools : '') + (list || empty) + '<div style="height:32px"></div>';
 }
 
 /* ---------- Profile ---------- */
@@ -1949,6 +2092,7 @@ function rerenderInPlace() {
   if (state.view === 'restaurant') $('#app').innerHTML = restaurantView(state.restaurants.find(r => r.id === state.restaurantId));
   else if (state.view === 'browse') renderResults();
   else if (state.view === 'profile') $('#app').innerHTML = profileView();
+  else if (state.view === 'dish') $('#app').innerHTML = dishView();
   document.querySelectorAll('[data-member]').forEach(b => b.setAttribute('aria-pressed', String(!!profile.members[b.dataset.member])));
   renderCart(); scrollTo(0, y);
 }
@@ -2005,6 +2149,8 @@ document.addEventListener('submit', async e => {
     changeQty(lineKey(sel.itemId, sel.opts), sel.qty, sel.opts);
     track('Add to cart', { options: sel.opts.length });
     toast(`Added ${sel.qty} × ${it.name} to your cart.`);
+  } else if (e.target.id === 'dishForm') {
+    const v = $('#dishInput').value.trim(); if (v) openDish(v);
   } else if (e.target.id === 'mismatchForm') {
     const o = profile.orders.find(x => x.id === e.target.dataset.oid);
     if (o) submitMismatch(new FormData(e.target), o);
@@ -2027,6 +2173,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'csvInput') { if (t.files.length) loadCsvFiles([...t.files]); return; }
   if (t.dataset.filter) { state.filters[t.dataset.filter] = t.value; renderResults(); return; }
+  if (t.dataset.dishSuburb !== undefined) { state.dish.suburb = t.value; rerenderInPlace(); return; }
   if (t.id === 'dietOnly') { state.dietOnly = t.checked; rerenderInPlace(); return; }
   if (t.dataset.pmember) { profile.members[t.dataset.pmember] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
   if (t.dataset.pnew) { profile.newTo[t.dataset.pnew] = t.checked; state.choice = null; saveProfile(); rerenderInPlace(); return; }
@@ -2092,6 +2239,9 @@ document.addEventListener('click', async e => {
     else { toast(`No ${state.choice === 'pickup' ? 'map location' : PLATFORMS[state.choice].label + ' link'} for ${r.name} yet (add one in restaurants.csv).`); setTimeout(askAboutOrder, 1500); }
   }
   else if (d.oc) answerOrder(d.oid, d.oc);
+  else if (d.dishQ) openDish(d.dishQ);
+  else if (d.dishSort) { state.dish.sort = d.dishSort; rerenderInPlace(); }
+  else if (d.dishToggle) { state.dish[d.dishToggle] = !state.dish[d.dishToggle]; rerenderInPlace(); }
   else if (d.toggleRatings !== undefined) { state.showRatings = !state.showRatings; rerenderInPlace(); }
   else if (d.toggleFees !== undefined) { state.showFees = !state.showFees; rerenderInPlace(); }
   else if (d.dietToggle !== undefined) { if (profile.diet.length) { state.dietOnly = !state.dietOnly; rerenderInPlace(); } else { state.view = 'profile'; render(); } }
@@ -2352,6 +2502,10 @@ function deliverReports(reports, r) {
 }
 
 $('#scrim').addEventListener('click', () => openCart(false));
+window.addEventListener('hashchange', () => {
+  const h = (location.hash || '').slice(1);
+  if (h.startsWith('dish-') && (state.view !== 'dish' || dishSlug(state.dish?.q || '') !== h.slice(5))) openDish(h.slice(5).replace(/-/g, ' '));
+});
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#cart').classList.contains('open')) openCart(false); });
 
 init();

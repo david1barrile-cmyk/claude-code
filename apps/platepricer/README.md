@@ -174,7 +174,16 @@ Per-sponsor impressions and clicks are the numbers to show advertisers. Order cl
   main dish ($14+) from the loaded menus with the biggest gap between apps, shown as bars that grow
   when the page opens (one serving, delivered, fees included). With no restaurants yet it shows a
   labelled example.
-- **Dish search** across all restaurants, cheapest first ("pad thai").
+- **Dish search page** (`#dish-pad-thai`, shareable): one dish across every restaurant, menu prices
+  only (fees stay in the cart). A summary gives the number of restaurants, the in-store price range,
+  how much the apps add on average (shown once 3+ restaurants have the dish) and the lowest app
+  price. Each restaurant gets a row with the menu's price strip, a "Lowest app price" badge, the
+  pickup price and a + to add it to the cart. Sort by lowest app price, lowest in-store, smallest
+  markup, closest or top rated; filter by suburb, pickup or vegetarian. Spellings are matched
+  ("phad" = "pad", accents ignored, "parma" = "parmigiana", see `DISH_SYNONYMS`) and labelled, and a
+  dish with a protein you didn't search for is flagged ("with prawn"). Popular dishes (on 2+ menus)
+  appear as chips here and on the home page; the restaurant search links to it ("Compare every pad
+  thai →").
 - **Menu items:** a dish photo (or cuisine pattern), name, diet icons and a flag to report a wrong price.
   A **price strip** shows the in-store price at the left and one dot per platform, with its price
   above and its name below; the cheapest is blue. Close prices keep a minimum gap and lift one
