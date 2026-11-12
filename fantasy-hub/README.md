@@ -1,0 +1,121 @@
+# Fantasy Hub
+
+A single place for your Sleeper league: standings and matchups, waiver and trade
+advice tailored to your roster, advanced usage metrics, auto-generated scouting
+reports, and aggregated news and highlight videos.
+
+## Run it
+
+Requires Node 18+ and has no dependencies to install.
+
+```bash
+cd fantasy-hub
+npm start            # http://localhost:3000 with live Sleeper data
+npm run demo         # same app with built-in fake data, no network needed (username: demo)
+npm test
+```
+
+Open the site, type your **Sleeper username**, and pick a league. You don't
+need a password or API key, because Sleeper's API is public and read-only. The
+site saves your choice in the browser, and **switch** in the header changes it.
+
+## Host it for your league (Render, free)
+
+1. **Find your league ID.** Open your league on sleeper.com; it's the number in
+   the URL (`sleeper.com/leagues/<LEAGUE_ID>/...`). In the app it's under
+   League → Settings → General.
+2. **Get this code on your default branch.** Render deploys from a branch, so
+   merge `claude/fervent-tesla-tvfrle` into `main` (or pick that branch in Render).
+3. Sign in at [render.com](https://render.com) with GitHub → **New + →
+   Blueprint** → choose this repository. Render reads `render.yaml` at the repo
+   root and creates a free web service from the `fantasy-hub/` folder.
+4. When prompted, set **`LEAGUE_ID`**. Optionally set **`SITE_PASSWORD`** to
+   keep the site private (visitors enter it once; any username works).
+5. Deploy, then share the `https://fantasy-hub-xxxx.onrender.com` URL in your
+   league chat. Everyone just picks their team; no Sleeper login needed.
+
+Pushes to the branch redeploy automatically. On the **free** plan the site
+sleeps after ~15 minutes idle, so the first visit afterward takes ~30–60 s to
+wake. Render's $7/mo Starter plan keeps it always on. A custom domain can be
+added in the service's Settings.
+
+**Other hosts:** `fantasy-hub/Dockerfile` runs anywhere that takes a container
+(Fly.io, Railway, Google Cloud Run). Set the same `LEAGUE_ID` / `SITE_PASSWORD`
+environment variables, plus `PORT` if the platform requires it.
+
+| Variable | Purpose |
+|---|---|
+| `LEAGUE_ID` | Lock the site to one league; visitors pick their team instead of searching usernames |
+| `SITE_PASSWORD` | Optional shared password (HTTP Basic auth) |
+| `PORT` | Port to listen on (default 3000; Render sets it) |
+| `CFBD_API_KEY` | Optional free key from [collegefootballdata.com](https://collegefootballdata.com/key): adds college stats and dominator ratings to rookie profiles |
+| `KTC_ENABLED` | Set to `0` to stop reading KeepTradeCut |
+| `ROOKIE_NOTES` | Path to your own rookie notes JSON (default `data/rookies.json`; see `data/rookies.example.json`) |
+
+## How Sleeper is connected
+
+Everything goes through the server (`lib/sleeper.js`), which calls
+`https://api.sleeper.app/v1` and caches the responses:
+
+| Data | Endpoint | Cache |
+|---|---|---|
+| User → leagues | `/user/{name}`, `/user/{id}/leagues/nfl/{season}` | 6h / 5m |
+| League, rosters, users, matchups, transactions | `/league/{id}/...` | 5m |
+| Player database (~5 MB) | `/players/nfl` | 24h on disk (Sleeper asks for at most once a day) |
+| Trending adds | `/players/nfl/trending/add` | 5m |
+| Past seasons, playoff brackets, traded picks | `previous_league_id`, `/winners_bracket`, `/traded_picks` | finished seasons: 7 days on disk |
+| Weekly stats / projections | `/stats/nfl/regular/{season}/{week}`, `/projections/...` | 24h for past weeks |
+
+Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
+6-pt pass TDs and similar rules are reflected everywhere.
+
+## What each page does
+
+- **Power Rankings**: *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
+- **League History**: follows Sleeper's `previous_league_id` chain back through every season: champions, all-time standings, all-play and luck, finish-by-season heatmap, head-to-head matrix, and league records.
+- **Trade Analyzer**: pick players and draft picks from any two teams and compare value across KeepTradeCut, FantasyCalc, DynastyProcess and the built-in production model: per-source edge, consensus verdict, whether sources agree, and weekly lineup impact for both teams. Picks are valued at their projected slot.
+- **Trade Finder**: auto-suggested win-win trades (each opens in the analyzer).
+- **Rookies**: the incoming class ranked by consensus of KTC and DynastyProcess/FantasyPros, a value-curve chart for spotting tier cliffs, position mix by tier, scouting profiles (size, age, market disagreement, optional college production), and a **mock rookie draft** in projected order (current standings, traded picks applied) that you can run **by team need** or **straight rankings**.
+- **Dashboard**: your team at a glance, matchup win probability, scoring-by-week chart vs. league average, power rankings, standings with all-play, luck and recent form, this week's matchups, your top waiver targets, league transactions and the latest headlines.
+- **My Team**: your optimal lineup by rest-of-season points (it flags players who are better than someone you're starting) and your positional strength ranked against every team in the league.
+- **Waivers**: free agents ranked by how much they improve your best lineup, plus snap-share and target-share trends and Sleeper-wide add counts. It also suggests who to drop.
+- **Trades**: an analyzer (lineup change for both teams, trade value, verdict) and a trade finder that searches every roster for 1-for-1 and 2-for-1 deals that improve **both** lineups at roughly even value.
+- **Metrics**: sortable snap share, target share, air-yards share, WOPR, aDOT, yards/target, touches, YPC, red-zone opportunities and consistency.
+- **Player pages**: an auto-written scouting report (outlook, strengths, concerns), usage profile, weekly chart, game log, matching news and highlights.
+- **News & Highlights**: RSS from ESPN, CBS, Yahoo, PFT and RotoBaller, plus YouTube channel feeds. Edit the lists in `config.js`.
+
+## Data sources and caveats
+
+- Trade values come from [FantasyCalc](https://fantasycalc.com) (redraft or dynasty, 1QB or superflex, PPR, team count, all matched to your league). If FantasyCalc is unreachable, values are derived from production instead.
+- Sleeper's `/stats` and `/projections` endpoints are not in its official docs. They have been stable for years, but if they change, metrics degrade and the rest of the app keeps working.
+- Sleeper reports air yards only on completed catches, so air-yards share and WOPR understate deep targets; the metrics page shows yards per catch instead of aDOT.
+- Running behind a corporate/HTTPS proxy? Start with `NODE_USE_ENV_PROXY=1` (Node ≥ 22.21) so Node's fetch uses `HTTPS_PROXY`. Not needed on Render.
+- Target share and air-yards share use each player's *current* team, so they're approximate for players traded mid-season.
+- **KeepTradeCut has no public API.** The server reads the player list embedded in KTC's public rankings pages at most every 12 hours. If KTC changes its page, that source shows as unavailable and everything else keeps working. Set `KTC_ENABLED=0` to turn it off. Players are matched to Sleeper by name and position; DynastyProcess uses its published Sleeper ID map.
+- Rookie classes depend on what the ranking sites list. Early in the cycle (before the college season ends) the class may be short; add prospects or your own notes in `data/rookies.json`. The mock draft order is projected from current standings; leagues using a lottery or max-PF order will differ.
+- Dynasty values always use FantasyCalc's *dynasty* market, even in redraft leagues. Age curves are generic (RBs decline fastest, QBs slowest), so treat 2–3-year projections as directional. If FantasyCalc has no pick values, picks are estimated from the player value curve.
+- A news feed that fails is skipped, and the News page lists it as unavailable.
+
+## Layout
+
+```
+server.js        HTTP server + JSON API
+config.js        feeds, ports, cache TTLs
+lib/sleeper.js   Sleeper client
+lib/metrics.js   scoring + advanced metrics
+lib/lineup.js    optimal-lineup solver
+lib/advice.js    waiver + trade logic
+lib/history.js   multi-season history, records, head-to-head
+lib/dynasty.js   dynasty values, pick ownership, age-curve projections
+lib/power.js     season power rankings, win probability
+lib/sources.js   KeepTradeCut, FantasyCalc, DynastyProcess adapters
+lib/valuehub.js  per-league value table + trade comparison
+lib/picks.js     pick ownership, projected draft order, pick valuation
+lib/rookies.js   rookie board, scouting reports, college stats, mock draft
+data/            optional rookie notes
+lib/values.js    FantasyCalc / fallback trade values
+lib/scouting.js  rule-based scouting reports
+lib/feeds.js     RSS/Atom aggregation
+lib/mock.js      fake data for `npm run demo` and tests
+public/          single-page front end (charts.js = small SVG chart kit)
+```
