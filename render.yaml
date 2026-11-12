@@ -17,3 +17,5 @@ services:
         sync: false   # your Sleeper league ID (the number in sleeper.com/leagues/<id>)
       - key: SITE_PASSWORD
         sync: false   # optional: leave blank for a public site
+      - key: CFBD_API_KEY
+        sync: false   # optional: free key from collegefootballdata.com for rookie college stats

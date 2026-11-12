@@ -280,4 +280,7 @@ details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin
   .hero-team h1 { font-size: 28px; }
   .trade { grid-template-columns: 1fr; }
   .mu .score { font-size: 26px; }
+  .pick { flex-wrap: wrap; }
+  .pick .vals { flex-basis: 100%; margin-left: 26px !important; }
+  .hide-sm { display: none; }
 }

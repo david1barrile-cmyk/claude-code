@@ -13,6 +13,8 @@ import { getHistory } from './lib/history.js';
 import { getDynastyRankings } from './lib/dynasty.js';
 import { seasonPower, winProbability } from './lib/power.js';
 import { cached } from './lib/cache.js';
+import { getValueHub, compareSides } from './lib/valuehub.js';
+import { getRookieBoard, mockDraft, collegeProfile, rookieReport } from './lib/rookies.js';
 
 const PUBLIC = path.join(path.dirname(new URL(import.meta.url).pathname), 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -238,6 +240,44 @@ const routes = [
       weeks, average: avg,
       teams: cur.standings.map((s) => ({ ownerId: s.ownerId, weekly: s.weekly, apW: s.apW, apL: s.apL, form: s.form })),
     };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/values$/, async ([id]) => {
+    const ctx = await getLeagueContext(id);
+    const { _raw, ...hub } = await getValueHub(ctx);
+    return hub;
+  }],
+
+  ['POST', /^\/api\/league\/(\d+)\/analyze$/, async ([id], _q, body) => {
+    const ctx = await getLeagueContext(id);
+    const hub = await getValueHub(ctx);
+    const a = body.a || {}, b = body.b || {};
+    const ids = (side) => [...(side.players || []), ...(side.picks || [])].map(String).slice(0, 30);
+    const result = compareSides(hub, ids(a), ids(b));
+    const A = findTeam(ctx, a.rosterId), B = findTeam(ctx, b.rosterId);
+    if (A && B && A !== B) {
+      result.lineup = evaluateTrade({ players: ctx.players, metrics: ctx.metrics, values: ctx.values, slots: ctx.slots,
+        mineIds: A.ids, theirIds: B.ids, give: (a.players || []).filter((x) => A.ids.includes(x)), get: (b.players || []).filter((x) => B.ids.includes(x)) });
+    }
+    return result;
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/rookies$/, async ([id]) => getRookieBoard(await getLeagueContext(id))],
+
+  ['GET', /^\/api\/league\/(\d+)\/rookies\/mock$/, async ([id], q) =>
+    mockDraft(await getLeagueContext(id), q.get('mode') === 'bpa' ? 'bpa' : 'need')],
+
+  ['GET', /^\/api\/league\/(\d+)\/rookie\/([\w-]+)$/, async ([id, slug]) => {
+    const ctx = await getLeagueContext(id);
+    const { board, season } = await getRookieBoard(ctx);
+    const r = board.find((x) => x.slug === slug);
+    if (!r) throw new HttpError(404, 'Prospect not found');
+    const college = await collegeProfile(r, season);
+    const [need, bpa] = await Promise.all([mockDraft(ctx, 'need'), mockDraft(ctx, 'bpa')]);
+    const where = (m) => m.picks.find((p) => p.player?.slug === slug) ?? null;
+    const neighbors = board.filter((x) => x.pos === r.pos && Math.abs(x.rank - r.rank) <= 6 && x.slug !== slug).slice(0, 5)
+      .map(({ slug: s2, name, rank, college: c }) => ({ slug: s2, name, rank, college: c }));
+    return { season, rookie: r, college, report: rookieReport(r, college), mock: { need: where(need), bpa: where(bpa) }, neighbors };
   }],
 
   ['GET', /^\/api\/news$/, async (_m, q) => {

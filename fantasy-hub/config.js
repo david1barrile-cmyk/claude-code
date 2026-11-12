@@ -6,6 +6,11 @@ export const config = {
   leagueId: process.env.LEAGUE_ID || null,
   // Optional shared password (HTTP Basic auth; any username works).
   sitePassword: process.env.SITE_PASSWORD || null,
+  // KeepTradeCut has no API; we read its public rankings page at most every 12h. Set KTC_ENABLED=0 to turn off.
+  ktcEnabled: process.env.KTC_ENABLED !== '0',
+  // Optional free key from collegefootballdata.com: adds college stats to rookie profiles.
+  cfbdKey: process.env.CFBD_API_KEY || null,
+  rookieNotesFile: process.env.ROOKIE_NOTES || new URL('./data/rookies.json', import.meta.url).pathname,
   cacheDir: process.env.CACHE_DIR || new URL('./.cache/', import.meta.url).pathname,
 
   sleeperBase: 'https://api.sleeper.app/v1',

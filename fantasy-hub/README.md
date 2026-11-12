@@ -48,6 +48,9 @@ environment variables, plus `PORT` if the platform requires it.
 | `LEAGUE_ID` | Lock the site to one league; visitors pick their team instead of searching usernames |
 | `SITE_PASSWORD` | Optional shared password (HTTP Basic auth) |
 | `PORT` | Port to listen on (default 3000; Render sets it) |
+| `CFBD_API_KEY` | Optional free key from [collegefootballdata.com](https://collegefootballdata.com/key): adds college stats and dominator ratings to rookie profiles |
+| `KTC_ENABLED` | Set to `0` to stop reading KeepTradeCut |
+| `ROOKIE_NOTES` | Path to your own rookie notes JSON (default `data/rookies.json`; see `data/rookies.example.json`) |
 
 ## How Sleeper is connected
 
@@ -70,6 +73,9 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 
 - **Power Rankings**: *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
 - **League History**: follows Sleeper's `previous_league_id` chain back through every season: champions, all-time standings, all-play and luck, finish-by-season heatmap, head-to-head matrix, and league records.
+- **Trade Analyzer**: pick players and draft picks from any two teams and compare value across KeepTradeCut, FantasyCalc, DynastyProcess and the built-in production model: per-source edge, consensus verdict, whether sources agree, and weekly lineup impact for both teams. Picks are valued at their projected slot.
+- **Trade Finder**: auto-suggested win-win trades (each opens in the analyzer).
+- **Rookies**: the incoming class ranked by consensus of KTC and DynastyProcess/FantasyPros, a value-curve chart for spotting tier cliffs, position mix by tier, scouting profiles (size, age, market disagreement, optional college production), and a **mock rookie draft** in projected order (current standings, traded picks applied) that you can run **by team need** or **straight rankings**.
 - **Dashboard**: your team at a glance, matchup win probability, scoring-by-week chart vs. league average, power rankings, standings with all-play, luck and recent form, this week's matchups, your top waiver targets, league transactions and the latest headlines.
 - **My Team**: your optimal lineup by rest-of-season points (it flags players who are better than someone you're starting) and your positional strength ranked against every team in the league.
 - **Waivers**: free agents ranked by how much they improve your best lineup, plus snap-share and target-share trends and Sleeper-wide add counts. It also suggests who to drop.
@@ -83,6 +89,8 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 - Trade values come from [FantasyCalc](https://fantasycalc.com) (redraft or dynasty, 1QB or superflex, PPR, team count, all matched to your league). If FantasyCalc is unreachable, values are derived from production instead.
 - Sleeper's `/stats` and `/projections` endpoints are not in its official docs. They have been stable for years, but if they change, metrics degrade and the rest of the app keeps working.
 - Target share and air-yards share use each player's *current* team, so they're approximate for players traded mid-season.
+- **KeepTradeCut has no public API.** The server reads the player list embedded in KTC's public rankings pages at most every 12 hours. If KTC changes its page, that source shows as unavailable and everything else keeps working. Set `KTC_ENABLED=0` to turn it off. Players are matched to Sleeper by name and position; DynastyProcess uses its published Sleeper ID map.
+- Rookie classes depend on what the ranking sites list. Early in the cycle (before the college season ends) the class may be short; add prospects or your own notes in `data/rookies.json`. The mock draft order is projected from current standings; leagues using a lottery or max-PF order will differ.
 - Dynasty values always use FantasyCalc's *dynasty* market, even in redraft leagues. Age curves are generic (RBs decline fastest, QBs slowest), so treat 2–3-year projections as directional. If FantasyCalc has no pick values, picks are estimated from the player value curve.
 - A news feed that fails is skipped, and the News page lists it as unavailable.
 
@@ -98,6 +106,11 @@ lib/advice.js    waiver + trade logic
 lib/history.js   multi-season history, records, head-to-head
 lib/dynasty.js   dynasty values, pick ownership, age-curve projections
 lib/power.js     season power rankings, win probability
+lib/sources.js   KeepTradeCut, FantasyCalc, DynastyProcess adapters
+lib/valuehub.js  per-league value table + trade comparison
+lib/picks.js     pick ownership, projected draft order, pick valuation
+lib/rookies.js   rookie board, scouting reports, college stats, mock draft
+data/            optional rookie notes
 lib/values.js    FantasyCalc / fallback trade values
 lib/scouting.js  rule-based scouting reports
 lib/feeds.js     RSS/Atom aggregation

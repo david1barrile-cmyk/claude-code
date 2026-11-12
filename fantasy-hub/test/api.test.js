@@ -80,3 +80,27 @@ test('site password gate', async () => {
     assert.equal(ok.status, 200);
   } finally { config.sitePassword = null; }
 });
+
+test('trade analyzer and rookie endpoints', async () => {
+  const v = await get('/league/9001/values');
+  assert.deepEqual(v.body.sources.map((s) => [s.short, s.ok]), [['KTC', true], ['FC', true], ['DP', true], ['Model', true]]);
+  const mine = v.body.teams.find((t) => t.rosterId === 1), theirs = v.body.teams.find((t) => t.rosterId === 2);
+  assert.ok(mine.players[0].values.KTC > 0 && mine.picks.some((p) => p.values.KTC > 0));
+  const a = await get('/league/9001/analyze', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ a: { rosterId: 1, players: [mine.players[0].id], picks: [mine.picks[0].key] }, b: { rosterId: 2, players: [theirs.players[0].id] } }) });
+  assert.equal(a.body.perSource.length, 4);
+  assert.ok(a.body.lineup && typeof a.body.lineup.you.delta === 'number');
+  assert.equal(a.body.assets.length, 3);
+
+  const r = await get('/league/9001/rookies');
+  assert.equal(r.body.season, 2027);
+  assert.ok(r.body.board.length >= 30);
+  const need = await get('/league/9001/rookies/mock?mode=need'), bpa = await get('/league/9001/rookies/mock?mode=bpa');
+  assert.equal(need.body.picks.length, 48);
+  assert.deepEqual(bpa.body.picks.slice(0, 5).map((p) => p.player.rank), [1, 2, 3, 4, 5]);
+  // Traded pick shows up under its new owner.
+  assert.ok(need.body.picks.some((p) => p.round === 1 && p.owner === 1 && p.via));
+  const prof = await get(`/league/9001/rookie/${r.body.board[0].slug}`);
+  assert.ok(prof.body.college.seasons.length > 0 && prof.body.report.outlook.length > 0);
+  assert.equal((await get('/league/9001/rookie/nobody-here')).status, 404);
+});

@@ -1,0 +1,18 @@
+{
+  "_readme": "Optional. Copy to data/rookies.json (or set ROOKIE_NOTES) to add your own scouting notes or prospects the ranking sites don't list yet. Every field except name is optional. rank only matters for players no source ranks.",
+  "players": [
+    {
+      "name": "Example Prospect",
+      "pos": "WR",
+      "college": "Example State",
+      "age": 21.2,
+      "height": 73,
+      "weight": 195,
+      "rank": 30,
+      "comps": "Field-stretching X receiver",
+      "notes": "Your league's own write-up goes here.",
+      "strengths": ["Separates vs press"],
+      "concerns": ["Thin frame"]
+    }
+  ]
+}
