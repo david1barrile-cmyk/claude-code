@@ -100,20 +100,42 @@ export async function collegeProfile(r, draftYear) {
   const years = [draftYear - 1, draftYear - 2];
   try {
     // KTC school names include mascots ("Ohio State Buckeyes"); ask CFBD which team the player is on.
-    const found = await cached(`cfbd:s:${normName(r.name)}`, 7 * 24 * 3600e3, () => fetchJson(`${CFBD}/player/search?searchTerm=${encodeURIComponent(r.name)}`, headers)).catch(() => []);
-    const hit = (found || []).find((x) => normName(x.name) === normName(r.name) && (!r.college || r.college.toLowerCase().startsWith(String(x.team || '').toLowerCase())))
-      || (found || []).find((x) => normName(x.name) === normName(r.name));
-    const school = hit?.team || r.college;
+    const search = (term) => cached(`cfbd:s:${term.toLowerCase()}`, 7 * 24 * 3600e3, () => fetchJson(`${CFBD}/player/search?searchTerm=${encodeURIComponent(term)}`, headers)).catch(() => []);
+    let found = await search(r.name);
+    // CFBD's search is literal ("CJ Carr" misses "C.J. Carr"), so fall back to the last name.
+    if (!(found || []).some((x) => normName(x.name) === normName(r.name))) {
+      const last = normName(r.name).split(' ').filter(Boolean).pop();
+      if (last) found = [...(found || []), ...((await search(last)) || [])];
+    }
+    // Common names return several players: prefer same school, then same position.
+    const same = (found || []).filter((x) => normName(x.name) === normName(r.name));
+    const schoolOk = (x) => r.college && x.team && r.college.toLowerCase().startsWith(String(x.team).toLowerCase());
+    const hit = same.find((x) => schoolOk(x) && x.position === r.pos) || same.find(schoolOk) || same.find((x) => x.position === r.pos && (x.activeEndYear ?? 0) >= draftYear - 1);
+    let school = hit?.team || null, cfbdName = hit?.name || r.name;
+    if (!school && r.college) {
+      // Last resort (nicknames, hyphenated names): find the school by trimming the mascot off KTC's
+      // name ("Alabama Crimson Tide" → "Alabama"), then a unique same-last-name player at the position.
+      const words = r.college.split(/\s+/);
+      const lastName = normName(r.name).split(' ').pop();
+      const statPos = r.pos === 'TE' ? ['TE'] : [r.pos];
+      for (let n = words.length - 1; n >= 1 && !school; n--) {
+        const team = words.slice(0, n).join(' ');
+        const rows = await cached(`cfbd:p:${years[0]}:${team}`, 24 * 3600e3, () => fetchJson(`${CFBD}/stats/player/season?year=${years[0]}&team=${encodeURIComponent(team)}`, headers)).catch(() => []);
+        if (!rows?.length) continue;
+        const names = [...new Set(rows.filter((x) => normName(x.player).split(' ').includes(lastName) && (!x.position || statPos.includes(x.position))).map((x) => x.player))];
+        if (names.length === 1) { school = team; cfbdName = names[0]; }
+        else break; // found the school but no unique match
+      }
+    }
     if (!school) return null;
-    r = { ...r, college: school };
-    const seasons = [];
-    for (const year of years) {
+    r = { ...r, college: school, name: cfbdName };
+    const perYear = await Promise.all(years.map(async (year) => {
       const [ps, ts] = await Promise.all([
         cached(`cfbd:p:${year}:${r.college}`, 24 * 3600e3, () => fetchJson(`${CFBD}/stats/player/season?year=${year}&team=${encodeURIComponent(r.college)}`, headers)),
         cached(`cfbd:t:${year}:${r.college}`, 24 * 3600e3, () => fetchJson(`${CFBD}/stats/season?year=${year}&team=${encodeURIComponent(r.college)}`, headers)),
       ]);
       const mine = (ps || []).filter((x) => normName(x.player) === normName(r.name));
-      if (!mine.length) continue;
+      if (!mine.length) return null;
       const st = (cat, type) => Number(mine.find((x) => x.category === cat && x.statType === type)?.stat ?? 0);
       const team = (name) => Number((ts || []).find((x) => x.statName === name)?.statValue ?? 0);
       const s = {
@@ -129,8 +151,9 @@ export async function collegeProfile(r, draftYear) {
       s.ypa = s.passAtt ? s.passYds / s.passAtt : null;
       s.ypc = s.car ? s.rushYds / s.car : null;
       s.ypr = s.rec ? s.recYds / s.rec : null;
-      seasons.push(s);
-    }
+      return s;
+    }));
+    const seasons = perYear.filter(Boolean);
     return seasons.length ? { source: 'CollegeFootballData.com', seasons } : null;
   } catch (err) {
     console.warn('[cfbd]', err.message);
@@ -163,7 +186,13 @@ export function rookieReport(r, college) {
     if (r.pos === 'WR' && r.height >= 74) S.push(`Big-bodied receiver (${Math.floor(r.height / 12)}'${r.height % 12}").`);
     if (r.pos === 'QB' && r.height < 73) C.push(`Short for a QB (${Math.floor(r.height / 12)}'${r.height % 12}").`);
   }
-  const last = college?.seasons?.[0];
+  // Judge production on the most recent season with real volume; flag a thin latest season.
+  const enough = (x) => (r.pos === 'QB' ? x.passAtt >= 100 : r.pos === 'RB' ? x.car + x.rec >= 60 : x.rec >= 20);
+  const latest = college?.seasons?.[0];
+  const last = college?.seasons?.find(enough);
+  if (latest && !enough(latest)) {
+    C.push(`Limited ${latest.year} sample (${r.pos === 'QB' ? `${latest.passAtt} attempts` : r.pos === 'RB' ? `${latest.car + latest.rec} touches` : `${latest.rec} catches`}): check for injury or role change.`);
+  }
   if (last) {
     if (last.dominator != null) {
       if (last.dominator >= 0.3) S.push(`Dominant college producer: ${pct(last.dominator)} dominator rating in ${last.year} (share of team yards + TDs).`);
@@ -227,7 +256,11 @@ export function runMock({ board, picks, needs, mode }) {
   });
 }
 
-export async function mockDraft(ctx, mode = 'need') {
+export function mockDraft(ctx, mode = 'need') {
+  return cached(`mock:${ctx.league.league_id}:${mode}`, 10 * 60e3, () => runMockDraft(ctx, mode));
+}
+
+async function runMockDraft(ctx, mode) {
   const [{ board, season }, picks, dyn] = await Promise.all([getRookieBoard(ctx), leaguePicks(ctx, 1), getDynastyRankings(ctx)]);
   const cur = picks.filter((p) => p.season === season).sort((a, b) => a.round - b.round || a.slot - b.slot);
   const fmt = (await getValueHub(ctx)).format;

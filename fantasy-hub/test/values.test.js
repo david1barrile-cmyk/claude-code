@@ -123,3 +123,15 @@ test('KTC parser reads the JSON script tag and FantasyCalc pick names', () => {
   assert.equal(extractKtcPlayers(html).length, 2);
   assert.deepEqual(parsePickName('2027 1st (Early)'), { season: 2027, round: 1, tier: 'early', slot: null });
 });
+
+test('rookie report ignores a thin latest season and flags it', () => {
+  const r = { name: 'X', pos: 'RB', rank: 10, posRank: 3, sources: {} };
+  const college = { seasons: [
+    { year: 2026, car: 4, rec: 0, rushYds: 45, recYds: 0, ypc: 11.3, dominator: 0.006 },
+    { year: 2025, car: 256, rec: 6, rushYds: 1649, recYds: 22, ypc: 6.4, dominator: 0.33 },
+  ] };
+  const rep = rookieReport(r, college);
+  assert.ok(rep.concerns.some((x) => x.startsWith('Limited 2026 sample')));
+  assert.ok(rep.strengths.some((x) => x.includes('33% dominator rating in 2025')));
+  assert.ok(!rep.strengths.some((x) => x.includes('11.3')));
+});
