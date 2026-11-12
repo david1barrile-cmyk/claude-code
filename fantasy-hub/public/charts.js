@@ -51,7 +51,7 @@ function niceMax(v, ticks = 4) {
   const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
   return { max: step * ticks, step };
 }
-const fmtK = (v) => (Math.abs(v) >= 10000 ? `${r1(v / 1000)}k` : `${Math.round(v)}`);
+const fmtK = (v) => (Math.abs(v) >= 1e6 ? `${r1(v / 1e6)}M` : Math.abs(v) >= 10000 ? `${r1(v / 1000)}k` : `${Math.round(v)}`);
 
 export function legend(items) {
   return `<div class="legend">${items.map((i) => `<span><i class="${i.line ? 'line' : ''} ${i.dashed ? 'dash' : ''}" style="background:${i.color}"></i>${esc(i.label)}</span>`).join('')}</div>`;

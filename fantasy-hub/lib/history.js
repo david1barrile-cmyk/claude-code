@@ -50,6 +50,16 @@ export function summarizeSeason({ league, rosters, users, bracket, weeks }) {
       me.apW += scored.filter((x) => x.points < r.points).length;
       me.apL += scored.filter((x) => x.points > r.points).length;
     }
+    // Leagues with "play the league median" add a second game each week vs the median score.
+    if (league.settings?.league_average_match) {
+      const pts = scored.map((r) => r.points).sort((a, b) => a - b);
+      const mid = pts.length % 2 ? pts[(pts.length - 1) / 2] : (pts[pts.length / 2 - 1] + pts[pts.length / 2]) / 2;
+      for (const r of scored) {
+        const me = row(owner[r.roster_id]);
+        if (r.points > mid) me.wins++; else if (r.points < mid) me.losses++; else me.ties++;
+        me.medianW = (me.medianW || 0) + (r.points > mid ? 1 : 0);
+      }
+    }
     const byM = {};
     scored.forEach((r) => (byM[r.matchup_id] ||= []).push(r));
     for (const pair of Object.values(byM)) {
@@ -81,6 +91,7 @@ export function summarizeSeason({ league, rosters, users, bracket, weeks }) {
   const champ = bracket.find((m) => m.p === 1 && m.w);
   return {
     season: league.season, leagueId: league.league_id, name: league.name, complete: league.status === 'complete',
+    medianGames: !!league.settings?.league_average_match,
     champion: champ ? owner[champ.w] : null, runnerUp: champ ? owner[champ.l] : null,
     standings, games,
     users: Object.fromEntries(users.map((u) => [u.user_id, { name: u.metadata?.team_name || u.display_name, user: u.display_name, avatar: u.avatar }])),

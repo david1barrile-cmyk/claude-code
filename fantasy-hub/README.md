@@ -88,6 +88,8 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 
 - Trade values come from [FantasyCalc](https://fantasycalc.com) (redraft or dynasty, 1QB or superflex, PPR, team count, all matched to your league). If FantasyCalc is unreachable, values are derived from production instead.
 - Sleeper's `/stats` and `/projections` endpoints are not in its official docs. They have been stable for years, but if they change, metrics degrade and the rest of the app keeps working.
+- Sleeper reports air yards only on completed catches, so air-yards share and WOPR understate deep targets; the metrics page shows yards per catch instead of aDOT.
+- Running behind a corporate/HTTPS proxy? Start with `NODE_USE_ENV_PROXY=1` (Node ≥ 22.21) so Node's fetch uses `HTTPS_PROXY`. Not needed on Render.
 - Target share and air-yards share use each player's *current* team, so they're approximate for players traded mid-season.
 - **KeepTradeCut has no public API.** The server reads the player list embedded in KTC's public rankings pages at most every 12 hours. If KTC changes its page, that source shows as unavailable and everything else keeps working. Set `KTC_ENABLED=0` to turn it off. Players are matched to Sleeper by name and position; DynastyProcess uses its published Sleeper ID map.
 - Rookie classes depend on what the ranking sites list. Early in the cycle (before the college season ends) the class may be short; add prospects or your own notes in `data/rookies.json`. The mock draft order is projected from current standings; leagues using a lottery or max-PF order will differ.

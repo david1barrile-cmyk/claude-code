@@ -5,6 +5,7 @@ import { cached } from './cache.js';
 import { fetchJson } from './http.js';
 import * as S from './sleeper.js';
 import { leagueValueParams } from './values.js';
+import { parsePickName, resolvePickValue } from './picks.js';
 
 // Year-over-year value multiplier by position and age (age at start of the year).
 // Tuned to common dynasty aging patterns: RBs fall off fast after 26, WRs hold
@@ -31,14 +32,11 @@ async function dynastyValues(league) {
   const url = `${config.fantasyCalcBase}/values/current?isDynasty=true&numQbs=${p.numQbs}&numTeams=${p.numTeams}&ppr=${p.ppr}`;
   try {
     const rows = await cached(`fc:${url}`, config.ttl.values, () => fetchJson(url));
-    const players = {}, picks = {};
+    const players = {}, picks = [];
     for (const r of rows) {
-      const name = r.player?.name || '';
-      const pm = name.match(/^(\d{4})\s+(?:Round\s+)?(\d)(?:st|nd|rd|th)?\b/i);
-      if (pm && (r.player?.position === 'PICK' || /pick|round|1st|2nd|3rd|4th/i.test(name))) {
-        const key = `${pm[1]}:${pm[2]}`;
-        picks[key] = Math.max(picks[key] || 0, r.value); // generic "2027 1st" style entries
-      } else if (r.player?.sleeperId) players[r.player.sleeperId] = r.value;
+      const pk = r.player?.position === 'PICK' ? parsePickName(r.player?.name) : null;
+      if (pk) picks.push({ ...pk, value: r.value });
+      else if (r.player?.sleeperId) players[r.player.sleeperId] = r.value;
     }
     if (Object.keys(players).length) return { players, picks, source: 'FantasyCalc (dynasty)' };
   } catch (err) {
@@ -79,7 +77,8 @@ export function getDynastyRankings(ctx) {
       if (k in owned) owned[k] = tp.owner_id;
     }
     // Future picks are discounted ~10%/yr for uncertainty when estimated.
-    const pickVal = (season, round) => dv?.picks[`${season}:${round}`] ?? Math.round(genericPick(round) * 0.9 ** (season - firstDraft));
+    const pickVal = (season, round) => (dv?.picks.length ? resolvePickValue(dv.picks, { season, round, slot: null, tier: 'mid' }, n) : null)
+      ?? Math.round(genericPick(round) * 0.9 ** (season - firstDraft));
 
     const out = teams.map((t) => {
       const assets = t.ids.map((id) => ({ id, pos: players[id]?.pos, age: players[id]?.age, value: baseVal(id) }))
@@ -107,6 +106,6 @@ export function getDynastyRankings(ctx) {
     for (let y = 0; y < 4; y++) {
       [...out].sort((a, b) => b.projected[y] - a.projected[y]).forEach((t, i) => { (t.ranks ||= [])[y] = i + 1; });
     }
-    return { source: dv?.source ?? 'Estimated from production + age', pickSource: dv && Object.keys(dv.picks).length ? 'FantasyCalc' : 'Estimated', teams: out.sort((a, b) => a.ranks[0] - b.ranks[0]) };
+    return { source: dv?.source ?? 'Estimated from production + age', pickSource: dv?.picks.length ? 'FantasyCalc' : 'Estimated', teams: out.sort((a, b) => a.ranks[0] - b.ranks[0]) };
   });
 }

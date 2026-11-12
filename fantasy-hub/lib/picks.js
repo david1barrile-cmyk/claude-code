@@ -56,6 +56,8 @@ export function parsePickName(name) {
   if (m) return { season: +m[1], round: +m[2], slot: +m[3], tier: null };
   m = s.match(/^(\d{4})\s+(early|mid|late)\s+(\d)(?:st|nd|rd|th)/i);
   if (m) return { season: +m[1], round: +m[3], tier: m[2].toLowerCase(), slot: null };
+  m = s.match(/^(\d{4})\s+(\d)(?:st|nd|rd|th)\s*\((early|mid|late)\)$/i); // FantasyCalc: "2027 1st (Early)"
+  if (m) return { season: +m[1], round: +m[2], tier: m[3].toLowerCase(), slot: null };
   m = s.match(/^(\d{4})\s+(?:round\s+)?(\d)(?:st|nd|rd|th)?(?:\s+round)?(?:\s+pick)?$/i);
   if (m) return { season: +m[1], round: +m[2], tier: null, slot: null };
   return null;

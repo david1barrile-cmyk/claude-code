@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { config } from './config.js';
 import * as S from './lib/sleeper.js';
 import { getLeagueContext, findTeam } from './lib/league.js';
-import { bestLineup, lineupInfo } from './lib/lineup.js';
+import { bestLineup, lineupInfo, SLOT_ELIGIBILITY } from './lib/lineup.js';
 import { waiverAdvice, evaluateTrade, tradeSuggestions } from './lib/advice.js';
 import { getNews, getHighlights, mentions } from './lib/feeds.js';
 import { scoutingReport } from './lib/scouting.js';
@@ -134,8 +134,11 @@ const routes = [
     const team = findTeam(ctx, q.get('owner'));
     if (!team) throw new HttpError(400, 'owner query param must be your Sleeper user id');
     const trending = await S.getTrending('add').catch(() => []);
-    const advice = waiverAdvice({ players: ctx.players, metrics: ctx.metrics, slots: ctx.slots, myIds: team.ids, rosteredIds: ctx.rostered, trendingAdds: trending });
-    const trendingFree = trending.filter((t) => !ctx.rostered.has(t.player_id) && ctx.players[t.player_id]).slice(0, 15)
+    const held = new Set([...(team.reserve || []), ...(team.taxi || [])]);
+    const advice = waiverAdvice({ players: ctx.players, metrics: ctx.metrics, slots: ctx.slots, myIds: team.ids, rosteredIds: ctx.rostered, trendingAdds: trending,
+      droppableIds: team.ids.filter((x) => !held.has(x)) });
+    const usable = new Set(ctx.slots.flatMap((sl) => SLOT_ELIGIBILITY[sl] || []));
+    const trendingFree = trending.filter((t) => !ctx.rostered.has(t.player_id) && usable.has(ctx.players[t.player_id]?.pos)).slice(0, 15)
       .map((t) => ({ ...card(ctx, t.player_id), adds: t.count }));
     return {
       baseline: advice.baseline,

@@ -24,7 +24,7 @@ export function scoutingReport({ player: p, m, rank, value }) {
     else if (m.tgtShare >= 0.18) S.push(`Reliable target share (${pct(m.tgtShare)}).`);
     else if (p.pos !== 'RB' && m.tgtShare < 0.12) C.push(`Low target share (${pct(m.tgtShare)}); production leans on big plays or TDs.`);
   }
-  if (m.adot != null && m.adot >= 13 && p.pos !== 'RB') S.push(`Field-stretcher: ${m.adot} yd average depth of target.`);
+  if (m.ypr != null && m.ypr >= 15 && m.games >= 3 && p.pos !== 'RB') S.push(`Big-play threat: ${m.ypr} yards per catch.`);
   if (p.pos === 'RB' && m.touchesPg != null) {
     if (m.touchesPg >= 18) S.push(`Workhorse volume: ${m.touchesPg} touches per game.`);
     else if (m.touchesPg < 10) C.push(`Light workload: ${m.touchesPg} touches per game.`);

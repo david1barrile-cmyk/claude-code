@@ -30,8 +30,9 @@ export function seasonPower(ctx, currentSeason) {
   return rows.sort((a, b) => b.score - a.score).map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
-// P(team A outscores B) assuming normally distributed weekly margin (sd ~ 30 pts).
-export function winProbability(projA, projB, sd = 30) {
+// P(team A outscores B) assuming a normally distributed weekly margin; spread scales with
+// typical scores (deep lineups score more and swing more).
+export function winProbability(projA, projB, sd = Math.max(25, 0.17 * ((projA + projB) / 2))) {
   const z = (projA - projB) / sd;
   // Abramowitz–Stegun erf approximation
   const t = 1 / (1 + 0.3275911 * Math.abs(z / Math.SQRT2));

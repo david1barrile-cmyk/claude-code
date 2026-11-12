@@ -29,9 +29,9 @@ export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = []
     r.pos ||= pos;
     return r;
   };
-  for (const r of ktcRookies.filter((x) => POS.has(x.pos))) {
+  for (const r of ktcRookies.filter((x) => POS.has(x.pos) && (!x.draftYear || x.draftYear === season))) {
     Object.assign(get(r.name, r.pos), {
-      college: r.college ?? undefined, age: r.age ?? undefined, team: r.team || undefined, sleeperId: r.sleeperId ?? undefined,
+      college: r.college ?? undefined, hometown: r.hometown ?? undefined, age: r.age || undefined, team: r.team || undefined, sleeperId: r.sleeperId ?? undefined,
       height: r.heightFeet ? r.heightFeet * 12 + (r.heightInches || 0) : undefined, weight: r.weight ?? undefined,
     });
     get(r.name, r.pos).sources.KTC = { value: r.value, rank: r.rank, posRank: r.posRank, tier: r.tier, trend: r.trend };
@@ -82,8 +82,8 @@ export function getRookieBoard(ctx) {
     return {
       season, format: hub.format,
       sources: [
-        { short: 'KTC', name: 'KeepTradeCut rookie rankings', ok: ktc.ok && ktc.rookies.length > 0, error: ktc.error ?? (ktc.ok && !ktc.rookies.length ? 'no rookies listed' : null) },
-        { short: 'DP', name: 'DynastyProcess (FantasyPros rookie ECR)', ok: dp.ok && board.some((r) => r.sources.DP), error: dp.error ?? null },
+        { short: 'KTC', name: 'KeepTradeCut devy rankings (college prospects by draft year)', ok: ktc.ok && board.some((r) => r.sources.KTC), error: ktc.error ?? (ktc.ok && !board.some((r) => r.sources.KTC) ? `no ${season} prospects listed` : null) },
+        { short: 'DP', name: 'DynastyProcess (FantasyPros rookie ECR)', ok: dp.ok && board.some((r) => r.sources.DP), error: dp.error ?? (dp.ok && !board.some((r) => r.sources.DP) ? `no ${season} class listed yet (appears closer to the NFL Draft)` : null) },
         { short: 'Notes', name: 'League notes file (data/rookies.json)', ok: readNotes().length > 0, error: null },
       ],
       board,
@@ -95,10 +95,17 @@ export function getRookieBoard(ctx) {
 const CFBD = 'https://api.collegefootballdata.com';
 export async function collegeProfile(r, draftYear) {
   const key = config.cfbdKey || (config.mock ? 'mock' : null);
-  if (!key || !r.college) return null;
+  if (!key) return null;
   const headers = { authorization: `Bearer ${key}` };
   const years = [draftYear - 1, draftYear - 2];
   try {
+    // KTC school names include mascots ("Ohio State Buckeyes"); ask CFBD which team the player is on.
+    const found = await cached(`cfbd:s:${normName(r.name)}`, 7 * 24 * 3600e3, () => fetchJson(`${CFBD}/player/search?searchTerm=${encodeURIComponent(r.name)}`, headers)).catch(() => []);
+    const hit = (found || []).find((x) => normName(x.name) === normName(r.name) && (!r.college || r.college.toLowerCase().startsWith(String(x.team || '').toLowerCase())))
+      || (found || []).find((x) => normName(x.name) === normName(r.name));
+    const school = hit?.team || r.college;
+    if (!school) return null;
+    r = { ...r, college: school };
     const seasons = [];
     for (const year of years) {
       const [ps, ts] = await Promise.all([

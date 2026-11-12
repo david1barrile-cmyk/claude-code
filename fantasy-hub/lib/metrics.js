@@ -106,7 +106,9 @@ export function buildMetrics({ players, weeks, scoring, projections = {} }) {
       airShare: round(season.airShare, 3), wopr: round(wopr, 3),
       tgtPg: round(S('tgt') / (games || 1)), touchesPg: round((S('att') + S('rec')) / (games || 1)),
       ypc: round(ratio(S('rushYd'), S('att'))), ypt: round(ratio(S('recYd'), S('tgt'))),
-      catchRate: round(ratio(S('rec'), S('tgt')), 3), adot: round(ratio(S('air'), S('tgt'))),
+      // Sleeper's rec_air_yd counts air yards on catches only, so this is "completed air yards per target",
+      // a conservative stand-in for aDOT; airShare and WOPR inherit the same caveat.
+      catchRate: round(ratio(S('rec'), S('tgt')), 3), adot: round(ratio(S('air'), S('tgt'))), ypr: round(ratio(S('recYd'), S('rec'))),
       rzOpps: S('rz'), tds: S('td'),
       log: log.map(({ week, pts, snp, tmSnp, tgt, rec, recYd, att, rushYd, passYd, td }) =>
         ({ week, pts, snapPct: tmSnp ? round(snp / tmSnp, 3) : null, tgt, rec, recYd, att, rushYd, passYd, td })),

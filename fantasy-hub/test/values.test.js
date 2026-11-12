@@ -103,3 +103,23 @@ test('compareSides computes per-source edges and a consensus', () => {
   assert.equal(r.consensus, 9);
   assert.equal(r.verdict, 'Slight edge to side A');
 });
+
+import { summarizeSeason } from '../lib/history.js';
+import { extractKtcPlayers } from '../lib/sources.js';
+test('league-median games count toward the record', () => {
+  const rosters = [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: `o${r}` }));
+  const s = summarizeSeason({
+    league: { season: '2026', league_id: 'x', status: 'in_season', settings: { league_average_match: 1 } }, rosters, users: [], bracket: [],
+    weeks: [[{ roster_id: 1, matchup_id: 1, points: 100 }, { roster_id: 2, matchup_id: 1, points: 90 }, { roster_id: 3, matchup_id: 2, points: 80 }, { roster_id: 4, matchup_id: 2, points: 70 }]],
+  });
+  const o = Object.fromEntries(s.standings.map((r) => [r.ownerId, r]));
+  assert.deepEqual([o.o1.wins, o.o1.losses], [2, 0]); // beat opponent + above median
+  assert.deepEqual([o.o2.wins, o.o2.losses], [1, 1]); // lost H2H, above median
+  assert.deepEqual([o.o3.wins, o.o3.losses], [1, 1]);
+  assert.deepEqual([o.o4.wins, o.o4.losses], [0, 2]);
+});
+test('KTC parser reads the JSON script tag and FantasyCalc pick names', () => {
+  const html = '<script id="ktc-players" type="application/json">[{"playerName":"A"},{"playerName":"B"}]</script><script>var playersArray = JSON.parse(x);</script>';
+  assert.equal(extractKtcPlayers(html).length, 2);
+  assert.deepEqual(parsePickName('2027 1st (Early)'), { season: 2027, round: 1, tier: 'early', slot: null });
+});

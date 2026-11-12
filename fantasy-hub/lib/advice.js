@@ -7,14 +7,15 @@ const r1 = (x) => Math.round(x * 10) / 10;
 
 const makeInfo = lineupInfo;
 
-export function waiverAdvice({ players, metrics, slots, myIds, rosteredIds, trendingAdds = [], limit = 25 }) {
+export function waiverAdvice({ players, metrics, slots, myIds, rosteredIds, trendingAdds = [], limit = 25, droppableIds = myIds }) {
   const info = makeInfo(players, metrics);
   const base = bestLineup(myIds, info, slots).total;
   const trend = new Map(trendingAdds.map((t) => [t.player_id, t.count]));
   const eligible = new Set(slots.flatMap((s) => ({ QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], K: ['K'], DEF: ['DEF'] }[s] || ['QB', 'RB', 'WR', 'TE'])));
 
   // Drop candidate: the bench player whose loss hurts the lineup least, lowest ros as tiebreak.
-  const drops = myIds
+  // IR / taxi players don't use a bench spot, so they're never the suggested drop.
+  const drops = droppableIds
     .map((id) => ({ id, loss: base - bestLineup(myIds.filter((x) => x !== id), info, slots).total, ros: metrics[id]?.ros ?? 0 }))
     .sort((a, b) => a.loss - b.loss || a.ros - b.ros);
   const drop = drops[0];

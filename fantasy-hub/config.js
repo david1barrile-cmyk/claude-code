@@ -21,7 +21,7 @@ export const config = {
     { name: 'ESPN', url: 'https://www.espn.com/espn/rss/nfl/news' },
     { name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
     { name: 'Yahoo Sports', url: 'https://sports.yahoo.com/nfl/rss.xml' },
-    { name: 'Pro Football Talk', url: 'https://profootballtalk.nbcsports.com/feed/' },
+    { name: 'Pro Football Talk', url: 'https://www.nbcsports.com/profootballtalk.rss' },
     { name: 'RotoBaller', url: 'https://www.rotoballer.com/category/nfl/feed' },
   ],
 

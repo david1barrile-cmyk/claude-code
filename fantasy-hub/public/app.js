@@ -14,7 +14,7 @@ let routeQuery = new URLSearchParams();
 const fmt = (x, d = 1) => (x == null || Number.isNaN(x) ? '—' : Number(x).toFixed(d));
 const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
 const sign = (x, d = 1) => (x == null ? '—' : `${x > 0 ? '+' : ''}${fmt(x, d)}`);
-const k = (v) => (v == null ? '—' : v >= 10000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v).toLocaleString());
+const k = (v) => (v == null ? '—' : v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 10000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v).toLocaleString());
 const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 const ago = (t) => {
   if (!t) return '';
@@ -236,7 +236,7 @@ async function viewPower($) {
     return now && fut ? ['Dynasty', 'good'] : now ? ['Win now', 'warn'] : fut ? ['Rising', 'good'] : ['Rebuild', 'bad'];
   };
 
-  $.innerHTML = `${head('Power Rankings', `Two views of the league. <b>This season</b> blends record (25%), all-play record (35%) and current lineup strength (40%). <b>Dynasty</b> totals roster and draft-pick trade value (${esc(d.dynasty.source)}; picks ${esc(d.dynasty.pickSource.toLowerCase())}) and projects it 1–3 years out with position-specific age curves.`)}
+  $.innerHTML = `${head('Power Rankings', `Two views of the league. <b>This season</b> blends record (25%), all-play record (35%) and current lineup strength (40%). <b>Dynasty</b> totals roster and draft-pick trade value (${esc(d.dynasty.source)}; picks valued by ${esc(d.dynasty.pickSource === 'Estimated' ? 'an estimate' : d.dynasty.pickSource)}) and projects it 1–3 years out with position-specific age curves.`)}
   <div class="grid">
     ${card('This season', `<div id="c-season"></div>`, { span: 5, note: 'score 0–100' })}
     ${card('Contender or rebuilder?', `<div id="c-quad"></div>`, { span: 7, note: 'current strength vs. long-term value' })}
@@ -463,7 +463,8 @@ async function viewAnalyzer($) {
       <div class="row" style="margin:10px 0;min-height:28px">${chosen.map((x) => `<span class="chip" style="gap:6px">${x.kind === 'pick' ? '🎟' : posTag(x.pos)} ${esc(x.name)} <button class="link" data-rm="${k}" data-id="${esc(x.id)}" aria-label="Remove">✕</button></span>`).join('') || '<span class="muted small">Nothing selected</span>'}</div>
       <div style="max-height:360px;overflow:auto;border-top:1px solid var(--border)">${list.map((x) => `<label class="pick"><input type="checkbox" data-side="${k}" value="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}>
         ${x.kind === 'pick' ? `<span class="pos" data-p="PICK" style="--pc:var(--pick)">PICK</span> <span>${esc(x.name)}</span>` : `${posTag(x.pos)} <span>${esc(x.name)}</span> <span class="muted small">${esc(x.team || '')}${x.age ? ` · ${x.age}` : ''}</span>`}
-        <span class="muted small num vals" style="margin-left:auto">${okSrc.map((s) => `<span title="${SRC_LABEL[s]}">${s} ${x.values[s] == null ? '—' : k2(x.values[s])}</span>`).join(' · ')}</span></label>`).join('')}</div>`;
+        <span class="small num" style="margin-left:auto;white-space:nowrap" title="${esc(okSrc.map((s) => `${SRC_LABEL[s]}: ${x.values[s] == null ? '—' : Math.round(x.values[s]).toLocaleString()}`).join('\n'))}"><b>${k2(consensusVal(x.values, okSrc))}</b> <span class="muted">avg</span></span></label>`).join('')}</div>
+      <p class="small muted" style="margin:8px 0 0">Value shown is the average across sources; hover for each site's number.</p>`;
     el.querySelector('select').onchange = (e) => { if (k === 'A') state.a = Number(e.target.value); else state.b = Number(e.target.value); state[k].clear(); renderAll(); };
     el.querySelector('[data-filter]').oninput = (e) => { state.filter[k] = e.target.value; renderSide(k); const i = el.querySelector('[data-filter]'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
     el.querySelectorAll('input[type=checkbox]').forEach((c) => c.onchange = () => { c.checked ? sel.add(c.value) : sel.delete(c.value); renderSide(k); evaluate(); });
@@ -502,7 +503,7 @@ async function viewAnalyzer($) {
       <h3>Assets in this deal</h3><div class="scroll"><table><thead><tr><th>Asset</th><th>Goes to</th>${okSrc.map((s) => `<th class="num">${s}</th>`).join('')}</tr></thead><tbody>
         ${r.assets.map((x) => `<tr><td>${x.kind === 'pick' ? '🎟 ' : `${posTag(x.pos)} `}${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>` : esc(x.label)}</td><td>${esc(x.side === 'A' ? nB : nA)}</td>
           ${okSrc.map((s) => `<td class="num">${x.values[s] == null ? '—' : x.values[s].toLocaleString()}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-      <p class="small muted">Each source uses its own scale, so compare edges, not raw numbers. Picks are valued at their projected slot (current standings) for next year's draft and at "mid" for later years.</p>`;
+      <p class="small muted">Each source uses its own scale, so compare edges, not raw numbers. DynastyProcess prices picks much lower than KTC, so pick-heavy deals often split the sources. Picks are valued at their projected slot (current standings) for next year's draft and at "mid" for later years.</p>`;
   }
   function renderAll() { renderSide('A'); renderSide('B'); evaluate(); }
   renderAll();
@@ -615,7 +616,7 @@ async function viewRookie($, slug) {
       : '<p class="muted">College stats appear here when the server has a free <code>CFBD_API_KEY</code> from collegefootballdata.com.</p>', { span: 7 })}
     ${card('Film & links', `<div class="li"><a href="${yt}" target="_blank" rel="noopener">▶ ${esc(r.name)} highlights on YouTube</a></div>
       <div class="li"><a href="https://www.google.com/search?q=${encodeURIComponent(`${r.name} ${r.college || ''} scouting report`)}" target="_blank" rel="noopener">Scouting reports (web search)</a></div>
-      ${r.sources.KTC ? `<div class="li"><a href="https://keeptradecut.com/dynasty-rankings/rookie-rankings" target="_blank" rel="noopener">KeepTradeCut rookie rankings</a></div>` : ''}`, { span: 5 })}
+      ${r.sources.KTC ? `<div class="li"><a href="https://keeptradecut.com/devy-rankings" target="_blank" rel="noopener">KeepTradeCut devy rankings</a></div>` : ''}`, { span: 5 })}
   </div>`;
   if (c && r.pos !== 'QB' && document.getElementById('c-dom')) {
     columns(document.getElementById('c-dom'), { data: [...c.seasons].reverse().map((s) => ({ x: s.year, y: Math.round((s.dominator ?? 0) * 1000) / 10, s })), height: 160, color: POS4[r.pos], yFmt: (v) => `${v}%`,
@@ -633,16 +634,16 @@ async function viewMetrics($, pos = 'WR') {
     ${recv ? card('Opportunity vs. production', '<div id="c-opp"></div>', { span: 12, note: `top 40 ${pos}s · ${pos === 'RB' ? 'touches' : 'target share'} vs PPG · your players highlighted` }) : ''}
     ${card(`${pos} leaderboard`, `<div class="scroll"><table id="mt">
       <thead><tr><th data-sort>Player</th><th data-sort>Owner</th><th class="num" data-sort>G</th><th class="num" data-sort>PPG</th><th class="num" data-sort>L3</th><th class="num" data-sort>RoS</th><th class="num" data-sort>Snap%</th><th class="num" data-sort>Snap% L3</th>
-        ${recv ? '<th class="num" data-sort>Tgt%</th><th class="num" data-sort>Air%</th><th class="num" data-sort>WOPR</th><th class="num" data-sort>aDOT</th><th class="num" data-sort>Y/Tgt</th>' : ''}
+        ${recv ? '<th class="num" data-sort>Tgt%</th><th class="num" data-sort title="Share of team air yards on catches">Air%*</th><th class="num" data-sort title="Weighted opportunity rating">WOPR*</th><th class="num" data-sort>Y/Rec</th><th class="num" data-sort>Y/Tgt</th>' : ''}
         ${pos === 'RB' ? '<th class="num" data-sort>Touch/G</th><th class="num" data-sort>YPC</th>' : ''}
         <th class="num" data-sort>RZ opp</th><th class="num" data-sort>StDev</th></tr></thead>
       <tbody>${d.rows.map((r) => `<tr class="${r.owner === session.teamName ? 'me' : ''}"><td>${ptag(r)}</td><td>${r.owner ? esc(r.owner) : '<span class="chip good">FA</span>'}</td>
         <td class="num">${r.games}</td><td class="num">${fmt(r.ppg)}</td><td class="num ${trendCls(r.trend)}">${fmt(r.last3)}</td><td class="num"><b>${fmt(r.ros)}</b></td>
         <td class="num" data-v="${r.snapShare ?? -1}">${pct(r.snapShare)}</td><td class="num" data-v="${r.snapShareL3 ?? -1}">${pct(r.snapShareL3)}</td>
-        ${recv ? `<td class="num" data-v="${r.tgtShare ?? -1}">${pct(r.tgtShare)}</td><td class="num" data-v="${r.airShare ?? -1}">${pct(r.airShare)}</td><td class="num">${fmt(r.wopr, 2)}</td><td class="num">${fmt(r.adot)}</td><td class="num">${fmt(r.ypt)}</td>` : ''}
+        ${recv ? `<td class="num" data-v="${r.tgtShare ?? -1}">${pct(r.tgtShare)}</td><td class="num" data-v="${r.airShare ?? -1}">${pct(r.airShare)}</td><td class="num">${fmt(r.wopr, 2)}</td><td class="num">${fmt(r.ypr)}</td><td class="num">${fmt(r.ypt)}</td>` : ''}
         ${pos === 'RB' ? `<td class="num">${fmt(r.touchesPg)}</td><td class="num">${fmt(r.ypc)}</td>` : ''}
         <td class="num">${r.rzOpps}</td><td class="num">${fmt(r.stdev)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="small muted">WOPR = 1.5 × target share + 0.7 × air-yards share. Team shares use each player's current team. RoS blends season, last-3 and next-week projection.</p>`, { span: 12 })}
+      <p class="small muted">WOPR = 1.5 × target share + 0.7 × air-yards share. *Sleeper only reports air yards on completed catches, so Air% and WOPR understate deep targets that fell incomplete. Team shares use each player's current team. RoS blends season, last-3 and next-week projection.</p>`, { span: 12 })}
   </div>`;
   $.querySelectorAll('[data-pos]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/metrics/${b.dataset.pos}`; }));
   sortableTable(document.getElementById('mt'));
@@ -700,8 +701,8 @@ async function viewPlayer($, id) {
     ${card('Usage profile', `<table><tbody>
       <tr><td>Snap share (season / L3)</td><td class="num">${pct(m.snapShare)} / ${pct(m.snapShareL3)}</td></tr>
       <tr><td>Target share (season / L3)</td><td class="num">${pct(m.tgtShare)} / ${pct(m.tgtShareL3)}</td></tr>
-      <tr><td>Air-yards share · WOPR</td><td class="num">${pct(m.airShare)} · ${fmt(m.wopr, 2)}</td></tr>
-      <tr><td>Targets / game · aDOT</td><td class="num">${fmt(m.tgtPg)} · ${fmt(m.adot)}</td></tr>
+      <tr><td title="Based on air yards from completed catches">Air-yards share · WOPR*</td><td class="num">${pct(m.airShare)} · ${fmt(m.wopr, 2)}</td></tr>
+      <tr><td>Targets / game · Yds / catch</td><td class="num">${fmt(m.tgtPg)} · ${fmt(m.ypr)}</td></tr>
       <tr><td>Touches / game · YPC</td><td class="num">${fmt(m.touchesPg)} · ${fmt(m.ypc)}</td></tr>
       <tr><td>Catch rate · Yds / target</td><td class="num">${pct(m.catchRate)} · ${fmt(m.ypt)}</td></tr>
       <tr><td>Red-zone opportunities · TDs</td><td class="num">${m.rzOpps ?? '—'} · ${m.tds ?? '—'}</td></tr>

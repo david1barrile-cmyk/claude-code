@@ -221,7 +221,9 @@ function ktcArray(rookiesOnly) {
     oneQBValues: { value: Math.round([6200, 2900, 1300][rd - 1] * [1.25, 1, 0.82][ti] * (y === '2027' ? 1 : 0.92)) }, superflexValues: { value: 1 } }))));
   return [...vets, ...rook, ...pk];
 }
-const ktcHtml = (rookiesOnly) => `<html><script>var foo = 1; var playersArray = ${JSON.stringify(ktcArray(rookiesOnly))};\nvar other = [];</script></html>`;
+// Main rankings use the current page format (JSON in a script tag); devy uses the older inline-array format.
+const ktcHtml = () => `<html><script id="ktc-players" type="application/json">${JSON.stringify(ktcArray(false).filter((r) => !r.rookie))}</script><script>var playersArray = JSON.parse(document.getElementById('ktc-players').textContent);</script></html>`;
+const ktcDevyHtml = () => `<html><script>var foo = 1; var playersArray = ${JSON.stringify(ktcArray(true).map((r, i) => ({ ...r, rookie: false, team: 'NCAA', draftYear: 2027, teamLongName: `${rookieClass[i].college} Mascots`, college: 'Hometown, ST', age: 0 })))};\nvar other = [];</script></html>`;
 const csv = (rows) => [Object.keys(rows[0]).join(','), ...rows.map((r) => Object.values(r).map((v) => (/[",]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v)).join(','))].join('\n');
 function dpPlayersCsv() {
   const vets = fcValues().filter((r) => ['QB', 'RB', 'WR', 'TE'].includes(players[r.player.sleeperId].position)).map((r, i) => {
@@ -236,6 +238,10 @@ const dpPicksCsv = () => csv(['2027', '2028'].flatMap((y) => [1, 2, 3].flatMap((
   : [{ player: `${y} ${['1st', '2nd', '3rd'][rd - 1]}`, pos: 'PICK', value_1qb: [6500, 2800, 1200][rd - 1], value_2qb: 1 }]))));
 const dpIdsCsv = () => csv(Object.values(players).filter((p) => p.position !== 'DEF').slice(0, 200).map((p) => ({ fantasypros_id: `fp${p.player_id}`, sleeper_id: p.player_id, name: p.full_name })));
 function cfbd(u) {
+  if (u.pathname === '/player/search') {
+    const q = u.searchParams.get('searchTerm');
+    return rookieClass.filter((x) => x.name === q).map((x) => ({ name: x.name, team: x.college, position: x.pos }));
+  }
   const team = u.searchParams.get('team'), year = Number(u.searchParams.get('year'));
   const r = rng(year + team.length);
   if (u.pathname === '/stats/season') return [
@@ -285,7 +291,7 @@ export function handle(url) {
     }
   }
   if (u.hostname.includes('fantasycalc')) return fcValues();
-  if (u.hostname.includes('keeptradecut')) return ktcHtml(u.pathname.includes('rookie'));
+  if (u.hostname.includes('keeptradecut')) return u.pathname.includes('devy') ? ktcDevyHtml() : ktcHtml();
   if (u.hostname.includes('githubusercontent')) return p.endsWith('values-players.csv') ? dpPlayersCsv() : p.endsWith('values-picks.csv') ? dpPicksCsv() : p.endsWith('db_playerids.csv') ? dpIdsCsv() : undefined;
   if (u.hostname.includes('collegefootballdata')) return cfbd(u);
   if (u.hostname.includes('youtube')) return ytXml();
