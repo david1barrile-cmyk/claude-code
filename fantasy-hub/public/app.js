@@ -75,8 +75,9 @@ const ICONS = {
   rookies: '<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.5 6.5 19.5l1-6.3L3 8.9 9 8z"/>',
   metrics: '<path d="M3 3v18h18M7 15l4-4 3 3 6-6"/>',
   news: '<path d="M4 5h13v14H5a1 1 0 0 1-1-1zM17 9h3v9a1 1 0 0 1-1 1h-2M7 9h7M7 13h7M7 16h4"/>',
+  gazette: '<path d="M3 6h15v13H4a1 1 0 0 1-1-1zM18 10h3v8a1 1 0 0 1-2 0v-8M6 9h9M6 12h4M6 15h4M12 12h3v3h-3z"/>',
 };
-const NAV = [['', 'Dashboard'], ['power', 'Power Rankings'], ['history', 'League History'], ['team', 'My Team'], ['waivers', 'Waivers'], ['analyzer', 'Trade Analyzer'], ['trades', 'Trade Finder'], ['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']];
+const NAV = [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History'], ['team', 'My Team'], ['waivers', 'Waivers'], ['analyzer', 'Trade Analyzer'], ['trades', 'Trade Finder'], ['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']];
 
 function renderShell(active) {
   root.innerHTML = `<div class="shell">
@@ -141,6 +142,7 @@ async function viewConnect() {
 
 // ---------- dashboard ----------
 async function viewDashboard($) {
+  const gz = api(L('/gazette')).catch(() => null);
   const [lg, mu, weekly, power, wv, tx, news] = await Promise.all([
     api(L()), api(L('/matchups')), api(L('/weekly')).catch(() => null), api(L('/power')).catch(() => null),
     api(L(`/waivers?owner=${session.userId}`)).catch(() => null), api(L('/transactions')).catch(() => []), api('/news').catch(() => ({ items: [] })),
@@ -176,6 +178,7 @@ async function viewDashboard($) {
         <div class="lbl"><span><b>${a.winProb}%</b> win probability</span><span>${b.winProb}%</span></div></div>` : '<p class="muted">No matchup this week.</p>'}
     </section>
 
+    <section class="card span-12" id="gz-card" style="display:none"></section>
     ${card('Scoring by week', '<div id="c-weekly"></div>', { span: 8, note: 'Your team vs league average' })}
     ${card('Power rankings', `<div id="c-power"></div><p class="small"><a href="#/power">Full rankings & dynasty outlook →</a></p>`, { span: 4, note: 'record + all-play + lineup' })}
 
@@ -202,6 +205,16 @@ async function viewDashboard($) {
     ${card('Latest news', news.items.slice(0, 7).map((n) => `<div class="li"><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a><div class="small muted">${esc(n.source)} · ${ago(n.published)}</div></div>`).join('') + '<p class="small"><a href="#/news">News & highlights →</a></p>', { span: 4 })}
   </div>`;
 
+  gz.then((g) => {
+    const el = document.getElementById('gz-card');
+    if (!el || !g?.edition) return;
+    const e = g.edition;
+    el.style.display = '';
+    el.innerHTML = `<div class="card-head"><h2>📰 From the League Gazette · Week ${e.week}</h2><a class="small" href="#/gazette">Read the full edition →</a></div>
+      <div style="font:700 12px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--bad-ink)">${esc(e.lead.kicker)}</div>
+      <div style="font:900 26px/1.15 'Playfair Display',Georgia,serif;margin:6px 0">${esc(e.lead.headline)}</div>
+      <div class="muted" style="font-family:'Source Serif 4',Georgia,serif;font-size:15px">${esc(e.lead.body)}</div>`;
+  });
   if (weekly?.weeks.length && wk) {
     const byWeek = Object.fromEntries(wk.weekly.map((w) => [w.week, w.pts]));
     lines(document.getElementById('c-weekly'), {
@@ -624,6 +637,54 @@ async function viewRookie($, slug) {
   }
 }
 
+// ---------- gazette ----------
+async function viewGazette($) {
+  const want = routeQuery.get('week');
+  $.innerHTML = '<div class="paper"><p class="muted">The presses are running…</p></div>';
+  const d = await api(L(`/gazette${want ? `?week=${encodeURIComponent(want)}` : ''}`));
+  if (!d.edition) {
+    $.innerHTML = `<div class="paper"><div class="flag">The ${esc(session.leagueName)} Gazette</div><p class="tag">The first edition goes to print after Week 1 is final.</p></div>`;
+    return;
+  }
+  const e = d.edition;
+  const i = d.weeks.indexOf(e.week);
+  const prev = d.weeks[i - 1], next = d.weeks[i + 1];
+  const flag = d.masthead || `The ${e.league} Gazette`;
+  const mine = (txt) => session.teamName && txt.includes(session.teamName);
+  const story = (s) => `<article class="story">${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ''}<h3>${esc(s.headline)}</h3><p>${esc(s.body)}</p>${mine(s.headline + s.body) ? '<div class="small" style="margin-top:4px"><span class="chip warn">📣 That’s you</span></div>' : ''}</article>`;
+  $.innerHTML = `<div class="paper">
+    <div class="topline"><span>Vol. ${esc(e.season)} · No. ${e.week}</span><span>Week ${e.week} Edition</span><span>Price: $1 FAAB</span></div>
+    <div class="flag">${esc(flag)}</div>
+    <div class="tag">All the news that's fit to roast</div>
+    <div class="weeknav">
+      ${prev ? `<a class="chip" href="#/gazette?week=${prev}">← Week ${prev}</a>` : '<span></span>'}
+      <select id="gz-week" aria-label="Edition">${d.weeks.map((w) => `<option value="${w}" ${w === e.week ? 'selected' : ''}>Week ${w}</option>`).join('')}</select>
+      ${next ? `<a class="chip" href="#/gazette?week=${next}">Week ${next} →</a>` : '<span></span>'}
+    </div>
+    <hr class="rule">
+    <section class="lead">
+      <div><div class="kicker">${esc(e.lead.kicker)}</div><h2>${esc(e.lead.headline)}</h2><p>${esc(e.lead.body)}</p></div>
+      <aside><div class="sb-title">Final scores, Week ${e.week}</div><div id="gz-sb"></div>
+        ${e.median != null ? `<div class="small muted" style="font-family:var(--font)">Dashed line: league median (${fmt(e.median)})${e.medianGames ? ' · beat it for an extra win' : ''}</div>` : ''}</aside>
+    </section>
+    <section class="cols">${e.stories.map(story).join('')}</section>
+    <section class="lower">
+      <div><div class="section-title">Around the League</div><ul class="briefs">${e.briefs.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>
+      <div class="ahead"><div class="section-title">Looking Ahead</div>${e.lookahead.length ? e.lookahead.map((x) => `<h4>${esc(x.headline)}</h4><p>${esc(x.body)}</p>`).join('') : '<p>The regular season is over. Pray for your playoff matchup.</p>'}</div>
+    </section>
+    <div class="fine">Satire. Scores and stats are real; quotes, sources and experts are not. Any resemblance to competent management is coincidental.<br>
+      ${e.generator === 'claude' ? `Written by Claude (${esc(e.model || 'AI')}) from this week's league data.` : "Written by the Gazette's in-house joke machine."}</div>
+  </div>`;
+  document.getElementById('gz-week').onchange = (ev) => { location.hash = `#/gazette?week=${ev.target.value}`; };
+  const sb = document.getElementById('gz-sb');
+  const max = Math.max(...e.scoreboard.map((x) => x.points), 1);
+  sb.innerHTML = `<div style="position:relative">${e.scoreboard.map((x) => `<div class="bullet" style="grid-template-columns:118px 1fr 50px;font-family:var(--font)" data-tip="${esc(`<b>${esc(x.team)}</b>${fmt(x.points)} pts${e.median != null ? ` · ${x.aboveMedian ? 'above' : 'below'} median` : ''}`)}">
+      <span class="small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.owner === session.userId ? '<b>' : ''}${esc(x.team)}${x.owner === session.userId ? '</b>' : ''}</span>
+      <div class="track"><div class="fill" style="width:${(x.points / max) * 100}%;background:${x.owner === session.userId ? 'var(--series-me)' : 'var(--bar-muted)'}"></div>
+        ${e.median != null ? `<div class="mark" style="left:${(e.median / max) * 100}%;background:none;border-left:2px dashed var(--ink);width:0"></div>` : ''}</div>
+      <span class="small num" style="text-align:right">${fmt(x.points)}</span></div>`).join('')}</div>`;
+}
+
 // ---------- metrics ----------
 async function viewMetrics($, pos = 'WR') {
   const d = await api(L(`/metrics?pos=${pos}`));
@@ -721,7 +782,7 @@ async function viewPlayer($, id) {
 }
 
 // ---------- router ----------
-const views = { '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');

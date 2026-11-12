@@ -15,6 +15,11 @@ import { seasonPower, winProbability } from './lib/power.js';
 import { cached } from './lib/cache.js';
 import { getValueHub, compareSides } from './lib/valuehub.js';
 import { getRookieBoard, mockDraft, collegeProfile, rookieReport } from './lib/rookies.js';
+import { getEdition, editionWeeks } from './lib/gazette.js';
+import { makeAiWriter } from './lib/gazette-ai.js';
+
+// AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
+const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
 
 const PUBLIC = path.join(path.dirname(new URL(import.meta.url).pathname), 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -281,6 +286,16 @@ const routes = [
     const neighbors = board.filter((x) => x.pos === r.pos && Math.abs(x.rank - r.rank) <= 6 && x.slug !== slug).slice(0, 5)
       .map(({ slug: s2, name, rank, college: c }) => ({ slug: s2, name, rank, college: c }));
     return { season, rookie: r, college, report: rookieReport(r, college), mock: { need: where(need), bpa: where(bpa) }, neighbors };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/gazette$/, async ([id], q) => {
+    const ctx = await getLeagueContext(id);
+    const weeks = editionWeeks(ctx);
+    if (!weeks.length) return { weeks, edition: null, ai: !!aiWriter };
+    const want = Number(q.get('week'));
+    const week = weeks.includes(want) ? want : weeks.at(-1);
+    const edition = await getEdition(ctx, week, { aiWriter });
+    return { weeks, edition, ai: !!aiWriter, masthead: process.env.GAZETTE_NAME || null };
   }],
 
   ['GET', /^\/api\/news$/, async (_m, q) => {

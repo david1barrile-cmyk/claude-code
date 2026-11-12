@@ -6,10 +6,11 @@ reports, and aggregated news and highlight videos.
 
 ## Run it
 
-Requires Node 18+ and has no dependencies to install.
+Requires Node 18+. The only dependency is the Anthropic SDK (used only for the optional AI-written Gazette).
 
 ```bash
 cd fantasy-hub
+npm install
 npm start            # http://localhost:3000 with live Sleeper data
 npm run demo         # same app with built-in fake data, no network needed (username: demo)
 npm test
@@ -49,6 +50,9 @@ environment variables, plus `PORT` if the platform requires it.
 | `SITE_PASSWORD` | Optional shared password (HTTP Basic auth) |
 | `PORT` | Port to listen on (default 3000; Render sets it) |
 | `CFBD_API_KEY` | Optional free key from [collegefootballdata.com](https://collegefootballdata.com/key): adds college stats and dominator ratings to rookie profiles |
+| `ANTHROPIC_API_KEY` | Optional. Claude (Opus 5.5) writes the weekly League Gazette instead of the built-in joke writer. One request per completed week, cached; roughly a few cents per edition |
+| `GAZETTE_NAME` | Optional newspaper name (default: "The <league name> Gazette") |
+| `GAZETTE_AI` | Set to `0` to keep using the built-in writer even when a key is set |
 | `KTC_ENABLED` | Set to `0` to stop reading KeepTradeCut |
 | `ROOKIE_NOTES` | Path to your own rookie notes JSON (default `data/rookies.json`; see `data/rookies.example.json`) |
 
@@ -71,6 +75,7 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 
 ## What each page does
 
+- **League Gazette**: a satirical weekly newspaper for every completed week, written from real results: blowouts, nail-biters, upsets, bench blunders, top performers and duds, median-game heartbreak, streaks, luck, trades and FAAB splurges, plus a look ahead at next week's game of the week and the playoff race. Uses a built-in joke writer by default; with `ANTHROPIC_API_KEY` set, Claude writes each edition (scores and stats always come from the data; quotes are clearly satire). Archive of past weeks, and the latest headline on the dashboard.
 - **Power Rankings**: *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
 - **League History**: follows Sleeper's `previous_league_id` chain back through every season: champions, all-time standings, all-play and luck, finish-by-season heatmap, head-to-head matrix, and league records.
 - **Trade Analyzer**: pick players and draft picks from any two teams and compare value across KeepTradeCut, FantasyCalc, DynastyProcess and the built-in production model: per-source edge, consensus verdict, whether sources agree, and weekly lineup impact for both teams. Picks are valued at their projected slot.
@@ -112,6 +117,8 @@ lib/sources.js   KeepTradeCut, FantasyCalc, DynastyProcess adapters
 lib/valuehub.js  per-league value table + trade comparison
 lib/picks.js     pick ownership, projected draft order, pick valuation
 lib/rookies.js   rookie board, scouting reports, college stats, mock draft
+lib/gazette.js   weekly facts + built-in satirical writer
+lib/gazette-ai.js optional Claude writer (structured output, refusal fallback)
 data/            optional rookie notes
 lib/values.js    FantasyCalc / fallback trade values
 lib/scouting.js  rule-based scouting reports
