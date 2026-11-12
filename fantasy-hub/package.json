@@ -1,0 +1,13 @@
+{
+  "name": "fantasy-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fantasy football hub powered by your Sleeper league: news, highlights, scouting reports, advanced metrics, waiver and trade advice.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "demo": "MOCK=1 node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}
