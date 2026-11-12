@@ -34,3 +34,10 @@ export function bestLineup(ids, info, slots) {
   }
   return { total: Math.round(total * 100) / 100, lineup };
 }
+
+const UNAVAILABLE = new Set(['Out', 'IR', 'PUP', 'Suspended', 'NA']);
+// Player info for lineup math: rest-of-season pts, or 0 if they can't play.
+export const lineupInfo = (players, metrics) => (id) => {
+  const p = players[id];
+  return { pos: p?.pos, pts: p && UNAVAILABLE.has(p.injury) ? 0 : metrics[id]?.ros ?? 0 };
+};

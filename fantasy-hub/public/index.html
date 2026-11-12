@@ -4,24 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fantasy Hub</title>
+  <meta name="description" content="League hub for our Sleeper fantasy football league: power rankings, history, waiver and trade advice.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <script>
+    try { const t = localStorage.getItem('fh.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
 </head>
 <body>
-  <header class="topbar">
-    <a href="#/" class="brand">🏈 Fantasy Hub</a>
-    <nav id="nav" hidden>
-      <a href="#/">Dashboard</a>
-      <a href="#/team">My Team</a>
-      <a href="#/waivers">Waivers</a>
-      <a href="#/trades">Trades</a>
-      <a href="#/metrics">Metrics</a>
-      <a href="#/news">News &amp; Highlights</a>
-    </nav>
-    <div id="who" class="who"></div>
-  </header>
-  <main id="app"><p class="muted">Loading…</p></main>
-  <footer class="foot">League data from Sleeper · trade values from FantasyCalc · stats-derived metrics are estimates</footer>
+  <div id="root"></div>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

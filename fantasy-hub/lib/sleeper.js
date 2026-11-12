@@ -71,3 +71,6 @@ export async function getWeekProjections(season, week) {
     return {}; // projections are an unofficial endpoint; degrade gracefully
   }
 }
+
+export const getWinnersBracket = (id) => j(`/league/${id}/winners_bracket`, T.live);
+export const getTradedPicks = (id) => j(`/league/${id}/traded_picks`, T.live);

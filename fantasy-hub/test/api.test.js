@@ -19,7 +19,7 @@ test('username → leagues → league overview', async () => {
   assert.equal((await get('/user/nobody/leagues')).status, 404);
   const l = await get('/league/9001');
   assert.equal(l.body.teams.length, 12);
-  assert.equal(l.body.format, 'PPR');
+  assert.equal(l.body.format, 'PPR · Dynasty');
 });
 
 test('team, waivers, trades, metrics, player, news', async () => {
@@ -40,4 +40,43 @@ test('team, waivers, trades, metrics, player, news', async () => {
   assert.ok(n.body.items.length > 0 && n.body.status.every((x) => x.ok));
   const tx = await get('/league/9001/transactions');
   assert.equal(new Set(tx.body.map((x) => x.at + x.adds[0]?.id)).size, tx.body.length);
+});
+
+test('history, power rankings and weekly series', async () => {
+  const h = await get('/league/9001/history');
+  assert.equal(h.body.seasons.length, 3);
+  assert.deepEqual(h.body.seasons.map((s) => s.complete), [false, true, true]);
+  assert.ok(h.body.seasons[1].champion);
+  const champ = h.body.seasons[1].standings.find((s) => s.ownerId === h.body.seasons[1].champion);
+  assert.equal(champ.finish, 1);
+  assert.equal(h.body.owners.reduce((s, o) => s + o.titles, 0), 2);
+  assert.ok(h.body.records.high.pts > h.body.records.low.pts);
+  // h2h is symmetric
+  const [a, b] = h.body.owners.map((o) => o.ownerId);
+  const ab = h.body.h2h[a]?.[b], ba = h.body.h2h[b]?.[a];
+  if (ab) assert.equal(ab.w, ba.l);
+
+  const p = await get('/league/9001/power');
+  assert.equal(p.body.season.length, 12);
+  assert.ok(p.body.season.every((t, i) => i === 0 || p.body.season[i - 1].score >= t.score));
+  assert.ok(p.body.dynasty.teams.every((t) => t.projected.length === 4 && t.picks.length > 0));
+  // A team that acquired another team's 2027 1st owns two of them.
+  const t1 = p.body.dynasty.teams.find((t) => t.rosterId === 1);
+  assert.equal(t1.picks.filter((x) => x.season === 2027 && x.round === 1).length, 2);
+
+  const w = await get('/league/9001/weekly');
+  assert.equal(w.body.weeks.length, 10);
+  const mu = await get('/league/9001/matchups');
+  assert.ok(mu.body.matchups.every(([x, y]) => x.winProb + y.winProb === 100));
+});
+
+test('site password gate', async () => {
+  const { config } = await import('../config.js');
+  config.sitePassword = 'hunter2';
+  try {
+    assert.equal((await fetch(base + '/league/9001')).status, 401);
+    assert.equal((await fetch(base + '/health')).status, 200);
+    const ok = await fetch(base + '/league/9001', { headers: { authorization: 'Basic ' + Buffer.from('x:hunter2').toString('base64') } });
+    assert.equal(ok.status, 200);
+  } finally { config.sitePassword = null; }
 });

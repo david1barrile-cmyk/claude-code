@@ -64,8 +64,8 @@ const scoring = {
   fgm_30_39: 3, fgm_40_49: 4, xpm: 1, def_int: 2, def_fr: 2, def_sack: 1, def_td: 6, pts_allow_14_20: 1,
 };
 const league = {
-  league_id: '9001', name: 'Mock Sunday League', season: SEASON, status: 'in_season', total_rosters: 12, avatar: null,
-  settings: { type: 0, playoff_week_start: 15 }, scoring_settings: scoring,
+  league_id: '9001', previous_league_id: '8001', name: 'Mock Sunday League', season: SEASON, status: 'in_season', total_rosters: 12, avatar: null,
+  settings: { type: 2, playoff_week_start: 15, draft_rounds: 4 }, scoring_settings: scoring,
   roster_positions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'FLEX', 'K', 'DEF', 'BN', 'BN', 'BN', 'BN', 'BN', 'BN'],
 };
 const users = Array.from({ length: 12 }, (_, i) => ({
@@ -90,16 +90,6 @@ const pts = (rid, w) => {
   return r.players.slice(0, 10).reduce((s, id) => { const st = stats(w)[id]; if (!st) return s; let p = 0; for (const [k, m] of Object.entries(scoring)) p += (st[k] || 0) * m; return s + p; }, 0);
 };
 for (const r of rosters) { r.starters = r.players.slice(0, 10); }
-for (let w = 1; w < WEEK; w++) {
-  for (let i = 0; i < 12; i += 2) {
-    const a = rosters[(i + w) % 12], b = rosters[(i + 1 + w * 3) % 12] === a ? rosters[(i + 2) % 12] : rosters[(i + 1 + w * 3) % 12];
-    const pa = pts(a.roster_id, w), pb = pts(b.roster_id, w);
-    for (const [x, px, py] of [[a, pa, pb], [b, pb, pa]]) {
-      const s = x.settings; s.wins = (s.wins || 0) + (px > py); s.losses = (s.losses || 0) + (px < py);
-      s.fpts = (s.fpts || 0) + Math.floor(px); s.fpts_against = (s.fpts_against || 0) + Math.floor(py);
-    }
-  }
-}
 for (const r of rosters) { r.settings.fpts_decimal = 0; r.settings.ties = 0; }
 
 const free = Object.keys(players).filter((id) => !rosters.some((r) => r.players.includes(id)));
@@ -119,6 +109,18 @@ function matchups(week) {
     out.push({ roster_id: r.roster_id, matchup_id: Math.floor(i / 2) + 1, starters: r.starters, players: r.players, players_points: pp, points: +Object.values(pp).reduce((s, x) => s + x, 0).toFixed(2) });
   }
   return out;
+}
+
+// Standings derived from the same weekly matchups the API serves.
+for (const r of rosters) Object.assign(r.settings, { wins: 0, losses: 0, ties: 0, fpts: 0, fpts_decimal: 0, fpts_against: 0 });
+for (let w = 1; w < WEEK; w++) {
+  const ms = matchups(w);
+  for (const a of ms) {
+    const b = ms.find((x) => x.matchup_id === a.matchup_id && x !== a);
+    const s = rosters[a.roster_id - 1].settings;
+    s.wins += a.points > b.points; s.losses += a.points < b.points;
+    s.fpts += Math.floor(a.points); s.fpts_against += Math.floor(b.points);
+  }
 }
 
 function rss(source, items) {
@@ -152,6 +154,45 @@ const fcValues = () => Object.keys(players).map((id) => {
   return { player: { sleeperId: id, name: players[id].full_name }, value: Math.round((n ? s / n : 0) ** 1.6 * 25), trend30Day: Math.round((R() - 0.5) * 400) };
 }).filter((r) => r.value > 0);
 
+// ---- Past seasons (history) ----
+const past = {};
+for (const [id, season, prev, shift] of [['8001', '2025', '7001', 3], ['7001', '2024', null, 7]]) {
+  const lg = { ...league, league_id: id, season, previous_league_id: prev, status: 'complete' };
+  const rs = users.map((u, i) => ({ roster_id: i + 1, owner_id: users[(i + shift) % 12].user_id, players: [], settings: {} }));
+  const r = rng(Number(id));
+  const skill = rs.map(() => 95 + r() * 35);
+  const weeks = {};
+  const rec = rs.map(() => ({ w: 0, pf: 0 }));
+  for (let w = 1; w <= 17; w++) {
+    const order = rs.map((_, i) => i).sort((a, b) => ((a * 7 + w * 5) % 12) - ((b * 7 + w * 5) % 12));
+    weeks[w] = [];
+    for (let k = 0; k < 12; k += 2) {
+      const [a, b] = [order[k], order[k + 1]];
+      const pa = +(skill[a] + (r() - 0.5) * 60).toFixed(2), pb = +(skill[b] + (r() - 0.5) * 60).toFixed(2);
+      weeks[w].push({ roster_id: a + 1, matchup_id: k / 2 + 1, points: pa }, { roster_id: b + 1, matchup_id: k / 2 + 1, points: pb });
+      if (w <= 14) { rec[a].pf += pa; rec[b].pf += pb; if (pa > pb) rec[a].w++; else rec[b].w++; }
+    }
+  }
+  const seeds = rec.map((x, i) => ({ ...x, rid: i + 1 })).sort((a, b) => b.w - a.w || b.pf - a.pf).map((x) => x.rid);
+  const win = (x, y) => (skill[x - 1] + (r() - 0.5) * 50 > skill[y - 1] + (r() - 0.5) * 50 ? [x, y] : [y, x]);
+  const [w1, l1] = win(seeds[2], seeds[5]), [w2, l2] = win(seeds[3], seeds[4]);
+  const [w3, l3] = win(seeds[0], w2), [w4, l4] = win(seeds[1], w1);
+  const [ch, ru] = win(w3, w4), [t3, t4] = win(l3, l4), [f5, f6] = win(l1, l2);
+  const bracket = [
+    { r: 1, m: 1, t1: seeds[2], t2: seeds[5], w: w1, l: l1 }, { r: 1, m: 2, t1: seeds[3], t2: seeds[4], w: w2, l: l2 },
+    { r: 2, m: 3, t1: seeds[0], t2: { w: 2 }, w: w3, l: l3 }, { r: 2, m: 4, t1: seeds[1], t2: { w: 1 }, w: w4, l: l4 },
+    { r: 3, m: 5, t1: { w: 3 }, t2: { w: 4 }, w: ch, l: ru, p: 1 }, { r: 3, m: 6, t1: { l: 3 }, t2: { l: 4 }, w: t3, l: t4, p: 3 },
+    { r: 2, m: 7, t1: { l: 1 }, t2: { l: 2 }, w: f5, l: f6, p: 5 },
+  ];
+  past[id] = { league: lg, rosters: rs, weeks, bracket };
+}
+// Current season: weeks already played feed history; bracket empty until playoffs.
+const tradedPicks = [
+  { season: '2027', round: 1, roster_id: 7, owner_id: 1, previous_owner_id: 7 },
+  { season: '2027', round: 2, roster_id: 1, owner_id: 4, previous_owner_id: 1 },
+  { season: '2028', round: 1, roster_id: 12, owner_id: 3, previous_owner_id: 12 },
+];
+
 export function handle(url) {
   const u = new URL(url);
   const p = u.pathname.replace(/^\/v1/, '');
@@ -161,6 +202,18 @@ export function handle(url) {
     if ((m = p.match(/^\/user\/([^/]+)$/))) return users.find((x) => x.display_name === decodeURIComponent(m[1]) || x.user_id === m[1]) ?? null;
     if (/^\/user\/[^/]+\/leagues\/nfl\/\d+$/.test(p)) return [league];
     if (p === '/league/9001') return league;
+    if (p === '/league/9001/winners_bracket') return [];
+    if (p === '/league/9001/traded_picks') return tradedPicks;
+    if ((m = p.match(/^\/league\/(8001|7001)(\/.*)?$/))) {
+      const P = past[m[1]], sub = m[2] || '';
+      if (!sub) return P.league;
+      if (sub === '/rosters') return P.rosters;
+      if (sub === '/users') return users;
+      if (sub === '/winners_bracket') return P.bracket;
+      if (sub === '/traded_picks') return [];
+      const w = sub.match(/^\/matchups\/(\d+)$/);
+      if (w) return P.weeks[Number(w[1])] || [];
+    }
     if (p === '/league/9001/rosters') return rosters;
     if (p === '/league/9001/users') return users;
     if ((m = p.match(/^\/league\/9001\/matchups\/(\d+)$/))) return matchups(Number(m[1]));

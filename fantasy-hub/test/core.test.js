@@ -72,3 +72,37 @@ test('weeksToLoad covers in-season, preseason and past seasons', () => {
   assert.deepEqual(weeksToLoad({ season: '2026', week: 0, season_type: 'pre' }, '2026'), { completed: [], next: 1 });
   assert.equal(weeksToLoad({ season: '2026', week: 1, season_type: 'regular' }, '2025').completed.length, 18);
 });
+
+import { summarizeSeason } from '../lib/history.js';
+import { ageFactor, projectValue } from '../lib/dynasty.js';
+import { winProbability } from '../lib/power.js';
+
+test('summarizeSeason computes records, all-play and bracket finishes', () => {
+  const rosters = [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: `o${r}` }));
+  const wk = (pts) => pts.map((p, i) => ({ roster_id: i + 1, matchup_id: i < 2 ? 1 : 2, points: p }));
+  const s = summarizeSeason({
+    league: { season: '2025', league_id: 'x', status: 'complete' }, rosters, users: [],
+    weeks: [wk([100, 90, 80, 70]), wk([60, 110, 120, 50])],
+    bracket: [{ r: 1, m: 1, t1: 1, t2: 2, w: 2, l: 1, p: 1 }, { r: 1, m: 2, t1: 3, t2: 4, w: 3, l: 4, p: 3 }],
+  });
+  const o = Object.fromEntries(s.standings.map((r) => [r.ownerId, r]));
+  assert.equal(o.o1.wins, 1); assert.equal(o.o1.losses, 1);
+  assert.equal(o.o1.apW, 3 + 1); // beat all 3 in week 1, beat 1 in week 2
+  assert.equal(s.champion, 'o2');
+  assert.deepEqual([o.o2.finish, o.o1.finish, o.o3.finish, o.o4.finish], [1, 2, 3, 4]);
+});
+
+test('dynasty age curves and win probability behave sensibly', () => {
+  assert.ok(ageFactor('RB', 28) < ageFactor('WR', 28));
+  assert.ok(projectValue(1000, 'WR', 22, 3) > 1000);
+  assert.ok(projectValue(1000, 'RB', 27, 3) < 400);
+  assert.equal(Math.round(winProbability(100, 100) * 100), 50);
+  assert.ok(winProbability(130, 100) > 0.8);
+});
+
+import { lineupInfo } from '../lib/lineup.js';
+test('players ruled Out or on IR never make the optimal lineup', () => {
+  const players = { a: { pos: 'QB', injury: 'Out' }, b: { pos: 'QB', injury: 'Questionable' } };
+  const L = bestLineup(['a', 'b'], lineupInfo(players, { a: { ros: 25 }, b: { ros: 15 } }), ['QB']);
+  assert.equal(L.lineup[0].id, 'b');
+});

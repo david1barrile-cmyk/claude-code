@@ -2,6 +2,10 @@
 export const config = {
   port: Number(process.env.PORT) || 3000,
   mock: process.env.MOCK === '1',
+  // Lock the site to one league: visitors just pick their team. Leave unset to let anyone search by username.
+  leagueId: process.env.LEAGUE_ID || null,
+  // Optional shared password (HTTP Basic auth; any username works).
+  sitePassword: process.env.SITE_PASSWORD || null,
   cacheDir: process.env.CACHE_DIR || new URL('./.cache/', import.meta.url).pathname,
 
   sleeperBase: 'https://api.sleeper.app/v1',

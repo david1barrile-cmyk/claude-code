@@ -1,0 +1,19 @@
+# Render Blueprint for Fantasy Hub (https://render.com/docs/blueprint-spec).
+# In Render: New + → Blueprint → pick this repository. You'll be asked for LEAGUE_ID.
+services:
+  - type: web
+    name: fantasy-hub
+    runtime: node
+    plan: free
+    rootDir: fantasy-hub
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: LEAGUE_ID
+        sync: false   # your Sleeper league ID (the number in sleeper.com/leagues/<id>)
+      - key: SITE_PASSWORD
+        sync: false   # optional: leave blank for a public site

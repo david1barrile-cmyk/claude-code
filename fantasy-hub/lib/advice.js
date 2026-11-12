@@ -1,13 +1,11 @@
 // Waiver and trade advice. Every recommendation is grounded in how it changes
 // the user's optimal starting lineup (rest-of-season points per game), plus
 // market signals (Sleeper trending adds, trade values).
-import { bestLineup } from './lineup.js';
+import { bestLineup, lineupInfo } from './lineup.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 
-function makeInfo(players, metrics) {
-  return (id) => ({ pos: players[id]?.pos, pts: metrics[id]?.ros ?? 0 });
-}
+const makeInfo = lineupInfo;
 
 export function waiverAdvice({ players, metrics, slots, myIds, rosteredIds, trendingAdds = [], limit = 25 }) {
   const info = makeInfo(players, metrics);

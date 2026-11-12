@@ -1,13 +1,18 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { config } from './config.js';
 import * as S from './lib/sleeper.js';
 import { getLeagueContext, findTeam } from './lib/league.js';
-import { bestLineup } from './lib/lineup.js';
+import { bestLineup, lineupInfo } from './lib/lineup.js';
 import { waiverAdvice, evaluateTrade, tradeSuggestions } from './lib/advice.js';
 import { getNews, getHighlights, mentions } from './lib/feeds.js';
 import { scoutingReport } from './lib/scouting.js';
+import { getHistory } from './lib/history.js';
+import { getDynastyRankings } from './lib/dynasty.js';
+import { seasonPower, winProbability } from './lib/power.js';
+import { cached } from './lib/cache.js';
 
 const PUBLIC = path.join(path.dirname(new URL(import.meta.url).pathname), 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -26,8 +31,7 @@ function card(ctx, id) {
 }
 
 function positionStrength(ctx, ids) {
-  const info = (id) => ({ pos: ctx.players[id]?.pos, pts: ctx.metrics[id]?.ros ?? 0 });
-  const { lineup, total } = bestLineup(ids, info, ctx.slots);
+  const { lineup, total } = bestLineup(ids, lineupInfo(ctx.players, ctx.metrics), ctx.slots);
   const byPos = {};
   for (const s of lineup) if (s.id) byPos[ctx.players[s.id].pos] = (byPos[ctx.players[s.id].pos] || 0) + s.pts;
   return { lineup, total, byPos };
@@ -46,7 +50,18 @@ function leagueNeeds(ctx, team) {
   return out;
 }
 
+async function currentSeasonSummary(ctx) {
+  const h = await getHistory(ctx.league.league_id).catch(() => null);
+  return h?.seasons.find((s) => String(s.season) === String(ctx.league.season)) ?? null;
+}
+
 const routes = [
+  ['GET', /^\/api\/health$/, async () => ({ ok: true })],
+  ['GET', /^\/api\/config$/, async () => {
+    if (!config.leagueId) return { leagueId: null };
+    const lg = await getLeagueContext(config.leagueId);
+    return { leagueId: config.leagueId, leagueName: lg.league.name, teams: lg.teams.map((t) => ({ rosterId: t.rosterId, ownerId: t.ownerId, name: t.name, owner: t.owner, avatar: t.avatar })) };
+  }],
   ['GET', /^\/api\/state$/, async () => S.getState()],
 
   ['GET', /^\/api\/user\/([^/]+)\/leagues$/, async ([username], q) => {
@@ -88,7 +103,12 @@ const routes = [
         starters: (r.starters || []).map((pid) => ({ ...card(ctx, pid), pts: r.players_points?.[pid] ?? 0 })),
       });
     }
-    return { week, matchups: Object.values(groups) };
+    const mus = Object.values(groups);
+    for (const pair of mus) if (pair.length === 2) {
+      const p = winProbability(pair[0].projected, pair[1].projected);
+      pair[0].winProb = Math.round(p * 100); pair[1].winProb = 100 - pair[0].winProb;
+    }
+    return { week, matchups: mus };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/team\/([^/]+)$/, async ([id, owner]) => {
@@ -128,7 +148,8 @@ const routes = [
     const me = findTeam(ctx, q.get('owner'));
     if (!me) throw new HttpError(400, 'owner query param must be your Sleeper user id');
     const others = ctx.teams.filter((t) => t !== me);
-    const sugg = tradeSuggestions({ players: ctx.players, metrics: ctx.metrics, values: ctx.values, slots: ctx.slots, myIds: me.ids, others });
+    const sugg = await cached(`sugg:${id}:${me.rosterId}`, 10 * 60e3, async () =>
+      tradeSuggestions({ players: ctx.players, metrics: ctx.metrics, values: ctx.values, slots: ctx.slots, myIds: me.ids, others }));
     return {
       needs: leagueNeeds(ctx, me),
       suggestions: sugg.map((s) => ({ ...s, give: s.give.map((x) => card(ctx, x)), get: s.get.map((x) => card(ctx, x)) })),
@@ -196,6 +217,29 @@ const routes = [
       }));
   }],
 
+  ['GET', /^\/api\/league\/(\d+)\/history$/, async ([id]) => getHistory(id)],
+
+  ['GET', /^\/api\/league\/(\d+)\/power$/, async ([id]) => {
+    const ctx = await getLeagueContext(id);
+    const [cur, dynasty] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx)]);
+    return { season: seasonPower(ctx, cur), dynasty, draftSeason: Number(ctx.league.season) + 1 };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/weekly$/, async ([id]) => {
+    const ctx = await getLeagueContext(id);
+    const cur = await currentSeasonSummary(ctx);
+    if (!cur) return { weeks: [], teams: [] };
+    const weeks = [...new Set(cur.standings.flatMap((s) => s.weekly.map((w) => w.week)))].sort((a, b) => a - b);
+    const avg = weeks.map((w) => {
+      const v = cur.standings.flatMap((s) => s.weekly.filter((x) => x.week === w).map((x) => x.pts));
+      return { week: w, pts: Math.round((v.reduce((a, b) => a + b, 0) / (v.length || 1)) * 10) / 10 };
+    });
+    return {
+      weeks, average: avg,
+      teams: cur.standings.map((s) => ({ ownerId: s.ownerId, weekly: s.weekly, apW: s.apW, apL: s.apL, form: s.form })),
+    };
+  }],
+
   ['GET', /^\/api\/news$/, async (_m, q) => {
     const data = await getNews();
     const term = q.get('q');
@@ -225,8 +269,21 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+function authorized(req) {
+  if (!config.sitePassword) return true;
+  const [scheme, b64] = (req.headers.authorization || '').split(' ');
+  if (scheme !== 'Basic' || !b64) return false;
+  const pass = Buffer.from(b64, 'base64').toString().split(':').slice(1).join(':');
+  const a = Buffer.from(pass), b = Buffer.from(config.sitePassword);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname !== '/api/health' && !authorized(req)) {
+    res.writeHead(401, { 'www-authenticate': 'Basic realm="Fantasy Hub", charset="UTF-8"' }).end('Password required (any username)');
+    return;
+  }
   if (!url.pathname.startsWith('/api/')) return serveStatic(req, res, url.pathname);
   for (const [method, re, fn] of routes) {
     const m = url.pathname.match(re);

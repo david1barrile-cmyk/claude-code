@@ -33,8 +33,12 @@ export async function cached(key, ttl, producer, { disk = false } = {}) {
       const v = await producer();
       mem.set(key, { t: Date.now(), v });
       if (disk) {
-        fs.mkdirSync(config.cacheDir, { recursive: true });
-        fs.writeFileSync(diskPath(key), JSON.stringify(v));
+        try {
+          fs.mkdirSync(config.cacheDir, { recursive: true });
+          fs.writeFileSync(diskPath(key), JSON.stringify(v));
+        } catch (err) {
+          console.warn('[cache] disk write skipped:', err.message); // memory cache still works
+        }
       }
       return v;
     } catch (err) {
