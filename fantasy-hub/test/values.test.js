@@ -135,3 +135,15 @@ test('rookie report ignores a thin latest season and flags it', () => {
   assert.ok(rep.strengths.some((x) => x.includes('33% dominator rating in 2025')));
   assert.ok(!rep.strengths.some((x) => x.includes('11.3')));
 });
+
+import { assignTiers } from '../lib/rookies.js';
+test('rookie tiers break at real value cliffs inside the draftable range', () => {
+  const scores = [100, 77, 75, 72, 58, 57, 54, 50, 49, 47, 46, 41, 40, 39, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21];
+  const board = scores.map((score, i) => ({ score, rank: i + 1 }));
+  const { cuts } = assignTiers(board, 24);
+  assert.ok(cuts.includes(1), 'cliff after #1');
+  assert.ok(cuts.includes(4), 'cliff after #4');
+  assert.equal(board[0].tier, 'Tier 1');
+  assert.equal(board[1].tier, 'Tier 2');
+  assert.equal(board.at(-1).tier, 'Depth');
+});

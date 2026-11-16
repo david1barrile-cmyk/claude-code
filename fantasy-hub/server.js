@@ -18,6 +18,8 @@ import { getRookieBoard, mockDraft, collegeProfile, rookieReport } from './lib/r
 import { getEdition, editionWeeks } from './lib/gazette.js';
 import { makeAiWriter } from './lib/gazette-ai.js';
 import { gradeLeagueTrades } from './lib/tradegrades.js';
+import { requestStats } from './lib/health.js';
+import { getOdds } from './lib/odds.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -45,6 +47,38 @@ function positionStrength(ctx, ids) {
   return { lineup, total, byPos };
 }
 
+// Start/sit for the current week: best lineup by this week's projections vs. the lineup set in Sleeper.
+const OUT = new Set(['Out', 'IR', 'PUP', 'Suspended', 'NA']);
+function thisWeekLineup(ctx, team) {
+  if (!ctx.currentWeek) return null;
+  const projOf = (id) => (OUT.has(ctx.players[id]?.injury) ? 0 : ctx.metrics[id]?.proj ?? 0);
+  const taxi = new Set(team.taxi || []), reserve = new Set(team.reserve || []);
+  const eligible = team.ids.filter((id) => !taxi.has(id) && !reserve.has(id));
+  const best = bestLineup(eligible, (id) => ({ pos: ctx.players[id]?.pos, pts: projOf(id) }), ctx.slots);
+  const current = (team.starters || []).filter((id) => id && id !== '0');
+  const currentPts = current.reduce((a, id) => a + projOf(id), 0);
+  const bestIds = new Set(best.lineup.map((s) => s.id).filter(Boolean));
+  const ins = [...bestIds].filter((id) => !current.includes(id)).sort((a, b) => projOf(b) - projOf(a));
+  const outs = current.filter((id) => !bestIds.has(id)).sort((a, b) => projOf(a) - projOf(b));
+  const pc = (id) => ({ ...card(ctx, id), proj: Math.round(projOf(id) * 10) / 10 });
+  const swaps = ins.map((id, i) => ({ start: pc(id), sit: outs[i] ? pc(outs[i]) : null, gain: Math.round((projOf(id) - (outs[i] ? projOf(outs[i]) : 0)) * 10) / 10 }))
+    .filter((x) => x.gain > 0.05);
+  const warnings = current.map((id) => {
+    const p = ctx.players[id];
+    if (!p) return null;
+    if (OUT.has(p.injury)) return { player: card(ctx, id), issue: `${p.injury}: will score 0 if started` };
+    if (ctx.metrics[id]?.proj == null) return { player: card(ctx, id), issue: 'No projection this week (bye or not expected to play)' };
+    if (['Questionable', 'Doubtful'].includes(p.injury)) return { player: card(ctx, id), issue: `${p.injury}: check status before kickoff` };
+    return null;
+  }).filter(Boolean);
+  return {
+    week: ctx.currentWeek,
+    currentPts: Math.round(currentPts * 10) / 10, bestPts: Math.round(best.total * 10) / 10,
+    lineup: best.lineup.map((s) => ({ slot: s.slot, player: s.id ? { ...card(ctx, s.id), proj: projOf(s.id) } : null, starting: s.id ? current.includes(s.id) : false })),
+    swaps, warnings,
+  };
+}
+
 function leagueNeeds(ctx, team) {
   const all = ctx.teams.map((t) => positionStrength(ctx, t.ids).byPos);
   const mine = positionStrength(ctx, team.ids);
@@ -65,6 +99,56 @@ async function currentSeasonSummary(ctx) {
 
 const routes = [
   ['GET', /^\/api\/health$/, async () => ({ ok: true })],
+
+  // Data health: request log per source plus content checks on what each source returned.
+  ['GET', /^\/api\/status$/, async (_m, q) => {
+    const id = q.get('league') || config.leagueId;
+    const checks = [];
+    const check = async (area, name, fn) => {
+      try { checks.push({ area, name, ...(await fn()) }); } catch (err) { checks.push({ area, name, status: 'fail', detail: err.message }); }
+    };
+    let ctx = null;
+    await check('League', 'Sleeper league data', async () => {
+      if (!id) return { status: 'off', detail: 'No league selected (LEAGUE_ID not set).' };
+      ctx = await getLeagueContext(id);
+      return { status: 'ok', detail: `${ctx.league.name}: ${ctx.teams.length} teams, week ${ctx.currentWeek ?? 'n/a'}` };
+    });
+    if (ctx) {
+      await check('League', 'Player database', async () => {
+        const n = Object.keys(ctx.players).length;
+        return { status: n > 1000 ? 'ok' : 'warn', detail: `${n.toLocaleString()} players` };
+      });
+      await check('League', 'Weekly stats & projections', async () => {
+        const withGames = Object.values(ctx.metrics).filter((m) => m.games > 0).length;
+        const withProj = Object.values(ctx.metrics).filter((m) => m.proj != null).length;
+        return { status: withGames > 100 || !ctx.completedWeeks.length ? 'ok' : 'warn', detail: `${ctx.completedWeeks.length} completed weeks; ${withGames} players with stats, ${withProj} with this week's projection` };
+      });
+      const hub = await getValueHub(ctx);
+      const { ktc, fc, dp } = hub._raw;
+      await check('Trade values', 'KeepTradeCut', async () => (!ktc.ok ? { status: config.ktcEnabled ? 'fail' : 'off', detail: ktc.error }
+        : { status: ktc.matched > 150 ? 'ok' : 'warn', detail: `${ktc.matched} players matched to Sleeper, ${ktc.picks.length} pick values, ${ktc.rookies.length} college prospects${ktc.unmatched.length ? `; unmatched e.g. ${ktc.unmatched.slice(0, 3).join(', ')}` : ''}` }));
+      await check('Trade values', 'FantasyCalc', async () => (!fc.ok ? { status: 'fail', detail: fc.error }
+        : { status: Object.keys(fc.players).length > 150 ? 'ok' : 'warn', detail: `${Object.keys(fc.players).length} players, ${fc.picks.length} pick values (${fc.format})` }));
+      await check('Trade values', 'DynastyProcess', async () => (!dp.ok ? { status: 'fail', detail: dp.error }
+        : { status: Object.keys(dp.players).length > 150 ? 'ok' : 'warn', detail: `${Object.keys(dp.players).length} players, ${dp.picks.length} pick values` }));
+      await check('Rookies', 'Incoming rookie class', async () => {
+        const r = await getRookieBoard(ctx);
+        return { status: r.board.length >= 24 ? 'ok' : r.board.length ? 'warn' : 'fail', detail: `${r.season} class: ${r.board.length} prospects (${r.sources.filter((x) => x.ok).map((x) => x.short).join(', ') || 'no sources'})` };
+      });
+    }
+    await check('Content', 'News feeds', async () => {
+      const n = await getNews();
+      const bad = n.status.filter((x) => !x.ok);
+      return { status: !bad.length ? 'ok' : bad.length < n.status.length ? 'warn' : 'fail', detail: `${n.status.length - bad.length}/${n.status.length} feeds, ${n.items.length} articles${bad.length ? `; down: ${bad.map((x) => x.source).join(', ')}` : ''}` };
+    });
+    await check('Content', 'Highlights', async () => {
+      const h = await getHighlights();
+      return { status: h.items.length ? 'ok' : 'warn', detail: `${h.items.length} videos` };
+    });
+    await check('Optional', 'College stats (CFBD_API_KEY)', async () => ({ status: config.cfbdKey ? 'ok' : 'off', detail: config.cfbdKey ? 'Key set' : 'Not set: rookie profiles skip college stats' }));
+    await check('Optional', 'AI Gazette writer (ANTHROPIC_API_KEY)', async () => ({ status: aiWriter ? 'ok' : 'off', detail: aiWriter ? 'Key set: Claude writes the Gazette' : 'Not set: built-in joke writer' }));
+    return { checkedAt: Date.now(), checks, requests: requestStats() };
+  }],
   ['GET', /^\/api\/config$/, async () => {
     if (!config.leagueId) return { leagueId: null };
     const lg = await getLeagueContext(config.leagueId);
@@ -127,6 +211,7 @@ const routes = [
     const benchIds = new Set(team.ids);
     lineup.forEach((s) => s.id && benchIds.delete(s.id));
     return {
+      thisWeek: thisWeekLineup(ctx, team),
       team: { rosterId: team.rosterId, name: team.name, owner: team.owner, wins: team.wins, losses: team.losses, ties: team.ties },
       optimal: { total: +total.toFixed(1), lineup: lineup.map((s) => ({ slot: s.slot, player: s.id ? card(ctx, s.id) : null })) },
       currentStarters: team.starters.filter((x) => x !== '0').map((pid) => pid),
@@ -232,8 +317,8 @@ const routes = [
 
   ['GET', /^\/api\/league\/(\d+)\/power$/, async ([id]) => {
     const ctx = await getLeagueContext(id);
-    const [cur, dynasty] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx)]);
-    return { season: seasonPower(ctx, cur), dynasty, draftSeason: Number(ctx.league.season) + 1 };
+    const [cur, dynasty, odds] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx), getOdds(ctx).catch((err) => { console.warn('[odds]', err.message); return null; })]);
+    return { season: seasonPower(ctx, cur), dynasty, odds, draftSeason: Number(ctx.league.season) + 1 };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/weekly$/, async ([id]) => {
@@ -286,7 +371,7 @@ const routes = [
     const where = (m) => m.picks.find((p) => p.player?.slug === slug) ?? null;
     const neighbors = board.filter((x) => x.pos === r.pos && Math.abs(x.rank - r.rank) <= 6 && x.slug !== slug).slice(0, 5)
       .map(({ slug: s2, name, rank, college: c }) => ({ slug: s2, name, rank, college: c }));
-    return { season, rookie: r, college, report: rookieReport(r, college), mock: { need: where(need), bpa: where(bpa) }, neighbors };
+    return { season, rookie: r, college, report: rookieReport(r, college, ctx.teams.length), mock: { need: where(need), bpa: where(bpa) }, neighbors };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/trade-grades$/, async ([id]) => {

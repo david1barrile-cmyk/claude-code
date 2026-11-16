@@ -21,12 +21,14 @@ export const getTrending = (type, hours = 48, limit = 50) =>
 
 // ~5 MB; trimmed to the fields the app uses and cached to disk for a day.
 export const getPlayers = () =>
-  cached('sleeper:players:trim', T.players, async () => {
+  cached('sleeper:players:trim2', T.players, async () => {
     const all = await fetchJson(`${B}/players/nfl`);
     const out = {};
     for (const [id, p] of Object.entries(all)) {
-      const pos = p.fantasy_positions?.[0] || p.position;
-      if (!['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(pos)) continue;
+      // Two-way players (e.g. CB/WR) are kept under their first fantasy-relevant position.
+      const FANTASY = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+      const pos = (p.fantasy_positions || []).find((x) => FANTASY.includes(x)) || p.position;
+      if (!FANTASY.includes(pos)) continue;
       if (pos !== 'DEF' && !p.active) continue;
       out[id] = {
         id,

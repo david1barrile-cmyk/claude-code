@@ -78,18 +78,29 @@ const ICONS = {
   grades: '<path d="M9 3h6l1 2h3v16H5V5h3zM9 3v3h6V3M8.5 13l2 2 4.5-5"/>',
   gazette: '<path d="M3 6h15v13H4a1 1 0 0 1-1-1zM18 10h3v8a1 1 0 0 1-2 0v-8M6 9h9M6 12h4M6 15h4M12 12h3v3h-3z"/>',
 };
-const NAV = [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History'], ['team', 'My Team'], ['waivers', 'Waivers'], ['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder'], ['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']];
+const GROUPS = [
+  { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History']] },
+  { name: 'My Team', icon: 'team', items: [['team', 'My Team'], ['waivers', 'Waivers']] },
+  { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder']] },
+  { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
+];
+ICONS.status = '<path d="M3 12h4l3-8 4 16 3-8h4"/>';
+const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
 
 function renderShell(active) {
+  const group = GROUPS.find((g) => g.items.some(([h]) => h === active)) || GROUPS[0];
   root.innerHTML = `<div class="shell">
     <aside class="side">
       <a href="#/" class="brand"><span class="ball">🏈</span>Fantasy Hub</a>
-      <nav>${NAV.map(([h, label]) => `<a href="#/${h}" class="${h === active ? 'active' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[h]}</svg>${label}</a>`).join('')}</nav>
+      <nav class="nav-full">${GROUPS.map((g) => `<div class="nav-group">${esc(g.name)}</div>${g.items.map(([h, label]) => `<a href="#/${h}" class="${h === active ? 'active' : ''}">${icon(h)}${label}</a>`).join('')}`).join('')}</nav>
+      <nav class="nav-sub">${group.items.map(([h, label]) => `<a href="#/${h}" class="${h === active ? 'active' : ''}">${label}</a>`).join('')}</nav>
       <div class="grow"></div>
+      <a class="status-link" href="#/status">${icon('status')}Data status</a>
       <div class="me">${teamAv({ name: session.teamName || session.username, avatar: session.avatar })}<div><b>${esc(session.teamName || session.username)}</b><small>${esc(session.leagueName)}</small></div></div>
       <div class="side-actions"><button id="theme" title="Toggle light/dark">◐</button><button id="switch">Switch</button></div>
     </aside>
     <main class="main" id="app"><div class="grid">${'<div class="skeleton span-6"></div>'.repeat(4)}</div></main>
+    <nav class="tabbar">${GROUPS.map((g) => `<a href="#/${g.items[0][0]}" class="${g === group && active !== 'status' ? 'active' : ''}">${icon(g.icon)}<span>${esc(g.name)}</span></a>`).join('')}</nav>
   </div>`;
   document.getElementById('switch').onclick = () => { store.del('fh.session'); session = null; location.hash = '#/connect'; route(); };
   document.getElementById('theme').onclick = () => {
@@ -166,6 +177,7 @@ async function viewDashboard($) {
         <div><b>${me ? `${me.wins}-${me.losses}${me.ties ? `-${me.ties}` : ''}` : '—'}</b><span>Record · ${standRank ? ordinal(standRank) : '—'}</span></div>
         <div><b>${pr ? `#${pr.rank}` : '—'}</b><span>Power rank</span></div>
         <div><b>${dyn ? `#${dyn.ranks[0]}` : '—'}</b><span>Dynasty rank</span></div>
+        ${power?.odds ? (() => { const o = power.odds.teams.find((t) => t.ownerId === session.userId); return o ? `<div><b>${o.playoffOdds >= 99.95 ? '>99' : o.playoffOdds < 0.5 ? '<1' : Math.round(o.playoffOdds)}%</b><span>Playoff odds</span></div>` : ''; })() : ''}
         <div><b>${me ? k(me.pf) : '—'}</b><span>Points for · ${pfRank ? ordinal(pfRank) : ''}</span></div>
         ${wk ? `<div><b>${wk.apW}-${wk.apL}</b><span>All-play</span></div>` : ''}
       </div>
@@ -252,6 +264,11 @@ async function viewPower($) {
 
   $.innerHTML = `${head('Power Rankings', `Two views of the league. <b>This season</b> blends record (25%), all-play record (35%) and current lineup strength (40%). <b>Dynasty</b> totals roster and draft-pick trade value (${esc(d.dynasty.source)}; picks valued by ${esc(d.dynasty.pickSource === 'Estimated' ? 'an estimate' : d.dynasty.pickSource)}) and projects it 1–3 years out with position-specific age curves.`)}
   <div class="grid">
+    ${d.odds ? card('Projected season finish', `<div class="grid" style="gap:24px">
+        <div class="span-5"><h3 style="margin-top:0">Projected final wins</h3><div id="c-wins"></div>
+          <div class="legend" style="margin-top:8px"><span><i style="background:var(--bar-muted)"></i>80% range</span><span><i style="background:var(--series-me);border-radius:50%"></i>Average</span><span><i style="background:var(--ink);width:2px"></i>Wins today</span></div></div>
+        <div class="span-7"><h3 style="margin-top:0">Chance of each final standing</h3><div id="c-finish"></div></div></div>
+      <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
     ${card('This season', `<div id="c-season"></div>`, { span: 5, note: 'score 0–100' })}
     ${card('Contender or rebuilder?', `<div id="c-quad"></div>`, { span: 7, note: 'current strength vs. long-term value' })}
     ${card('Dynasty value by position', `<div class="row" style="justify-content:space-between;margin-bottom:6px">${legend(Object.entries(POS_COLORS).map(([label, color]) => ({ label, color })))}
@@ -272,6 +289,7 @@ async function viewPower($) {
         <td class="num">${t.wins}-${t.losses}</td><td class="num">${pct(t.apPct)}</td><td class="num">${fmt(t.lineup)}</td><td>${form(t.form)}</td></tr>`).join('')}</tbody></table></div>`, { span: 12 })}
   </div>`;
 
+  if (d.odds) renderOdds(d.odds);
   hbars(document.getElementById('c-season'), {
     rows: season.map((t) => ({ label: `${t.rank}. ${t.name}`, value: t.score, highlight: t.ownerId === session.userId, t })), max: 100, fmt: (v) => v,
     tipFn: (r) => `<b>${esc(r.t.name)}</b>Record ${pct(r.t.components.record)} · All-play ${pct(r.t.components.allPlay)} · Lineup ${pct(r.t.components.lineup)} (percentile within league)`,
@@ -297,6 +315,38 @@ async function viewPower($) {
     document.querySelectorAll('#yr button').forEach((x) => x.classList.toggle('on', x === b));
     drawDyn(Number(b.dataset.y));
   }));
+}
+
+function renderOdds(o) {
+  const teams = [...o.teams].sort((a, b) => b.projWins - a.projWins);
+  const maxW = o.gamesTotal || Math.max(...teams.map((t) => t.winsP90), 1);
+  const x = (w) => `${(w / maxW) * 100}%`;
+  document.getElementById('c-wins').innerHTML = teams.map((t) => {
+    const me = t.ownerId === session.userId;
+    return `<div class="bullet" style="grid-template-columns:120px 1fr 64px" data-tip="${esc(`<b>${esc(t.name)}</b>Projected ${t.projWins} wins (80%: ${t.winsP10}–${t.winsP90})<br>Now ${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''} · Playoffs ${t.playoffOdds}%`)}">
+      <span class="small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${me ? '<b>' : ''}${esc(t.name)}${me ? '</b>' : ''}</span>
+      <div class="track" style="background:var(--surface-2)">
+        <div style="position:absolute;top:2px;bottom:2px;left:${x(t.winsP10)};width:calc(${x(t.winsP90)} - ${x(t.winsP10)});min-width:4px;background:var(--bar-muted);border-radius:4px"></div>
+        <div class="mark" style="left:${x(t.wins)}"></div>
+        <div style="position:absolute;top:50%;left:${x(t.projWins)};width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:${me ? 'var(--series-me)' : 'var(--series-ref)'};border:2px solid var(--surface)"></div>
+      </div>
+      <span class="small num" style="text-align:right"><b>${fmt(t.projWins)}</b> W</span></div>`;
+  }).join('') + `<div class="small muted" style="display:flex;justify-content:space-between;margin-left:130px;margin-right:74px"><span>0</span><span>${maxW} games</span></div>`;
+  const n = o.teams.length;
+  const cellColor = (p) => {
+    if (p < 0.5) return ['transparent', 'var(--muted)'];
+    const steps = ['--seq-7', '--seq-6', '--seq-5', '--seq-4', '--seq-3', '--seq-2', '--seq-1'];
+    const k = Math.min(steps.length - 1, Math.floor((p / 70) * steps.length));
+    const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+    return [`var(${steps[k]})`, (dark ? k <= 3 : k >= 4) ? '#ffffff' : 'var(--ink)'];
+  };
+  document.getElementById('c-finish').innerHTML = `<div class="scroll"><table class="heat">
+    <thead><tr><th>Team</th>${Array.from({ length: n }, (_, i) => `<th class="rot">${ordinal(i + 1)}</th>`).join('')}<th class="num">Playoffs</th>${o.byes ? '<th class="num">Bye</th>' : ''}<th class="num">#1 seed</th></tr></thead>
+    <tbody>${o.teams.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td>${teamTag({ name: t.name, avatar: t.avatar }, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''}`)}</td>
+      ${t.finishDist.map((p, i) => { const [bg, fg] = cellColor(p); return `<td class="cell" style="background:${bg};color:${fg}" data-tip="${esc(`<b>${esc(t.name)}</b>${p}% chance to finish ${ordinal(i + 1)}`)}">${p >= 0.5 ? Math.round(p) : ''}</td>`; }).join('')}
+      <td class="num"><span class="chip ${t.playoffOdds >= 75 ? 'good' : t.playoffOdds <= 25 ? 'bad' : 'warn'}">${t.playoffOdds >= 99.95 ? 'Clinched*' : t.playoffOdds < 0.05 ? 'Out*' : `${fmt(t.playoffOdds)}%`}</span></td>
+      ${o.byes ? `<td class="num">${fmt(t.byeOdds)}%</td>` : ''}<td class="num">${fmt(t.firstOdds)}%</td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted">Cells: % chance of finishing in that place (darker = likelier). *In every simulation; not an official clinch.</p>`;
 }
 
 // ---------- history ----------
@@ -376,7 +426,16 @@ async function viewTeam($) {
   const needRows = Object.entries(t.needs).filter(([p]) => !['K', 'DEF'].includes(p));
   $.innerHTML = `${head(esc(t.team.name), `${t.team.wins}-${t.team.losses} · Your optimal lineup projects <b>${fmt(t.optimal.total)}</b> pts/wk on rest-of-season form.`)}
   <div class="grid">
-    ${card('Optimal lineup', `<div class="scroll"><table>
+    ${t.thisWeek ? card(`This week: Week ${t.thisWeek.week} start/sit`, `<div class="kpis" style="margin-bottom:12px">
+        <div class="kpi"><b>${fmt(t.thisWeek.currentPts)}</b><span>Your Sleeper lineup (projected)</span></div>
+        <div class="kpi"><b>${fmt(t.thisWeek.bestPts)}</b><span>Best possible lineup</span></div>
+        <div class="kpi"><b class="${t.thisWeek.bestPts - t.thisWeek.currentPts > 0.5 ? 'up' : ''}">${sign(t.thisWeek.bestPts - t.thisWeek.currentPts)}</b><span>Points you'd add</span></div></div>
+      ${t.thisWeek.swaps.length ? `<h3>Suggested swaps</h3>${t.thisWeek.swaps.map((x) => `<div class="li row"><span class="chip good">Start</span>${ptag(x.start)}<span class="muted small">${fmt(x.start.proj)}</span>
+        ${x.sit ? `<span class="chip">Sit</span>${ptag(x.sit)}<span class="muted small">${fmt(x.sit.proj)}</span>` : ''}<b class="up" style="margin-left:auto">+${fmt(x.gain)}</b></div>`).join('')}` : '<p class="small"><span class="chip good">✓</span> Your Sleeper lineup is already the best by this week\'s projections.</p>'}
+      ${t.thisWeek.warnings.length ? `<h3>Check these starters</h3>${t.thisWeek.warnings.map((w) => `<div class="li row">${ptag(w.player)}<span class="chip warn">⚠ ${esc(w.issue)}</span></div>`).join('')}` : ''}
+      <details><summary>Best lineup by this week's projections</summary><div class="scroll"><table><tbody>${t.thisWeek.lineup.map((s2) => `<tr><td>${posTag(s2.slot.replace('SUPER_FLEX', 'SF').replace('REC_FLEX', 'FLEX').replace('WRRB_FLEX', 'FLEX'))}</td><td>${s2.player ? ptag(s2.player) : '<span class="muted">empty</span>'}</td><td class="num"><b>${fmt(s2.player?.proj)}</b></td><td>${s2.player && !s2.starting ? '<span class="chip warn">not in your lineup</span>' : ''}</td></tr>`).join('')}</tbody></table></div></details>
+      <p class="small muted">Projections from Sleeper, scored with your league's settings. Players ruled Out or on IR count as 0; taxi and IR slots are excluded.</p>`, { span: 12 }) : ''}
+    ${card('Optimal lineup (rest of season)', `<div class="scroll"><table>
       <thead><tr><th>Slot</th><th>Player</th><th class="num">RoS</th><th class="num">Proj</th><th class="num">L3</th><th></th></tr></thead>
       <tbody>${t.optimal.lineup.map((s) => `<tr><td>${posTag(s.slot.replace('SUPER_FLEX', 'SF').replace('REC_FLEX', 'FLEX').replace('WRRB_FLEX', 'FLEX'))}</td>
         <td>${s.player ? ptag(s.player) : '<span class="muted">empty</span>'}</td>
@@ -526,7 +585,7 @@ async function viewAnalyzer($) {
 // ---------- rookies ----------
 const POS4 = { QB: 'var(--qb)', RB: 'var(--rb)', WR: 'var(--wr)', TE: 'var(--te)' };
 const height = (h) => (h ? `${Math.floor(h / 12)}'${h % 12}"` : '—');
-const tierChip = (t) => `<span class="chip ${t === 'Elite' ? 'good' : t === 'Tier 1' ? 'good' : t === 'Depth' ? '' : 'warn'}">${esc(t)}</span>`;
+const tierChip = (t) => `<span class="chip ${t === 'Tier 1' || t === 'Tier 2' ? 'good' : t === 'Depth' ? '' : 'warn'}">${esc(t)}</span>`;
 
 async function viewRookies($) {
   const tab = routeQuery.get('view') === 'mock' ? 'mock' : 'board';
@@ -554,10 +613,12 @@ async function viewRookies($) {
 
 function renderBoard(el, d, posF) {
   const rows = d.board.filter((r) => !posF || r.pos === posF);
-  const tiers = ['Elite', 'Tier 1', 'Tier 2', 'Tier 3', 'Depth'];
+  const tiers = [...new Set(d.board.map((r) => r.tier))].filter((t) => t !== 'Depth');
+  const range = (t) => { const rs = d.board.filter((r) => r.tier === t).map((r) => r.rank); return rs.length ? `#${rs[0]}${rs.length > 1 ? `–${rs.at(-1)}` : ''}` : ''; };
+  const breaks = d.board.slice(0, 36).map((r, i) => (i > 0 && r.tier !== d.board[i - 1].tier && r.tier !== 'Depth' ? i : null)).filter((x) => x != null);
   el.innerHTML = `<div class="grid">
-    ${card('Value curve', `${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}<div id="c-curve"></div>`, { span: 8, note: 'consensus score by rank (top 36) · tier cliffs show where to trade up or down' })}
-    ${card('Position mix by tier', `<div id="c-tiers"></div>${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}`, { span: 4 })}
+    ${card('Value curve', `${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}<div id="c-curve"></div>`, { span: 8, note: 'consensus score by rank (top 36) · dashed lines mark value cliffs (tier breaks)' })}
+    ${card('Position mix by tier', `<div id="c-tiers"></div>${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}<p class="small muted">Draftable range only: your rookie draft has ${d.draftable} picks. Tiers break where value drops off sharply.</p>`, { span: 4 })}
     ${card(posF ? `${posF} rankings` : 'Big board', `<div class="scroll"><table id="bb">
       <thead><tr><th class="num" data-sort>#</th><th data-sort>Prospect</th><th data-sort>College</th><th class="num" data-sort>Age</th><th class="num">Size</th><th data-sort>Tier</th><th class="num" data-sort>KTC</th><th class="num" data-sort title="FantasyPros overall rank among all players">FP ECR</th><th class="num" data-sort>Score</th></tr></thead>
       <tbody>${rows.map((r) => `<tr><td class="rank num" data-v="${r.rank}">${r.rank}</td>
@@ -570,11 +631,11 @@ function renderBoard(el, d, posF) {
   </div>`;
   sortableTable(document.getElementById('bb'));
   const top = d.board.slice(0, 36);
-  columns(document.getElementById('c-curve'), { data: top.map((r) => ({ x: r.rank, y: r.score, color: POS4[r.pos], r })), height: 220, yFmt: (v) => fmt(v, 0),
+  columns(document.getElementById('c-curve'), { data: top.map((r) => ({ x: r.rank, y: r.score, color: POS4[r.pos], r })), height: 220, yFmt: (v) => fmt(v, 0), breaks,
     tipFn: (x) => `<b>#${x.r.rank} ${esc(x.r.name)}</b>${x.r.pos}${x.r.posRank} · ${esc(x.r.college || '')} · ${esc(x.r.tier)}<br>Score ${fmt(x.r.score, 0)}` });
   stackedHbars(document.getElementById('c-tiers'), {
-    rows: tiers.map((t) => ({ label: t, parts: Object.fromEntries(Object.keys(POS4).map((p) => [p, d.board.filter((r) => r.tier === t && r.pos === p).length])) })).filter((r) => Object.values(r.parts).some(Boolean)),
-    keys: Object.keys(POS4), colors: POS4, fmt: (v) => Math.round(v), labelW: 60, rowH: 30,
+    rows: tiers.map((t) => ({ label: `${t} ${range(t)}`, parts: Object.fromEntries(Object.keys(POS4).map((p) => [p, d.board.filter((r) => r.tier === t && r.pos === p).length])) })).filter((r) => Object.values(r.parts).some(Boolean)),
+    keys: Object.keys(POS4), colors: POS4, fmt: (v) => Math.round(v), labelW: 96, rowH: 30,
   });
 }
 
@@ -848,8 +909,27 @@ async function viewPlayer($, id) {
   }
 }
 
+// ---------- data status ----------
+async function viewStatus($) {
+  const d = await api(`/status?league=${encodeURIComponent(session.leagueId)}`);
+  const badge = { ok: ['good', '✓ Working'], warn: ['warn', '⚠ Check'], fail: ['bad', '✕ Down'], off: ['', '– Off'] };
+  const rel = (t) => (t ? ago(t) : 'never');
+  const areas = [...new Set(d.checks.map((c) => c.area))];
+  const worst = d.checks.some((c) => c.status === 'fail') ? 'fail' : d.checks.some((c) => c.status === 'warn') ? 'warn' : 'ok';
+  $.innerHTML = `${head('Data Status', `Where each part of the site gets its data, and whether it's working. Checked ${new Date(d.checkedAt).toLocaleTimeString()}.`,
+    `<span class="chip ${badge[worst][0]}" style="font-size:14px;padding:6px 14px">${worst === 'ok' ? '✓ All systems working' : worst === 'warn' ? '⚠ Something needs a look' : '✕ A source is down'}</span>`)}
+  <div class="grid">
+    ${areas.map((a) => card(a, `<table><tbody>${d.checks.filter((c) => c.area === a).map((c) => `<tr><td style="width:220px"><b>${esc(c.name)}</b></td>
+      <td style="width:110px"><span class="chip ${badge[c.status][0]}">${badge[c.status][1]}</span></td><td class="wrap small">${esc(c.detail || '')}</td></tr>`).join('')}</tbody></table>`, { span: 12 })).join('')}
+    ${card('Requests since the server started', `<div class="scroll"><table><thead><tr><th>Source</th><th class="num">OK</th><th class="num">Failed</th><th>Last success</th><th>Last failure</th><th class="num">Last time</th></tr></thead><tbody>
+      ${d.requests.sources.map((s2) => `<tr><td><b>${esc(s2.name)}</b></td><td class="num">${s2.ok}</td><td class="num ${s2.failed ? 'down' : ''}">${s2.failed}</td><td>${rel(s2.lastOk)}</td>
+        <td class="wrap small">${s2.lastFail ? `${rel(s2.lastFail)}: ${esc(s2.lastError)}` : '—'}</td><td class="num">${s2.lastMs != null ? `${s2.lastMs} ms` : '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No outside requests yet.</td></tr>'}
+      </tbody></table></div><p class="small muted">Server up since ${new Date(d.requests.since).toLocaleString()}. Most data is cached (player database 24h, values 6–12h, scores 5 min), so few requests is normal.</p>`, { span: 12 })}
+  </div>`;
+}
+
 // ---------- router ----------
-const views = { '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');
