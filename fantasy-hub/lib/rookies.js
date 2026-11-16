@@ -20,7 +20,29 @@ function readNotes() {
   } catch { return []; }
 }
 
-export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = [] }) {
+/**
+ * Tiers from the board's own drop-offs: within the draftable range (plus a margin), a new tier
+ * starts wherever the score falls by more than ~2x the typical rank-to-rank gap. Up to 6 tiers;
+ * everyone below the range is "Depth".
+ */
+export function assignTiers(board, draftable = 24) {
+  const n = Math.min(board.length, Math.max(12, Math.round(draftable * 1.25)));
+  const gaps = [];
+  for (let i = 1; i < n; i++) gaps.push({ at: i, gap: board[i - 1].score - board[i].score });
+  const sorted = gaps.map((g) => g.gap).sort((a, b) => a - b);
+  const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+  const threshold = Math.max(1.5, median * 2.2);
+  const cuts = gaps.filter((g) => g.gap >= threshold).sort((a, b) => b.gap - a.gap).slice(0, 5).map((g) => g.at).sort((a, b) => a - b);
+  let tier = 1;
+  board.forEach((r, i) => {
+    if (i >= n) { r.tier = 'Depth'; r.tierN = null; return; }
+    if (cuts.includes(i)) tier++;
+    r.tier = `Tier ${tier}`; r.tierN = tier;
+  });
+  return { cuts, draftable, range: n };
+}
+
+export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = [], draftable = 24 }) {
   const map = new Map();
   const get = (name, pos) => {
     const k = normName(name);
@@ -67,9 +89,7 @@ export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = []
   }
   const posCount = {};
   board.forEach((r, i) => { r.rank = i + 1; posCount[r.pos] = (posCount[r.pos] || 0) + 1; r.posRank = posCount[r.pos]; });
-  board.forEach((r) => {
-    r.tier = r.rank <= 3 ? 'Elite' : r.rank <= 8 ? 'Tier 1' : r.rank <= 14 ? 'Tier 2' : r.rank <= 26 ? 'Tier 3' : 'Depth';
-  });
+  assignTiers(board, draftable);
   return board;
 }
 
@@ -78,9 +98,10 @@ export function getRookieBoard(ctx) {
     const hub = await getValueHub(ctx);
     const season = draftSeason(ctx.league);
     const { ktc, dp } = hub._raw;
-    const board = buildBoard({ season, ktcRookies: ktc.ok ? ktc.rookies : [], dpRookies: dp.ok ? dp.rookies : [], notes: readNotes() });
+    const draftable = (ctx.teams.length || 12) * (ctx.league.settings?.draft_rounds || 4);
+    const board = buildBoard({ season, ktcRookies: ktc.ok ? ktc.rookies : [], dpRookies: dp.ok ? dp.rookies : [], notes: readNotes(), draftable });
     return {
-      season, format: hub.format,
+      season, format: hub.format, draftable,
       sources: [
         { short: 'KTC', name: 'KeepTradeCut devy rankings (college prospects by draft year)', ok: ktc.ok && board.some((r) => r.sources.KTC), error: ktc.error ?? (ktc.ok && !board.some((r) => r.sources.KTC) ? `no ${season} prospects listed` : null) },
         { short: 'DP', name: 'DynastyProcess (FantasyPros rookie ECR)', ok: dp.ok && board.some((r) => r.sources.DP), error: dp.error ?? (dp.ok && !board.some((r) => r.sources.DP) ? `no ${season} class listed yet (appears closer to the NFL Draft)` : null) },
@@ -162,11 +183,11 @@ export async function collegeProfile(r, draftYear) {
 }
 function avg(a, b) { const v = [a, b].filter((x) => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; }
 
-export function rookieReport(r, college) {
+export function rookieReport(r, college, teams = 12) {
   const S = [], C = [], O = [];
   const pct = (x) => `${Math.round(x * 100)}%`;
-  O.push(r.rank <= 3 ? `Elite prospect: a 1.01–1.03 type in your rookie draft.` : r.rank <= 8 ? `First-round lock (consensus #${r.rank}).`
-    : r.rank <= 14 ? `Late-1st / early-2nd value (consensus #${r.rank}).` : r.rank <= 26 ? `Second-round pick (consensus #${r.rank}).` : `Day-3 dart throw (consensus #${r.rank}).`);
+  const rd = Math.ceil(r.rank / teams), slot = ((r.rank - 1) % teams) + 1;
+  O.push(`Consensus #${r.rank}: roughly a ${rd}.${String(slot).padStart(2, '0')} value in your ${teams}-team rookie draft${r.tier && r.tier !== 'Depth' ? ` (${r.tier})` : ''}.`);
   O.push(`${r.pos}${r.posRank} in this class.`);
   const ktc = r.sources.KTC?.classRank, dp = r.sources.DP?.classRank;
   if (ktc && dp && Math.abs(ktc - dp) >= 4) O.push(`Markets disagree: rookie #${ktc} on KTC vs #${dp} on FantasyPros/DynastyProcess. KTC traders are ${ktc < dp ? 'higher' : 'lower'} on this prospect.`);

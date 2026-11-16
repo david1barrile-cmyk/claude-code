@@ -73,7 +73,7 @@ function hbarPath(x0, y, w, h, r = 4) {
 }
 
 // ---------- vertical bars (single series) ----------
-export function columns(el, { data, height = 220, color = 'var(--series-me)', tipFn, yFmt = fmtK }) {
+export function columns(el, { data, height = 220, color = 'var(--series-me)', tipFn, yFmt = fmtK, breaks = [] }) {
   mount(el, (W) => {
     const padL = 34, padB = 22, padT = 8;
     const { max, step } = niceMax(Math.max(...data.map((d) => d.y), 1));
@@ -88,7 +88,8 @@ export function columns(el, { data, height = 220, color = 'var(--series-me)', ti
         <text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${esc(d.x)}</text>
         <rect class="hit" x="${padL + i * bw}" y="${padT}" width="${bw}" height="${ih}" data-tip="${esc(tipFn ? tipFn(d) : `${esc(d.x)}: ${esc(d.y)}`)}"/></g>`;
     }).join('');
-    return `<svg width="${W}" height="${H}" role="img">${g}${bars}</svg>`;
+    const marks = breaks.map((i) => `<line x1="${padL + i * bw}" x2="${padL + i * bw}" y1="${padT}" y2="${padT + ih}" stroke="var(--muted)" stroke-dasharray="4 4"/>`).join('');
+    return `<svg width="${W}" height="${H}" role="img">${g}${marks}${bars}</svg>`;
   });
 }
 

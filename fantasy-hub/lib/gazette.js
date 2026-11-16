@@ -9,6 +9,7 @@ import { summarizeSeason } from './history.js';
 import { bestLineup } from './lineup.js';
 import { winProbability } from './power.js';
 import { gradeLeagueTrades } from './tradegrades.js';
+import { getOdds } from './odds.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 
@@ -276,6 +277,17 @@ export function templateEdition(f, seedKey = '') {
     `${fa.team} Drops $${fa.faab} Of FAAB On ${fa.player}; Financial Planner Weeps`,
   ]), `Financial advisors were unavailable for comment. ${fa.player} was unavailable for a role.`, [fa.team]);
 
+  const om = f.oddsMove || [];
+  const up = om[0], down = om.at(-1);
+  if (up && up.change >= 10) add('Odds Desk', pick([
+    `${up.team}'s Playoff Odds Jump From ${up.before}% To ${up.now}%; Manager Already Shopping For Banner`,
+    `Simulations Now Like ${up.team}: Playoff Odds Up ${up.change} Points To ${up.now}%`,
+  ]), `Ten thousand simulated seasons later, ${up.team} projects for ${up.projWins} wins. The computer would like everyone to know it was "always a believer."`, [up.team]);
+  if (down && down.change <= -10) add('Odds Desk', pick([
+    `${down.team}'s Playoff Odds Plunge From ${down.before}% To ${down.now}%`,
+    `Computer Gives Up On ${down.team} Faster Than Its Manager Did: Odds Fall To ${down.now}%`,
+  ]), `A ${Math.abs(down.change)}-point drop in one week. ${down.team} says it "doesn't believe in simulations," a stance shared by most teams at ${down.now}%.`, [down.team]);
+
   // Lead = the most dramatic story available.
   const order = ['Upset Alert', 'Blowout', 'Nail-Biter', 'Manager Malpractice', 'Star Watch'];
   const rankOf = (k) => (order.indexOf(k) === -1 ? 99 : order.indexOf(k));
@@ -359,6 +371,14 @@ export async function getEdition(ctx, week, { aiWriter } = {}) {
   const facts = await cached(`gfacts:${ctx.league.league_id}:${week}`, 30 * 60e3, () => weekFacts(ctx, week));
   if (!facts) return null;
   const graded = await gradeLeagueTrades(ctx).catch(() => []);
+  // Playoff-odds swing this week (simulated from standings after this week vs. the week before).
+  if (!facts.oddsMove && week > 1 && facts.race.weeksLeft > 0) {
+    const [now, prev] = await Promise.all([getOdds(ctx, { throughWeek: week }), getOdds(ctx, { throughWeek: week - 1 })]).catch(() => [null, null]);
+    if (now && prev) {
+      facts.oddsMove = now.teams.map((t) => ({ team: t.name, now: t.playoffOdds, before: prev.teams.find((p) => p.ownerId === t.ownerId)?.playoffOdds ?? null, projWins: t.projWins }))
+        .filter((x) => x.before != null).map((x) => ({ ...x, change: Math.round((x.now - x.before) * 10) / 10 })).sort((a, b) => b.change - a.change);
+    }
+  }
   const cards = deskCards(graded.filter((t) => !t.offseason && t.week === week));
   facts.tradeDesk = cards;
   const base = { week, season: facts.season, league: facts.league, scoreboard: facts.scoreboard, medianGames: facts.medianGames, median: facts.medianNotes?.median ?? null };

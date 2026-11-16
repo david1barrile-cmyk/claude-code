@@ -114,3 +114,17 @@ test('gazette endpoint serves the latest completed week and archives', async () 
   assert.equal(old.body.edition.week, 3);
   assert.ok(old.body.edition.lead.headline);
 });
+
+test('this-week start/sit and playoff odds', async () => {
+  const t = await get('/league/9001/team/u1');
+  const w = t.body.thisWeek;
+  assert.equal(w.week, 11);
+  assert.ok(w.bestPts >= w.currentPts);
+  assert.ok(w.swaps.every((x) => x.gain > 0));
+  const p = await get('/league/9001/power');
+  assert.equal(p.body.odds.teams.length, 12);
+  assert.ok(Math.abs(p.body.odds.teams.reduce((s, x) => s + x.playoffOdds, 0) - 100 * p.body.odds.spots) < 1);
+  const st = await get('/status?league=9001');
+  assert.ok(st.body.checks.some((c) => c.name === 'KeepTradeCut' && c.status === 'ok'));
+  assert.ok(st.body.requests.sources.length > 0);
+});
