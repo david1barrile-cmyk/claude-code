@@ -25,12 +25,14 @@ function modelSource(ctx, picks, fmt) {
   const n = ctx.teams.length;
   const at = (rank) => sorted[Math.min(sorted.length - 1, rank)] || 0;
   const tierMult = { early: 1.3, mid: 1, late: 0.8 };
-  const pickVals = {};
-  for (const pk of picks) {
+  const first = picks[0]?.season ?? Number(ctx.league.season) + 1;
+  const pickFn = (pk) => {
     const base = pk.round > 3 ? at(n * 26) : at(n * [5, 12, 20][pk.round - 1]);
-    pickVals[pk.key] = Math.round(base * (tierMult[pk.tier] ?? 1) * 0.9 ** (pk.season - picks[0].season));
-  }
-  return { name: 'Fantasy Hub model', short: 'Model', ok: true, format: fmt.isDynasty ? 'Production + age' : 'Production', players, pickVals };
+    return Math.round(base * (tierMult[pk.tier] ?? 1) * 0.9 ** Math.max(0, pk.season - first));
+  };
+  const pickVals = {};
+  for (const pk of picks) pickVals[pk.key] = pickFn(pk);
+  return { name: 'Fantasy Hub model', short: 'Model', ok: true, format: fmt.isDynasty ? 'Production + age' : 'Production', players, pickVals, pickFn };
 }
 
 export function getValueHub(ctx) {
@@ -68,7 +70,7 @@ export function getValueHub(ctx) {
       format: fmt,
       sources: sources.map((s) => ({ short: s.short, name: s.name, ok: s.ok, format: s.format ?? null, error: s.error ?? null })),
       teams,
-      _raw: { ktc, dp, fc },
+      _raw: { ktc, dp, fc, model, picks },
     };
   });
 }

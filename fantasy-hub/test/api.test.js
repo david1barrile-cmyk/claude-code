@@ -104,3 +104,13 @@ test('trade analyzer and rookie endpoints', async () => {
   assert.ok(prof.body.college.seasons.length > 0 && prof.body.report.outlook.length > 0);
   assert.equal((await get('/league/9001/rookie/nobody-here')).status, 404);
 });
+
+test('gazette endpoint serves the latest completed week and archives', async () => {
+  const g = await get('/league/9001/gazette');
+  assert.equal(g.body.edition.week, 10);
+  assert.equal(g.body.weeks.length, 10);
+  assert.equal(g.body.ai, false);
+  const old = await get('/league/9001/gazette?week=3');
+  assert.equal(old.body.edition.week, 3);
+  assert.ok(old.body.edition.lead.headline);
+});

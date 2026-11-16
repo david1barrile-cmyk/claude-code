@@ -75,8 +75,10 @@ const ICONS = {
   rookies: '<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.5 6.5 19.5l1-6.3L3 8.9 9 8z"/>',
   metrics: '<path d="M3 3v18h18M7 15l4-4 3 3 6-6"/>',
   news: '<path d="M4 5h13v14H5a1 1 0 0 1-1-1zM17 9h3v9a1 1 0 0 1-1 1h-2M7 9h7M7 13h7M7 16h4"/>',
+  grades: '<path d="M9 3h6l1 2h3v16H5V5h3zM9 3v3h6V3M8.5 13l2 2 4.5-5"/>',
+  gazette: '<path d="M3 6h15v13H4a1 1 0 0 1-1-1zM18 10h3v8a1 1 0 0 1-2 0v-8M6 9h9M6 12h4M6 15h4M12 12h3v3h-3z"/>',
 };
-const NAV = [['', 'Dashboard'], ['power', 'Power Rankings'], ['history', 'League History'], ['team', 'My Team'], ['waivers', 'Waivers'], ['analyzer', 'Trade Analyzer'], ['trades', 'Trade Finder'], ['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']];
+const NAV = [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History'], ['team', 'My Team'], ['waivers', 'Waivers'], ['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder'], ['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']];
 
 function renderShell(active) {
   root.innerHTML = `<div class="shell">
@@ -141,6 +143,7 @@ async function viewConnect() {
 
 // ---------- dashboard ----------
 async function viewDashboard($) {
+  const gz = api(L('/gazette')).catch(() => null);
   const [lg, mu, weekly, power, wv, tx, news] = await Promise.all([
     api(L()), api(L('/matchups')), api(L('/weekly')).catch(() => null), api(L('/power')).catch(() => null),
     api(L(`/waivers?owner=${session.userId}`)).catch(() => null), api(L('/transactions')).catch(() => []), api('/news').catch(() => ({ items: [] })),
@@ -176,6 +179,7 @@ async function viewDashboard($) {
         <div class="lbl"><span><b>${a.winProb}%</b> win probability</span><span>${b.winProb}%</span></div></div>` : '<p class="muted">No matchup this week.</p>'}
     </section>
 
+    <section class="card span-12" id="gz-card" style="display:none"></section>
     ${card('Scoring by week', '<div id="c-weekly"></div>', { span: 8, note: 'Your team vs league average' })}
     ${card('Power rankings', `<div id="c-power"></div><p class="small"><a href="#/power">Full rankings & dynasty outlook →</a></p>`, { span: 4, note: 'record + all-play + lineup' })}
 
@@ -202,6 +206,16 @@ async function viewDashboard($) {
     ${card('Latest news', news.items.slice(0, 7).map((n) => `<div class="li"><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a><div class="small muted">${esc(n.source)} · ${ago(n.published)}</div></div>`).join('') + '<p class="small"><a href="#/news">News & highlights →</a></p>', { span: 4 })}
   </div>`;
 
+  gz.then((g) => {
+    const el = document.getElementById('gz-card');
+    if (!el || !g?.edition) return;
+    const e = g.edition;
+    el.style.display = '';
+    el.innerHTML = `<div class="card-head"><h2>📰 From the League Gazette · Week ${e.week}</h2><a class="small" href="#/gazette">Read the full edition →</a></div>
+      <div style="font:700 12px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--bad-ink)">${esc(e.lead.kicker)}</div>
+      <div style="font:900 26px/1.15 'Playfair Display',Georgia,serif;margin:6px 0">${esc(e.lead.headline)}</div>
+      <div class="muted" style="font-family:'Source Serif 4',Georgia,serif;font-size:15px">${esc(e.lead.body)}</div>`;
+  });
   if (weekly?.weeks.length && wk) {
     const byWeek = Object.fromEntries(wk.weekly.map((w) => [w.week, w.pts]));
     lines(document.getElementById('c-weekly'), {
@@ -624,6 +638,120 @@ async function viewRookie($, slug) {
   }
 }
 
+// ---------- trade report cards ----------
+const gradeCls = (g) => `grade g-${String(g)[0].toLowerCase()}`;
+const when = (t) => (t.offseason ? 'Offseason' : `Week ${t.week}`) + ` · ${new Date(t.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+function assetLine(x) {
+  const v = Object.values(x.values).filter((n) => n != null);
+  const avg = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  const tip = Object.entries(x.values).map(([k2, n]) => `${k2}: ${n == null ? '—' : Math.round(n).toLocaleString()}`).join('\n');
+  return `<li>${x.kind === 'pick' ? '<span class="pos" style="--pc:var(--pick)">PICK</span>' : posTag(x.pos)}
+    ${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>${x.age ? ` <span class="muted">${x.age}</span>` : ''}` : esc(x.label)}
+    <span class="muted num" style="margin-left:auto" title="${esc(tip)}">${x.used ? 'used' : avg == null ? '—' : k(avg)}</span></li>`;
+}
+function tradeCard(t) {
+  return `<article class="tcard">
+    <div class="row" style="justify-content:space-between"><div class="row"><b>${t.teamsCount > 2 ? `${t.teamsCount}-team trade` : 'Trade'}</b><span class="muted small">${esc(when(t))}</span></div>
+      <span class="chip ${t.winner ? 'warn' : 'good'}">${esc(t.verdict)}</span></div>
+    <div class="sides">${t.sides.map((s) => `<div class="tside ${t.winner === s.team ? "won" : ""}">
+      <div class="row"><span class="who">${teamAv({ name: s.team, avatar: s.avatar }, 'sm')}<span class="t"><span><b>${esc(s.team)}</b></span><small>${s.contender ? 'Contender' : 'Building'} · ${ordinal(s.recordRank)} in standings</small></span></span>
+        <span class="${gradeCls(s.grade)}" title="Score ${s.score}">${esc(s.grade)}</span></div>
+      <div class="small muted" style="margin-top:8px">Receives</div>
+      <ul class="gets">${s.received.map(assetLine).join('') || '<li class="muted">FAAB only</li>'}${s.faabIn ? `<li>💵 $${s.faabIn} FAAB</li>` : ''}</ul>
+      <div class="small muted" style="margin-top:6px">Sends: ${s.sent.map((x) => esc(x.label)).join(', ') || '—'}${s.faabOut ? `${s.sent.length ? ', ' : ''}$${s.faabOut} FAAB` : ''}</div>
+      <div class="stats">
+        <span title="Consensus value received vs. sent">Value <b class="${trendCls(s.edge)}">${s.edge > 0 ? '+' : ''}${s.edge}%</b></span>
+        <span title="Change in best rest-of-season lineup">Lineup <b class="${trendCls(s.lineupDelta ?? 0)}">${s.lineupDelta == null ? '—' : `${s.lineupDelta > 0 ? '+' : ''}${s.lineupDelta}/wk`}</b></span>
+        ${s.ageGain ? `<span>Age <b>${s.ageGain > 0 ? '−' : '+'}${Math.abs(s.ageGain)} yrs</b></span>` : ''}
+        ${!t.offseason ? `<span title="Fantasy points by acquired players since the trade">Since trade <b>${s.sincePts.acquired}</b> pts</span>` : ''}
+      </div></div>`).join('')}</div>
+    <ul class="reasons">${t.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
+    <details><summary>Value by source</summary><div class="scroll"><table><thead><tr><th>Source</th>${t.sides.map((s) => `<th class="num">${esc(s.team)} edge</th>`).join('')}</tr></thead>
+      <tbody>${t.sides[0].perSource.map((p, i) => `<tr><td>${esc(p.name)}${p.inGrade ? '' : ' <span class="muted small">(shown, not graded)</span>'}</td>${t.sides.map((s) => `<td class="num ${trendCls(s.perSource[i].edge)}">${s.perSource[i].usable ? `${s.perSource[i].edge > 0 ? '+' : ''}${s.perSource[i].edge}%` : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>
+  </article>`;
+}
+
+async function viewGrades($) {
+  const d = await api(L('/trade-grades'));
+  const mineOnly = routeQuery.get('mine') === '1';
+  const me = session.teamName;
+  const list = d.trades.filter((t) => !mineOnly || t.sides.some((s) => s.team === me));
+  const tally = {};
+  for (const t of d.trades) for (const s of t.sides) (tally[s.team] ||= []).push(s.score);
+  const gpa = Object.entries(tally).map(([team, xs]) => ({ team, n: xs.length, avg: xs.reduce((a, b) => a + b, 0) / xs.length })).sort((a, b) => b.avg - a.avg);
+  $.innerHTML = `${head('Trade Grades', `Report cards for all ${d.trades.length} league trades this year, newest first. Each team's grade blends value (the median edge across ${d.sources.filter((s) => s.ok && s.short !== 'Model').map((s) => s.short).join(', ')}), the change in its best lineup now, and whether the deal fits a contender or a rebuild. Grades use <b>today's</b> values (hindsight), so they update as players rise and fall; used draft picks count as the player they became.`,
+    `<div class="seg"><button data-mine="0" class="${mineOnly ? '' : 'on'}">All trades</button><button data-mine="1" class="${mineOnly ? 'on' : ''}">My trades</button></div>`)}
+  <div class="grid">
+    <section class="span-8">${list.map(tradeCard).join('') || '<div class="card"><p class="muted">No trades yet.</p></div>'}</section>
+    <aside class="span-4">${card('Trader report card', `<p class="small muted">Average trade grade per team this year.</p>${gpa.map((g) => `<div class="li row" style="justify-content:space-between"><span>${g.team === me ? '<b>' : ''}${esc(g.team)}${g.team === me ? '</b>' : ''} <span class="muted small">${g.n} trade${g.n === 1 ? '' : 's'}</span></span><span class="${gradeCls(gradeFromScore(g.avg))} sm">${gradeFromScore(g.avg)}</span></div>`).join('')}`, { span: 12 })}</aside>
+  </div>`;
+  $.querySelectorAll('[data-mine]').forEach((b) => b.onclick = () => { location.hash = `#/grades${b.dataset.mine === '1' ? '?mine=1' : ''}`; });
+}
+function gradeFromScore(x) { return [[90, 'A+'], [82, 'A'], [76, 'A-'], [70, 'B+'], [64, 'B'], [58, 'B-'], [53, 'C+'], [48, 'C'], [43, 'C-'], [36, 'D'], [-1e9, 'F']].find(([m]) => x >= m)[1]; }
+
+// ---------- gazette ----------
+async function viewGazette($) {
+  const want = routeQuery.get('week');
+  $.innerHTML = '<div class="paper"><p class="muted">The presses are running…</p></div>';
+  const d = await api(L(`/gazette${want ? `?week=${encodeURIComponent(want)}` : ''}`));
+  if (!d.edition) {
+    $.innerHTML = `<div class="paper"><div class="flag">The ${esc(session.leagueName)} Gazette</div><p class="tag">The first edition goes to print after Week 1 is final.</p></div>`;
+    return;
+  }
+  const e = d.edition;
+  const i = d.weeks.indexOf(e.week);
+  const prev = d.weeks[i - 1], next = d.weeks[i + 1];
+  const flag = d.masthead || `The ${e.league} Gazette`;
+  const mine = (txt) => session.teamName && txt.includes(session.teamName);
+  const story = (s) => `<article class="story">${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ''}<h3>${esc(s.headline)}</h3><p>${esc(s.body)}</p>${mine(s.headline + s.body) ? '<div class="small" style="margin-top:4px"><span class="chip warn">📣 That’s you</span></div>' : ''}</article>`;
+  $.innerHTML = `<div class="paper">
+    <div class="topline"><span>Vol. ${esc(e.season)} · No. ${e.week}</span><span>Week ${e.week} Edition</span><span>Price: $1 FAAB</span></div>
+    <div class="flag">${esc(flag)}</div>
+    <div class="tag">All the news that's fit to roast</div>
+    <div class="weeknav">
+      ${prev ? `<a class="chip" href="#/gazette?week=${prev}">← Week ${prev}</a>` : '<span></span>'}
+      <select id="gz-week" aria-label="Edition">${d.weeks.map((w) => `<option value="${w}" ${w === e.week ? 'selected' : ''}>Week ${w}</option>`).join('')}</select>
+      ${next ? `<a class="chip" href="#/gazette?week=${next}">Week ${next} →</a>` : '<span></span>'}
+    </div>
+    <hr class="rule">
+    <section class="lead">
+      <div><div class="kicker">${esc(e.lead.kicker)}</div><h2>${esc(e.lead.headline)}</h2><p>${esc(e.lead.body)}</p></div>
+      <aside><div class="sb-title">Final scores, Week ${e.week}</div><div id="gz-sb"></div>
+        ${e.median != null ? `<div class="small muted" style="font-family:var(--font)">Dashed line: league median (${fmt(e.median)})${e.medianGames ? ' · beat it for an extra win' : ''}</div>` : ''}</aside>
+    </section>
+    <section class="cols">${e.stories.map(story).join('')}</section>
+    <section class="desk" id="gz-desk"></section>
+    <section class="lower">
+      <div><div class="section-title">Around the League</div><ul class="briefs">${e.briefs.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>
+      <div class="ahead"><div class="section-title">Looking Ahead</div>${e.lookahead.length ? e.lookahead.map((x) => `<h4>${esc(x.headline)}</h4><p>${esc(x.body)}</p>`).join('') : '<p>The regular season is over. Pray for your playoff matchup.</p>'}</div>
+    </section>
+    <div class="fine">Satire. Scores and stats are real; quotes, sources and experts are not. Any resemblance to competent management is coincidental.<br>
+      ${e.generator === 'claude' ? `Written by Claude (${esc(e.model || 'AI')}) from this week's league data.` : "Written by the Gazette's in-house joke machine."}</div>
+  </div>`;
+  document.getElementById('gz-week').onchange = (ev) => { location.hash = `#/gazette?week=${ev.target.value}`; };
+  const desk = document.getElementById('gz-desk');
+  const deskItem = (headline, body, sides, extra = '') => `<div class="item"><div>${extra}<h3>${esc(headline)}</h3><p>${esc(body)}</p></div>
+    <div class="grades">${sides.map((x) => `<div class="g"><span class="${gradeCls(x.grade)} sm">${esc(x.grade)}</span>${esc(x.team)}</div>`).join('')}</div></div>`;
+  if (e.tradeDesk?.length) {
+    desk.innerHTML = `<div class="section-title">The Trade Desk · Week ${e.week}</div>${e.tradeDesk.map((t) => deskItem(t.headline, t.body, t.card.sides)).join('')}
+      <p class="small" style="font-family:var(--font)"><a href="#/grades">Full report cards →</a></p>`;
+  } else {
+    api(L('/trade-grades')).then((g) => {
+      const t = g.trades[0];
+      if (!t) { desk.remove(); return; }
+      desk.innerHTML = `<div class="section-title">The Trade Desk</div>${deskItem(`No trades in Week ${e.week}. The most recent deal still gets graded:`, t.notes.slice(0, 3).join(' '), t.sides, `<div class="kicker">${esc(when(t))}${t.winner ? ` · ${esc(t.verdict)}` : ''}</div>`)}
+        <p class="small" style="font-family:var(--font)"><a href="#/grades">All trade report cards →</a></p>`;
+    }).catch(() => desk.remove());
+  }
+  const sb = document.getElementById('gz-sb');
+  const max = Math.max(...e.scoreboard.map((x) => x.points), 1);
+  sb.innerHTML = `<div style="position:relative">${e.scoreboard.map((x) => `<div class="bullet" style="grid-template-columns:118px 1fr 50px;font-family:var(--font)" data-tip="${esc(`<b>${esc(x.team)}</b>${fmt(x.points)} pts${e.median != null ? ` · ${x.aboveMedian ? 'above' : 'below'} median` : ''}`)}">
+      <span class="small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.owner === session.userId ? '<b>' : ''}${esc(x.team)}${x.owner === session.userId ? '</b>' : ''}</span>
+      <div class="track"><div class="fill" style="width:${(x.points / max) * 100}%;background:${x.owner === session.userId ? 'var(--series-me)' : 'var(--bar-muted)'}"></div>
+        ${e.median != null ? `<div class="mark" style="left:${(e.median / max) * 100}%;background:none;border-left:2px dashed var(--ink);width:0"></div>` : ''}</div>
+      <span class="small num" style="text-align:right">${fmt(x.points)}</span></div>`).join('')}</div>`;
+}
+
 // ---------- metrics ----------
 async function viewMetrics($, pos = 'WR') {
   const d = await api(L(`/metrics?pos=${pos}`));
@@ -721,7 +849,7 @@ async function viewPlayer($, id) {
 }
 
 // ---------- router ----------
-const views = { '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');

@@ -74,3 +74,6 @@ export async function getWeekProjections(season, week) {
 
 export const getWinnersBracket = (id) => j(`/league/${id}/winners_bracket`, T.live);
 export const getTradedPicks = (id) => j(`/league/${id}/traded_picks`, T.live);
+export const getLeagueDrafts = (id) => j(`/league/${id}/drafts`, T.live);
+export const getDraft = (id) => j(`/draft/${id}`, T.pastWeekStats);
+export const getDraftPicks = (id) => j(`/draft/${id}/picks`, T.pastWeekStats);

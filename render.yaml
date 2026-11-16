@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     rootDir: fantasy-hub
-    buildCommand: npm install --omit=dev
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
@@ -19,3 +19,5 @@ services:
         sync: false   # optional: leave blank for a public site
       - key: CFBD_API_KEY
         sync: false   # optional: free key from collegefootballdata.com for rookie college stats
+      - key: ANTHROPIC_API_KEY
+        sync: false   # optional: lets Claude write the League Gazette (otherwise the built-in joke writer does)
