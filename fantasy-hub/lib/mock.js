@@ -111,6 +111,13 @@ function matchups(week) {
   return out;
 }
 
+// A Week 9 trade between rosters 1 and 2 (rosters reflect it).
+const tradeA = rosters[0].players[4], tradeB = rosters[1].players[3];
+rosters[0].players[4] = tradeB; rosters[1].players[3] = tradeA;
+const mockTrade = { transaction_id: 'trade1', type: 'trade', status: 'complete', leg: 9, created: Date.UTC(2026, 10, 3), status_updated: Date.UTC(2026, 10, 3),
+  roster_ids: [1, 2], adds: { [tradeB]: 1, [tradeA]: 2 }, drops: { [tradeB]: 2, [tradeA]: 1 },
+  draft_picks: [{ season: '2027', round: 1, roster_id: 2, previous_owner_id: 2, owner_id: 1 }], waiver_budget: [{ sender: 1, receiver: 2, amount: 5 }] };
+
 // Standings derived from the same weekly matchups the API serves.
 for (const r of rosters) Object.assign(r.settings, { wins: 0, losses: 0, ties: 0, fpts: 0, fpts_decimal: 0, fpts_against: 0 });
 for (let w = 1; w < WEEK; w++) {
@@ -260,7 +267,7 @@ export function handle(url) {
   const p = u.pathname.replace(/^\/v1/, '');
   let m;
   if (u.hostname.includes('sleeper')) {
-    if (p === '/state/nfl') return { season: SEASON, league_season: SEASON, week: WEEK, display_week: WEEK, season_type: 'regular' };
+    if (p === '/state/nfl') return { season: SEASON, league_season: SEASON, week: WEEK, display_week: WEEK, season_type: 'regular', season_start_date: '2026-09-09' };
     if ((m = p.match(/^\/user\/([^/]+)$/))) return users.find((x) => x.display_name === decodeURIComponent(m[1]) || x.user_id === m[1]) ?? null;
     if (/^\/user\/[^/]+\/leagues\/nfl\/\d+$/.test(p)) return [league];
     if (p === '/league/9001') return league;
@@ -279,7 +286,7 @@ export function handle(url) {
     if (p === '/league/9001/rosters') return rosters;
     if (p === '/league/9001/users') return users;
     if ((m = p.match(/^\/league\/9001\/matchups\/(\d+)$/))) return matchups(Number(m[1]));
-    if ((m = p.match(/^\/league\/9001\/transactions\/(\d+)$/))) return Number(m[1]) !== WEEK ? [] : trending.slice(0, 3).map((t, i) => ({ transaction_id: `tx${i}`, type: 'waiver', status: 'complete', created: Date.UTC(2026, 10, 11 - i), roster_ids: [i + 2], adds: { [t.player_id]: i + 2 }, drops: { [rosters[i + 1].players[15]]: i + 2 }, settings: { waiver_bid: 12 - i * 4 } }));
+    if ((m = p.match(/^\/league\/9001\/transactions\/(\d+)$/))) return Number(m[1]) === 9 ? [mockTrade] : Number(m[1]) !== WEEK ? [] : trending.slice(0, 3).map((t, i) => ({ transaction_id: `tx${i}`, type: 'waiver', status: 'complete', created: Date.UTC(2026, 10, 11 - i), roster_ids: [i + 2], adds: { [t.player_id]: i + 2 }, drops: { [rosters[i + 1].players[15]]: i + 2 }, settings: { waiver_bid: 12 - i * 4 } }));
     if (p === '/players/nfl') return players;
     if (p.startsWith('/players/nfl/trending/add')) return trending;
     if (p.startsWith('/players/nfl/trending/drop')) return [];

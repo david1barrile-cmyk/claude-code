@@ -8,6 +8,7 @@ import * as S from './sleeper.js';
 import { summarizeSeason } from './history.js';
 import { bestLineup } from './lineup.js';
 import { winProbability } from './power.js';
+import { gradeLeagueTrades } from './tradegrades.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 
@@ -263,7 +264,7 @@ export function templateEdition(f, seedKey = '') {
     `${unlucky.team} Statistically Good, Practically Losing`,
     `${unlucky.team} Owed ${Math.abs(unlucky.luck)} Wins By The Universe, Universe Not Returning Calls`,
   ]), `${unlucky.team} has ${Math.abs(unlucky.luck)} fewer wins than its scoring deserves. Experts recommend thoughts, prayers, and a better schedule.`, [unlucky.team]);
-  for (const t of f.trades.slice(0, 1)) {
+  for (const t of (f.tradeDesk?.length ? [] : f.trades).slice(0, 1)) {
     add('Transactions', pick([
       `Blockbuster: ${t.teams.join(' And ')} Agree To Trade Both Will Regret Eventually`,
       `${t.teams.join(', ')} Complete Trade; Both Sides Claim They Fleeced The Other`,
@@ -321,17 +322,57 @@ export function editionWeeks(ctx) {
   return Array.from({ length: Math.max(0, Math.min(last, regEnd)) }, (_, i) => i + 1);
 }
 
+// Compact report cards for the Gazette (and for the AI writer's facts).
+export function deskCards(trades) {
+  return trades.map((t) => ({
+    id: t.id, week: t.week, verdict: t.verdict, winner: t.winner,
+    sides: t.sides.map((s) => ({
+      team: s.team, rosterId: s.rosterId, grade: s.grade, valueEdgePct: s.edge, lineupDeltaPtsPerWeek: s.lineupDelta, contender: s.contender,
+      received: s.received.map((x) => (x.kind === 'pick' ? x.label : `${x.label} (${x.pos})`)),
+      pointsSinceTrade: s.sincePts.acquired,
+    })),
+    notes: t.notes,
+  }));
+}
+
+export function deskTemplates(cards, seedKey = '') {
+  return cards.map((c, i) => {
+    const pick = picker(hash(`${seedKey}:${c.id}:${i}`));
+    const [w, l] = [...c.sides].sort((a, b) => b.valueEdgePct - a.valueEdgePct);
+    const got = (s) => s.received.slice(0, 3).join(', ') || 'future considerations';
+    const headline = c.winner
+      ? pick([
+        `Trade Desk: ${c.winner} Fleeces ${c.sides.filter((s) => s.team !== c.winner).map((s) => s.team).join(' And ')}, Grades Confirm`,
+        `${c.winner} Wins Trade, Other Side Already Drafting Group-Chat Defense`,
+        `Report Card Is In: ${c.winner} Gets The ${c.sides.find((s) => s.team === c.winner)?.grade}, Everyone Else Gets A Lesson`,
+      ])
+      : pick([
+        `Trade Desk: ${c.sides.map((s) => s.team).join(' And ')} Swap Assets In Deal Analysts Call 'Annoyingly Fair'`,
+        `${c.sides.map((s) => s.team).join(', ')} Make A Trade; Nobody Gets Fleeced, Group Chat Disappointed`,
+      ]);
+    const body = `${w.team} gets ${got(w)}; ${l.team} gets ${got(l)}. ${c.notes.slice(0, 2).join(' ')}`;
+    return { headline, body };
+  });
+}
+
 export async function getEdition(ctx, week, { aiWriter } = {}) {
   const facts = await cached(`gfacts:${ctx.league.league_id}:${week}`, 30 * 60e3, () => weekFacts(ctx, week));
   if (!facts) return null;
+  const graded = await gradeLeagueTrades(ctx).catch(() => []);
+  const cards = deskCards(graded.filter((t) => !t.offseason && t.week === week));
+  facts.tradeDesk = cards;
   const base = { week, season: facts.season, league: facts.league, scoreboard: facts.scoreboard, medianGames: facts.medianGames, median: facts.medianNotes?.median ?? null };
+  const withDesk = (ed) => {
+    const text = Array.isArray(ed.tradeDesk) && ed.tradeDesk.length === cards.length ? ed.tradeDesk : deskTemplates(cards, ctx.league.league_id);
+    return { ...ed, tradeDesk: cards.map((c, i) => ({ card: c, headline: text[i].headline, body: text[i].body })) };
+  };
   if (aiWriter) {
     // Past weeks never change: keep AI editions for 60 days on disk so each is written once.
-    const ai = await cached(`gazette:ai:${ctx.league.league_id}:${facts.season}:${week}`, 60 * 24 * 3600e3, () => aiWriter(facts), { disk: true }).catch((err) => {
+    const ai = await cached(`gazette:ai2:${ctx.league.league_id}:${facts.season}:${week}`, 60 * 24 * 3600e3, () => aiWriter(facts), { disk: true }).catch((err) => {
       console.warn('[gazette] AI writer failed, using templates:', err.message);
       return null;
     });
-    if (ai) return { ...base, ...ai };
+    if (ai) return withDesk({ ...base, ...ai });
   }
-  return { ...base, ...templateEdition(facts, ctx.league.league_id) };
+  return withDesk({ ...base, ...templateEdition(facts, ctx.league.league_id) });
 }

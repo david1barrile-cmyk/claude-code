@@ -259,6 +259,22 @@ details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin
 .skeleton { height: 120px; border-radius: var(--radius); background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: sk 1.2s infinite linear; }
 @keyframes sk { to { background-position: -200% 0; } }
 
+/* ---------- trade report cards ---------- */
+.grade { display: inline-grid; place-items: center; min-width: 46px; height: 46px; padding: 0 6px; border-radius: 10px; font: 700 26px/1 var(--font-display); background: var(--surface-2); color: var(--ink); }
+.grade.g-a { background: color-mix(in srgb, var(--good) 18%, var(--surface)); color: var(--good-ink); }
+.grade.g-b { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.grade.g-c { background: color-mix(in srgb, var(--warn) 22%, var(--surface)); color: var(--warn-ink); }
+.grade.g-d, .grade.g-f { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); color: var(--bad-ink); }
+.grade.sm { min-width: 34px; height: 30px; font-size: 18px; border-radius: 7px; }
+.tcard { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: var(--surface); margin-bottom: 14px; }
+.tcard .sides { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 12px 0; }
+.tcard .tside { background: var(--surface-2); border-radius: 10px; padding: 12px; }
+.tcard .tside.won { box-shadow: inset 0 0 0 2px var(--good); }
+.tcard .tside .row { justify-content: space-between; }
+.tcard .gets { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.tcard .gets li { padding: 3px 0; display: flex; gap: 6px; align-items: center; }
+.tcard .stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+
 /* ---------- gazette ---------- */
 .paper { --serif: "Source Serif 4", Georgia, "Times New Roman", serif; --display: "Playfair Display", Georgia, serif;
   background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 26px 30px 30px; box-shadow: var(--shadow); font-family: var(--serif); color: var(--ink); }
@@ -283,6 +299,13 @@ details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin
 .paper .ahead h4 { font: 700 17px/1.2 var(--display); margin: 0 0 4px; }
 .paper .ahead p { margin: 0 0 12px; color: var(--ink-2); line-height: 1.5; }
 .paper .fine { margin-top: 18px; font: italic 13px/1.4 var(--serif); color: var(--muted); text-align: center; }
+.paper .desk { border-top: 3px double var(--ink); margin-top: 6px; padding-top: 16px; }
+.paper .desk .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; padding: 10px 0 16px; border-bottom: 1px solid var(--border); }
+.paper .desk .item:last-child { border-bottom: 0; }
+.paper .desk h3 { font: 700 22px/1.2 var(--display); margin: 0 0 6px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.paper .desk p { margin: 0; line-height: 1.55; color: var(--ink-2); }
+.paper .desk .grades { display: flex; flex-direction: column; gap: 8px; font-family: var(--font); min-width: 170px; }
+.paper .desk .grades .g { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .paper .sb-title { font: 700 12px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 
 /* ---------- responsive ---------- */

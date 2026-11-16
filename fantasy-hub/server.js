@@ -17,6 +17,7 @@ import { getValueHub, compareSides } from './lib/valuehub.js';
 import { getRookieBoard, mockDraft, collegeProfile, rookieReport } from './lib/rookies.js';
 import { getEdition, editionWeeks } from './lib/gazette.js';
 import { makeAiWriter } from './lib/gazette-ai.js';
+import { gradeLeagueTrades } from './lib/tradegrades.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -286,6 +287,11 @@ const routes = [
     const neighbors = board.filter((x) => x.pos === r.pos && Math.abs(x.rank - r.rank) <= 6 && x.slug !== slug).slice(0, 5)
       .map(({ slug: s2, name, rank, college: c }) => ({ slug: s2, name, rank, college: c }));
     return { season, rookie: r, college, report: rookieReport(r, college), mock: { need: where(need), bpa: where(bpa) }, neighbors };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/trade-grades$/, async ([id]) => {
+    const ctx = await getLeagueContext(id);
+    return { trades: await gradeLeagueTrades(ctx), sources: (await getValueHub(ctx)).sources };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/gazette$/, async ([id], q) => {

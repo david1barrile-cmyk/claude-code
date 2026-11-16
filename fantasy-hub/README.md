@@ -79,6 +79,7 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 - **Power Rankings**: *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
 - **League History**: follows Sleeper's `previous_league_id` chain back through every season: champions, all-time standings, all-play and luck, finish-by-season heatmap, head-to-head matrix, and league records.
 - **Trade Analyzer**: pick players and draft picks from any two teams and compare value across KeepTradeCut, FantasyCalc, DynastyProcess and the built-in production model: per-source edge, consensus verdict, whether sources agree, and weekly lineup impact for both teams. Picks are valued at their projected slot.
+- **Trade Grades**: a report card for every league trade (including 3-team deals, picks and FAAB), newest first. Each team gets a letter grade from value (median edge across KTC, FantasyCalc and DynastyProcess, using today's values), the change in its best lineup versus the roster it would have without the trade, and fit (contenders credited for points now, rebuilders for picks and youth). Used draft picks count as the player they became. Shows results since the trade, per-source detail, and a season-long average grade per team. Each Gazette edition has a Trade Desk covering that week's trades (or the latest one).
 - **Trade Finder**: auto-suggested win-win trades (each opens in the analyzer).
 - **Rookies**: the incoming class ranked by consensus of KTC and DynastyProcess/FantasyPros, a value-curve chart for spotting tier cliffs, position mix by tier, scouting profiles (size, age, market disagreement, optional college production), and a **mock rookie draft** in projected order (current standings, traded picks applied) that you can run **by team need** or **straight rankings**.
 - **Dashboard**: your team at a glance, matchup win probability, scoring-by-week chart vs. league average, power rankings, standings with all-play, luck and recent form, this week's matchups, your top waiver targets, league transactions and the latest headlines.
@@ -119,6 +120,7 @@ lib/picks.js     pick ownership, projected draft order, pick valuation
 lib/rookies.js   rookie board, scouting reports, college stats, mock draft
 lib/gazette.js   weekly facts + built-in satirical writer
 lib/gazette-ai.js optional Claude writer (structured output, refusal fallback)
+lib/tradegrades.js trade report cards (value, lineup impact, fit, results)
 data/            optional rookie notes
 lib/values.js    FantasyCalc / fallback trade values
 lib/scouting.js  rule-based scouting reports

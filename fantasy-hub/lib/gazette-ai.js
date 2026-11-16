@@ -20,8 +20,12 @@ const SCHEMA = {
       type: 'array',
       items: { type: 'object', properties: { headline: { type: 'string' }, body: { type: 'string' } }, required: ['headline', 'body'], additionalProperties: false },
     },
+    tradeDesk: {
+      type: 'array',
+      items: { type: 'object', properties: { headline: { type: 'string' }, body: { type: 'string' } }, required: ['headline', 'body'], additionalProperties: false },
+    },
   },
-  required: ['lead', 'stories', 'briefs', 'lookahead'],
+  required: ['lead', 'stories', 'briefs', 'lookahead', 'tradeDesk'],
   additionalProperties: false,
 };
 
@@ -34,6 +38,7 @@ Rules:
 - Roast fantasy decisions and results only: lineups, luck, records, waiver spending, trades. Keep it good-natured; this is read by friends. No profanity, no insults about anyone's real life, appearance, job, family or identity.
 - Team names are how managers are known; refer to teams by name. NFL players may be mentioned only in terms of their fantasy output in the facts; do not invent off-field events about them.
 - "lead": the week's biggest story (an upset, blowout, nail-biter, or bench disaster). "stories": 4-6 more, each a different angle, covering as many different teams as the facts allow. "briefs": 4-6 one-sentence items. "lookahead": 2-3 items previewing next week and the playoff race (empty if there is no next week).
+- "tradeDesk": exactly one item per entry in the facts' "tradeDesk" array, in the same order (empty array if there are none). Each is a satirical headline plus 3-5 sentences of trade analysis that uses the provided grades, value edges, lineup changes and notes. Never change or invent a grade; quote the grades given.
 - "kicker" is a 1-3 word section label (e.g. "Upset Alert", "Manager Malpractice", "Transactions").
 - Headlines in Title Case, under 16 words. Bodies 2-4 sentences.`;
 
@@ -71,5 +76,6 @@ export function validate(e) {
     stories: (Array.isArray(e.stories) ? e.stories : []).filter(story).slice(0, 8),
     briefs: (Array.isArray(e.briefs) ? e.briefs : []).filter(str).slice(0, 8),
     lookahead: (Array.isArray(e.lookahead) ? e.lookahead : []).filter((x) => x && str(x.headline) && str(x.body)).slice(0, 4),
+    tradeDesk: (Array.isArray(e.tradeDesk) ? e.tradeDesk : []).filter((x) => x && str(x.headline) && str(x.body)),
   };
 }
