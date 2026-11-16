@@ -83,12 +83,16 @@ test('site password gate', async () => {
 
 test('trade analyzer and rookie endpoints', async () => {
   const v = await get('/league/9001/values');
-  assert.deepEqual(v.body.sources.map((s) => [s.short, s.ok]), [['KTC', true], ['FC', true], ['DP', true], ['Model', true]]);
+  assert.deepEqual(v.body.sources.map((s) => [s.short, s.ok]), [['KTC', true], ['FC', true], ['DP', true], ['Model', true], ['Adj', true]]);
+  assert.ok(v.body.sources.find((s) => s.short === 'Adj').layer);
+  assert.ok(v.body.adjust.demandLeague.QB > 0 && v.body.adjust.shifts.KTC.QB);
   const mine = v.body.teams.find((t) => t.rosterId === 1), theirs = v.body.teams.find((t) => t.rosterId === 2);
   assert.ok(mine.players[0].values.KTC > 0 && mine.picks.some((p) => p.values.KTC > 0));
   const a = await get('/league/9001/analyze', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ a: { rosterId: 1, players: [mine.players[0].id], picks: [mine.picks[0].key] }, b: { rosterId: 2, players: [theirs.players[0].id] } }) });
-  assert.equal(a.body.perSource.length, 4);
+  assert.equal(a.body.perSource.length, 4); // the league-adjusted layer is reported separately
+  assert.ok(a.body.adjusted && typeof a.body.adjusted.edgeA === 'number');
+  assert.ok(a.body.adjusted.consolidation, '2-for-1 gets the consolidation note');
   assert.ok(a.body.lineup && typeof a.body.lineup.you.delta === 'number');
   assert.equal(a.body.assets.length, 3);
 

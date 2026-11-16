@@ -10,8 +10,9 @@
 import { cached } from './cache.js';
 import * as S from './sleeper.js';
 import { getValueHub } from './valuehub.js';
-import { resolvePickValue, draftSeason, tierForSlot, projectedOrder } from './picks.js';
+import { marketPickValue, draftSeason, tierForSlot, projectedOrder } from './picks.js';
 import { bestLineup, lineupInfo } from './lineup.js';
+import { consolidatedTotal } from './leagueadjust.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -58,7 +59,8 @@ async function allTrades(ctx) {
 export function gradeLeagueTrades(ctx) {
   return cached(`tgrades:${ctx.league.league_id}`, 30 * 60e3, async () => {
     const [trades, hub, usedPicks] = await Promise.all([allTrades(ctx), getValueHub(ctx), draftedPicks(ctx)]);
-    const { ktc, fc, dp, model } = hub._raw;
+    const { ktc, fc, dp, model, adjusted } = hub._raw;
+    const med = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return !v.length ? null : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
     const sources = [ktc, fc, dp, model].filter((s) => s.ok);
     const n = ctx.teams.length;
     const firstDraft = draftSeason(ctx.league);
@@ -75,6 +77,7 @@ export function gradeLeagueTrades(ctx) {
       return {
         kind: 'player', id: pid, label: p?.name ?? `Player ${pid}`, pos: p?.pos ?? '?', team: p?.team ?? '', age: p?.age ?? null,
         values: Object.fromEntries(sources.map((s) => [s.short, s.players?.[pid]?.value ?? null])),
+        adj: adjusted?.players?.[pid]?.value ?? null,
       };
     };
     const pickAsset = (dp_) => {
@@ -89,11 +92,9 @@ export function gradeLeagueTrades(ctx) {
       const slot = season === firstDraft ? order.indexOf(orig) + 1 : null;
       const pk = { season, round, slot, tier: tierForSlot(slot, n), key: `${season}:${round}:${orig}` };
       const label = `${season} ${slot ? `${round}.${String(slot).padStart(2, '0')}` : `Round ${round}`}${orig !== dp_.owner_id ? ` (${name(orig)})` : ''}`;
-      return {
-        kind: 'pick', id: pk.key, label, pos: 'PICK', used,
-        values: Object.fromEntries(sources.map((s) => [s.short, used ? null
-          : s.short === 'Model' ? s.pickFn(pk) : resolvePickValue(s.picks, pk, n)])),
-      };
+      const values = Object.fromEntries(sources.map((s) => [s.short, used ? null
+        : s.short === 'Model' ? s.pickFn(pk) : marketPickValue(s.picks, pk, n, s.short === 'FC' ? n : 12)]));
+      return { kind: 'pick', id: pk.key, label, pos: 'PICK', used, values, adj: used ? null : med([values.KTC, values.FC, values.DP]) };
     };
 
     return trades.map((t) => {
@@ -156,8 +157,14 @@ export function gradeLeagueTrades(ctx) {
         // Results so far: fantasy points by acquired vs. departed players after the trade.
         const since = (pids) => r1(pids.reduce((a, pid) => a + (ctx.metrics[pid]?.log || []).filter((g) => g.week > week).reduce((s, g) => s + g.pts, 0), 0));
         const score = gradeScore({ edge, lineupDelta, ageGain, futureShift, contender });
+        // League-adjusted layer: replacement-level shift + consolidation discount for extra pieces.
+        const adjIn = consolidatedTotal(received.map((x) => x.adj ?? 0), sent.length, n), adjOut = consolidatedTotal(sent.map((x) => x.adj ?? 0), received.length, n);
+        const adjBig = Math.max(adjIn, adjOut);
+        const adjEdge = adjBig ? ((adjIn - adjOut) / adjBig) * 100 : 0;
+        const adjScore = gradeScore({ edge: adjEdge, lineupDelta, ageGain, futureShift, contender });
         return {
           rosterId: rid, team: name(rid), avatar: tm?.avatar ?? null, grade: letter(score), score: Math.round(score), movedOn: !stillHere,
+          adjusted: { grade: letter(adjScore), score: Math.round(adjScore), edge: Math.round(adjEdge) },
           contender, recordRank: recordRank(rid),
           received, sent, faabIn, faabOut,
           edge: Math.round(edge), perSource, sourcesAgree: usable.length > 1 && usable.every((p) => Math.sign(p.edge) === Math.sign(edge) || Math.abs(p.edge) <= 5),

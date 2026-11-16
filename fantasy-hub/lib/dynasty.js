@@ -48,12 +48,17 @@ async function dynastyValues(league) {
 /**
  * @param {object} ctx league context from getLeagueContext
  */
-export function getDynastyRankings(ctx) {
-  return cached(`dyn:${ctx.league.league_id}`, 30 * 60e3, async () => {
+/**
+ * @param {object} [opts.altValues] player id -> value; replaces FantasyCalc player values
+ *   (used for the league-adjusted view). Picks keep their market values.
+ */
+export function getDynastyRankings(ctx, { altValues = null, key = 'market' } = {}) {
+  return cached(`dyn:${ctx.league.league_id}:${key}`, 30 * 60e3, async () => {
     const { league, players, teams } = ctx;
     const dv = await dynastyValues(league);
     // Fallback: redraft/production values (already on ctx) adjusted for age.
     const baseVal = (id) => {
+      if (altValues) return altValues[id] ?? 0;
       if (dv) return dv.players[id] ?? 0;
       const v = ctx.values[id]?.value ?? 0;
       const p = players[id];
@@ -106,6 +111,6 @@ export function getDynastyRankings(ctx) {
     for (let y = 0; y < 4; y++) {
       [...out].sort((a, b) => b.projected[y] - a.projected[y]).forEach((t, i) => { (t.ranks ||= [])[y] = i + 1; });
     }
-    return { source: dv?.source ?? 'Estimated from production + age', pickSource: dv?.picks.length ? 'FantasyCalc' : 'Estimated', teams: out.sort((a, b) => a.ranks[0] - b.ranks[0]) };
+    return { source: altValues ? 'League-adjusted (8-team lineup & replacement level)'.replace('8', String(ctx.teams.length)) : dv?.source ?? 'Estimated from production + age', pickSource: dv?.picks.length ? 'FantasyCalc' : 'Estimated', teams: out.sort((a, b) => a.ranks[0] - b.ranks[0]) };
   });
 }

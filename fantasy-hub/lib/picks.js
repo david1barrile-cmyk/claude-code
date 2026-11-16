@@ -84,3 +84,21 @@ export function resolvePickValue(table, pick, n) {
   const slots = rows.filter((p) => p.slot);
   return slots.length ? slots.reduce((s, p) => s + p.value, 0) / slots.length : null;
 }
+
+/**
+ * Convert a pick in an n-team league to the equivalent pick in a `base`-team league by overall
+ * pick number: in an 8-team league the 2.05 is overall pick 13, i.e. a 12-team 2.01.
+ * Future picks without a projected slot use the middle of their tier.
+ */
+export function equivalentPick(pk, n, base = 12) {
+  if (!n || n === base) return pk;
+  const slotEst = pk.slot ?? (pk.tier === 'early' ? Math.ceil(n * 0.17) : pk.tier === 'late' ? Math.ceil(n * 0.83) : Math.ceil(n / 2));
+  const overall = (pk.round - 1) * n + slotEst;
+  const round = Math.ceil(overall / base), slot = ((overall - 1) % base) + 1;
+  return { ...pk, round, slot: pk.slot ? slot : null, tier: tierForSlot(slot, base), overall };
+}
+
+/** Value of a league pick from a source whose pick values assume `base` teams. */
+export function marketPickValue(table, pk, n, base = 12) {
+  return resolvePickValue(table, equivalentPick(pk, n, base), base);
+}

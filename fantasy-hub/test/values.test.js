@@ -147,3 +147,24 @@ test('rookie tiers break at real value cliffs inside the draftable range', () =>
   assert.equal(board[1].tier, 'Tier 2');
   assert.equal(board.at(-1).tier, 'Depth');
 });
+
+import { equivalentPick } from '../lib/picks.js';
+import { adjustValues, consolidatedTotal, depthDiscount } from '../lib/leagueadjust.js';
+test('8-team picks map to 12-team equivalents by overall pick', () => {
+  assert.deepEqual([equivalentPick({ round: 2, slot: 5 }, 8)].map((e) => [e.overall, e.round, e.slot]), [[13, 2, 1]]);
+  assert.deepEqual([equivalentPick({ round: 3, slot: 8 }, 8)].map((e) => [e.overall, e.round, e.slot]), [[24, 2, 12]]);
+  assert.equal(equivalentPick({ round: 1, slot: 3 }, 12).round, 1); // 12-team leagues unchanged
+});
+test('league adjustment shifts by replacement level and discounts extra pieces', () => {
+  const players = {}, values = {};
+  for (let i = 1; i <= 30; i++) { players[`q${i}`] = { pos: 'QB' }; values[`q${i}`] = 10000 - i * 300; }
+  for (let i = 1; i <= 20; i++) { players[`t${i}`] = { pos: 'TE' }; values[`t${i}`] = 6000 - i * 250; }
+  const { values: adj, shifts } = adjustValues(values, players, { QB: 16, RB: 0, WR: 0, TE: 18 }, { QB: 24, RB: 0, WR: 0, TE: 14 });
+  assert.equal(shifts.QB.shift, 2400); // QB16 (5200) - QB24 (2800)
+  assert.equal(adj.q1, 9700 - 2400);
+  assert.equal(shifts.TE.shift, -1000); // deeper TE demand raises TEs
+  assert.equal(adj.t1, 5750 + 1000);
+  assert.equal(depthDiscount(8), 0.6);
+  assert.equal(depthDiscount(12), 1);
+  assert.equal(consolidatedTotal([100, 50, 50], 1, 8), 100 + 30 + 30);
+});

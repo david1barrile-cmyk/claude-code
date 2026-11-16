@@ -317,8 +317,11 @@ const routes = [
 
   ['GET', /^\/api\/league\/(\d+)\/power$/, async ([id]) => {
     const ctx = await getLeagueContext(id);
-    const [cur, dynasty, odds] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx), getOdds(ctx).catch((err) => { console.warn('[odds]', err.message); return null; })]);
-    return { season: seasonPower(ctx, cur), dynasty, odds, draftSeason: Number(ctx.league.season) + 1 };
+    const hub = await getValueHub(ctx);
+    const adjValues = Object.fromEntries(Object.entries(hub._raw.adjusted.players).map(([pid, x]) => [pid, x.value]));
+    const [cur, dynasty, dynastyAdj, odds] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx),
+      getDynastyRankings(ctx, { altValues: adjValues, key: 'adjusted' }), getOdds(ctx).catch((err) => { console.warn('[odds]', err.message); return null; })]);
+    return { season: seasonPower(ctx, cur), dynasty, dynastyAdj, adjust: hub.adjust, odds, draftSeason: Number(ctx.league.season) + 1 };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/weekly$/, async ([id]) => {
