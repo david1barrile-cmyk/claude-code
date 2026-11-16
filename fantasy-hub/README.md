@@ -76,8 +76,12 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 ## What each page does
 
 - **League Gazette**: a satirical weekly newspaper for every completed week, written from real results: blowouts, nail-biters, upsets, bench blunders, top performers and duds, median-game heartbreak, streaks, luck, trades and FAAB splurges, plus a look ahead at next week's game of the week and the playoff race. Uses a built-in joke writer by default; with `ANTHROPIC_API_KEY` set, Claude writes each edition (scores and stats always come from the data; quotes are clearly satire). Archive of past weeks, and the latest headline on the dashboard.
+- **Awards**: a Gazette special edition: Manager of the Year, the Points Machine, Bench Malpractice, Worst Lineup Call, Waiver Wire Wizard, Trade of the Year, the Generous Donor Award, Lucky Charm, Snakebitten, Draft Steal of the Year and more, each from real numbers with an acceptance speech in the winner's persona voice. "Midseason Awards" until the regular season ends.
+- **Rivalries**: pick any two teams for the all-time head-to-head, a margin chart of every game, biggest wins and closest game, current streak, next scheduled meeting, every trade between them (with grades) and persona trash talk. Click any cell of the History head-to-head matrix to open one.
+- **Season Wrapped**: one team at a time: best and worst week, MVP, most-trusted starter, most disrespectful win, heartbreaker, worst lineup call, points left on the bench, best waiver pickup, best and worst trade, and what happens next.
+- **Draft Grades**: every completed draft (startup and rookie) re-graded at today's values. Each pick is compared with what its slot should have produced (the value of the k-th best player that draft yielded). Team grades, steals, busts and an "if we redrafted today" board.
 - **Data Status** (sidebar link): every data source with ✓/⚠/✕, what it returned (players matched, pick values, prospects, articles), request counts and last errors.
-- **Power Rankings**: projected season finish from 10,000 simulated seasons on the real remaining schedule (median games included): projected final wins with an 80% range, chance of each final standing, playoff / bye / #1-seed odds. Plus *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
+- **Power Rankings**: projected season finish from 10,000 simulated seasons on the real remaining schedule (median games included): projected final wins with an 80% range, chance of each final standing, playoff, bye, final and title odds (the playoff bracket is simulated too). Plus *this season* (record 25% · all-play 35% · current best-lineup strength 40%) and *dynasty*: roster + draft-pick values projected 1–3 years ahead with position-specific age curves, a value-by-position chart with a year toggle, a contender/rebuilder quadrant, and tiers (Dynasty / Win now / Rising / Rebuild).
 - **League History**: follows Sleeper's `previous_league_id` chain back through every season: champions, all-time standings, all-play and luck, finish-by-season heatmap, head-to-head matrix, and league records.
 - **Trade Analyzer**: pick players and draft picks from any two teams and compare value across KeepTradeCut, FantasyCalc, DynastyProcess and the built-in production model: per-source edge, consensus verdict, whether sources agree, and weekly lineup impact for both teams. Picks are valued at their projected slot.
 - **Trade Grades**: a report card for every league trade (including 3-team deals, picks and FAAB), newest first. Each team gets a letter grade from value (median edge across KTC, FantasyCalc and DynastyProcess, using today's values), the change in its best lineup versus the roster it would have without the trade, and fit (contenders credited for points now, rebuilders for picks and youth). Used draft picks count as the player they became. Shows results since the trade, per-source detail, and a season-long average grade per team. Each Gazette edition has a Trade Desk covering that week's trades (or the latest one).
@@ -138,6 +142,10 @@ lib/picklink.js  next-draft picks valued by the prospects they're likely to beco
 lib/odds.js      season simulation (playoff odds, projected finish)
 lib/health.js    per-source request log for the status page
 lib/tradegrades.js trade report cards (value, lineup impact, fit, results)
+lib/seasonstats.js per-team season stats (Season Wrapped, Awards)
+lib/rivalry.js   two-team head-to-head pages
+lib/draftgrades.js draft re-grades at today's values
+lib/awards.js    the Awards issue
 data/            optional rookie notes
 lib/values.js    FantasyCalc / fallback trade values
 lib/scouting.js  rule-based scouting reports

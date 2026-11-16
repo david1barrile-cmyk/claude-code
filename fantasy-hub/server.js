@@ -22,6 +22,10 @@ import { requestStats } from './lib/health.js';
 import { getOdds } from './lib/odds.js';
 import { hubWithPickLinks, getPickLinks } from './lib/picklink.js';
 import { getPersonas } from './lib/personas.js';
+import { getSeasonStats } from './lib/seasonstats.js';
+import { getRivalry } from './lib/rivalry.js';
+import { getDraftGrades } from './lib/draftgrades.js';
+import { getAwards } from './lib/awards.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -389,6 +393,16 @@ const routes = [
   ['GET', /^\/api\/league\/(\d+)\/personas$/, async ([id]) => {
     const { personas } = await getPersonas(await getLeagueContext(id));
     return { personas: Object.values(personas).map(({ stats, ...p }) => ({ ...p, stats: { record: stats.record, trades: stats.trades, adds: stats.adds, faab: stats.faab, benchLeft: stats.benchLeft, luck: stats.luck, titles: stats.titles } })) };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/wrapped$/, async ([id]) => getSeasonStats(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/awards$/, async ([id]) => getAwards(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/drafts$/, async ([id]) => getDraftGrades(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/rivalry$/, async ([id], q) => {
+    const ctx = await getLeagueContext(id);
+    const a = q.get('a'), b = q.get('b');
+    if (!a || !b || a === b) throw new HttpError(400, 'Pick two different teams (a and b are owner ids)');
+    return getRivalry(ctx, a, b);
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/gazette$/, async ([id], q) => {

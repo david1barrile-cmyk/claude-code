@@ -79,12 +79,16 @@ const ICONS = {
   gazette: '<path d="M3 6h15v13H4a1 1 0 0 1-1-1zM18 10h3v8a1 1 0 0 1-2 0v-8M6 9h9M6 12h4M6 15h4M12 12h3v3h-3z"/>',
 };
 const GROUPS = [
-  { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History']] },
+  { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['awards', 'Awards'], ['power', 'Power Rankings'], ['history', 'League History'], ['rivalry', 'Rivalries'], ['wrapped', 'Season Wrapped']] },
   { name: 'My Team', icon: 'team', items: [['team', 'My Team'], ['waivers', 'Waivers']] },
   { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder']] },
-  { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
+  { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['drafts', 'Draft Grades'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
 ];
 ICONS.status = '<path d="M3 12h4l3-8 4 16 3-8h4"/>';
+ICONS.awards = '<circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/>';
+ICONS.rivalry = '<path d="M5 19 19 5M9 5H5v4M19 15v4h-4M15 9l4-4M5 19l4-4"/>';
+ICONS.wrapped = '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 11h18M12 7v14M12 7c-2-4-6-4-6-1s4 1 6 1c2 0 6 2 6-1s-4-3-6 1"/>';
+ICONS.drafts = '<path d="M4 4h16v16H4zM4 9h16M9 4v16"/>';
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
 
 function renderShell(active) {
@@ -267,10 +271,10 @@ async function viewPower($) {
   $.innerHTML = `${head('Power Rankings', `Two views of the league. <b>This season</b> blends record (25%), all-play record (35%) and current lineup strength (40%). <b>Dynasty</b> totals roster and draft-pick trade value (${esc(d.dynasty.source)}; picks valued by ${esc(d.dynasty.pickSource === 'Estimated' ? 'an estimate' : d.dynasty.pickSource)}) and projects it 1–3 years out with position-specific age curves.`)}
   <div class="grid">
     ${d.odds ? card('Projected season finish', `<div class="grid" style="gap:24px">
-        <div class="span-5"><h3 style="margin-top:0">Projected final wins</h3><div id="c-wins"></div>
-          <div class="legend" style="margin-top:8px"><span><i style="background:var(--bar-muted)"></i>80% range</span><span><i style="background:var(--series-me);border-radius:50%"></i>Average</span><span><i style="background:var(--ink);width:2px"></i>Wins today</span></div></div>
-        <div class="span-7"><h3 style="margin-top:0">Chance of each final standing</h3><div id="c-finish"></div></div></div>
-      <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
+        <div class="span-12"><h3 style="margin-top:0">Chance of each final standing</h3><div id="c-finish"></div></div>
+        <div class="span-12"><h3 style="margin-top:0">Projected final wins</h3><div id="c-wins" style="max-width:760px"></div>
+          <div class="legend" style="margin-top:8px"><span><i style="background:var(--bar-muted)"></i>80% range</span><span><i style="background:var(--series-me);border-radius:50%"></i>Average</span><span><i style="background:var(--ink);width:2px"></i>Wins today</span></div></div></div>
+      <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}; the bracket is simulated too, for final and title odds.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
     ${card('This season', `<div id="c-season"></div>`, { span: 5, note: 'score 0–100' })}
     ${card('Contender or rebuilder?', `<div id="c-quad"></div>`, { span: 7, note: 'current strength vs. long-term value' })}
     ${d.dynastyAdj ? `<section class="span-12 row" style="justify-content:space-between">
@@ -354,11 +358,11 @@ function renderOdds(o) {
     return [`var(${steps[k]})`, (dark ? k <= 3 : k >= 4) ? '#ffffff' : 'var(--ink)'];
   };
   document.getElementById('c-finish').innerHTML = `<div class="scroll"><table class="heat">
-    <thead><tr><th>Team</th>${Array.from({ length: n }, (_, i) => `<th class="rot">${ordinal(i + 1)}</th>`).join('')}<th class="num">Playoffs</th>${o.byes ? '<th class="num">Bye</th>' : ''}<th class="num">#1 seed</th></tr></thead>
+    <thead><tr><th>Team</th>${Array.from({ length: n }, (_, i) => `<th class="rot">${ordinal(i + 1)}</th>`).join('')}<th class="num">Playoffs</th>${o.byes ? '<th class="num">Bye</th>' : ''}<th class="num" title="Chance to reach the championship game">Final</th><th class="num" title="Chance to win the title">Title</th></tr></thead>
     <tbody>${o.teams.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td>${teamTag({ name: t.name, avatar: t.avatar }, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''}`)}</td>
       ${t.finishDist.map((p, i) => { const [bg, fg] = cellColor(p); return `<td class="cell" style="background:${bg};color:${fg}" data-tip="${esc(`<b>${esc(t.name)}</b>${p}% chance to finish ${ordinal(i + 1)}`)}">${p >= 0.5 ? Math.round(p) : ''}</td>`; }).join('')}
       <td class="num"><span class="chip ${t.playoffOdds >= 75 ? 'good' : t.playoffOdds <= 25 ? 'bad' : 'warn'}">${t.playoffOdds >= 99.95 ? 'Clinched*' : t.playoffOdds < 0.05 ? 'Out*' : `${fmt(t.playoffOdds)}%`}</span></td>
-      ${o.byes ? `<td class="num">${fmt(t.byeOdds)}%</td>` : ''}<td class="num">${fmt(t.firstOdds)}%</td></tr>`).join('')}</tbody></table></div>
+      ${o.byes ? `<td class="num">${fmt(t.byeOdds)}%</td>` : ''}<td class="num">${t.finalOdds != null ? `${fmt(t.finalOdds)}%` : '—'}</td><td class="num"><b>${t.titleOdds != null ? `${fmt(t.titleOdds)}%` : '—'}</b></td></tr>`).join('')}</tbody></table></div>
     <p class="small muted">Cells: % chance of finishing in that place (darker = likelier). *In every simulation; not an official clinch.</p>`;
 }
 
@@ -399,7 +403,7 @@ async function viewHistory($) {
         const g = c ? c.w + c.l + c.t : 0;
         const p = g ? (c.w + c.t / 2) / g : null;
         const [bg, fg] = divColor(p);
-        return `<td class="cell" style="background:${bg};color:${fg}" data-tip="${esc(`<b>${esc(a.name)} vs ${esc(b.name)}</b>${g ? `${c.w}-${c.l}${c.t ? `-${c.t}` : ''} all-time` : 'Never played'}`)}">${g ? `${c.w}-${c.l}` : ''}</td>`;
+        return `<td class="cell" style="background:${bg};color:${fg};cursor:pointer" onclick="location.hash='#/rivalry?a=${encodeURIComponent(a.ownerId)}&b=${encodeURIComponent(b.ownerId)}'" data-tip="${esc(`<b>${esc(a.name)} vs ${esc(b.name)}</b>${g ? `${c.w}-${c.l}${c.t ? `-${c.t}` : ''} all-time` : 'Never played'}<br>Click for the rivalry page`)}">${g ? `${c.w}-${c.l}` : ''}</td>`;
       }).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="small muted">Blue = row team has the edge, red = column team does, gray = even.</p>`, { span: 12 })}
     ${card('League records', `<div class="kpis">
@@ -809,7 +813,7 @@ async function viewGazette($) {
   $.innerHTML = `<div class="paper">
     <div class="topline"><span>Vol. ${esc(e.season)} · No. ${e.week}</span><span>Week ${e.week} Edition</span><span>Price: $1 FAAB</span></div>
     <div class="flag">${esc(flag)}</div>
-    <div class="tag">All the news that's fit to roast</div>
+    <div class="tag">All the news that's fit to roast · <a href="#/awards">Special edition: the Awards issue →</a></div>
     <div class="weeknav">
       ${prev ? `<a class="chip" href="#/gazette?week=${prev}">← Week ${prev}</a>` : '<span></span>'}
       <select id="gz-week" aria-label="Edition">${d.weeks.map((w) => `<option value="${w}" ${w === e.week ? 'selected' : ''}>Week ${w}</option>`).join('')}</select>
@@ -963,6 +967,128 @@ async function viewPlayer($, id) {
   }
 }
 
+// ---------- awards ----------
+async function viewAwards($) {
+  const a = await api(L('/awards'));
+  $.innerHTML = `<div class="paper">
+    <div class="topline"><span>Vol. ${esc(a.season)} · Special Edition</span><span>${a.complete ? 'Season in review' : `Through Week ${a.weeksPlayed}`}</span><span>Price: $1 FAAB</span></div>
+    <div class="flag">${esc(`The ${session.leagueName} Gazette`)}</div>
+    <div class="tag">${esc(a.title)}: the envelopes, please</div>
+    <hr class="rule">
+    <div style="display:grid;gap:26px 30px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">${a.awards.map((w) => `<article class="story" style="margin:0">
+      <div class="kicker">${esc(w.title)}</div>
+      <h3>${esc(w.team)}${w.nickname ? ` <span style="font-weight:400;font-style:italic;font-size:15px">(${esc(w.nickname)})</span>` : ''}</h3>
+      <div style="font:700 13px/1.3 var(--font);margin:2px 0 6px">${esc(w.stat)}</div>
+      <p>${esc(w.blurb)}</p>${w.speech ? `<p style="margin-top:6px;font-style:italic">${esc(w.speech)}</p>` : ''}
+      ${w.team === session.teamName ? '<div class="small" style="margin-top:6px;font-family:var(--font)"><span class="chip warn">📣 That’s you</span></div>' : ''}</article>`).join('')}</div>
+    <div class="fine">Satire. Every stat is real; every acceptance speech is not. ${a.complete ? '' : 'Final awards print when the regular season ends.'}</div>
+  </div>`;
+}
+
+// ---------- rivalry ----------
+async function viewRivalry($) {
+  const lg = await api(L());
+  const teams = lg.teams;
+  const meOwner = session.userId;
+  let a = routeQuery.get('a') || meOwner, b = routeQuery.get('b');
+  if (!b) {
+    const per = await api(L('/personas')).catch(() => null);
+    const myRival = per?.personas.find((p) => p.ownerId === a)?.rival;
+    b = teams.find((t) => t.name === myRival)?.ownerId || teams.find((t) => t.ownerId !== a)?.ownerId;
+  }
+  const r = await api(L(`/rivalry?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`));
+  const sel = (id2, cur, other) => `<select id="${id2}">${teams.map((t) => `<option value="${esc(t.ownerId)}" ${t.ownerId === cur ? 'selected' : ''} ${t.ownerId === other ? 'disabled' : ''}>${esc(t.name)}</option>`).join('')}</select>`;
+  const lead = r.record.a > r.record.b ? r.a.team : r.record.b > r.record.a ? r.b.team : null;
+  const tape = (x, y) => `<div style="text-align:center">${teamAv({ name: x.team, avatar: x.avatar }, 'lg')}<h2 style="margin:8px 0 2px;font:700 22px/1.2 var(--font-display)">${esc(x.team)}</h2>
+    ${x.persona ? `<div class="small muted"><i>${esc(x.persona.nickname)}</i> · ${esc(x.persona.voiceLabel)}</div>` : ''}
+    <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(2,1fr)"><div class="kpi"><b>${esc(x.record || '—')}</b><span>This season</span></div><div class="kpi"><b>${esc(x.allTime || '—')}</b><span>All-time</span></div>
+      <div class="kpi"><b>${x.titles ? '🏆'.repeat(x.titles) : '0'}</b><span>Titles</span></div><div class="kpi"><b>${x.titleOdds != null ? `${fmt(x.titleOdds)}%` : '—'}</b><span>Title odds</span></div></div>
+    ${x.trashTalk ? `<p style="font-style:italic;margin-top:10px">${esc(x.trashTalk)}</p>` : ''}</div>`;
+  const maxM = Math.max(1, ...r.games.map((g) => Math.abs(g.margin)));
+  $.innerHTML = `${head('Rivalries', 'Everything between two teams, all-time: head-to-head, blowouts, trades, and the personas’ trash talk.', `<div class="row">${sel('rv-a', a, b)}<span class="muted">vs</span>${sel('rv-b', b, a)}</div>`)}
+  <div class="grid">
+    <section class="card span-12"><div class="rv-tape">
+      <div>${tape(r.a, r.b)}</div>
+      <div class="rv-mid"><div class="eyebrow">All-time</div><div style="font:700 44px/1 var(--font-display)">${r.record.a}–${r.record.b}${r.record.ties ? `–${r.record.ties}` : ''}</div>
+        <div class="small muted" style="margin-top:6px">${r.record.games} game${r.record.games === 1 ? '' : 's'}${lead ? ` · ${esc(lead)} leads` : r.record.games ? ' · dead even' : ''}</div>
+        ${r.streak ? `<div class="chip" style="margin-top:8px">${esc(r.streak.team)} ${r.streak.n > 1 ? `won the last ${r.streak.n}` : 'won the last one'}</div>` : ''}
+        ${r.next ? `<div class="chip warn" style="margin-top:8px">Next: Week ${r.next.week}</div>` : ''}
+        ${r.personaRivals.a || r.personaRivals.b ? '<div class="small" style="margin-top:8px">🔥 Official Gazette rivals</div>' : ''}</div>
+      <div>${tape(r.b, r.a)}</div></div></section>
+    ${card('Every game', r.games.length ? `<div>${r.games.map((g) => `<div class="bullet" style="grid-template-columns:90px 1fr 120px" data-tip="${esc(`<b>${g.season} · Week ${g.week}</b>${esc(r.a.team)} ${g.aPts} – ${esc(r.b.team)} ${g.bPts}`)}">
+        <span class="small muted">${g.season} W${g.week}</span>
+        <div class="track" style="background:transparent"><div class="mark" style="left:50%;background:var(--muted);width:1px"></div>
+          <div style="position:absolute;top:0;bottom:0;${g.margin >= 0 ? 'left:50%;border-radius:0 4px 4px 0;background:var(--div-pos-2)' : 'right:50%;border-radius:4px 0 0 4px;background:var(--div-neg-2)'};width:${(Math.abs(g.margin) / maxM) * 50}%"></div></div>
+        <span class="small num" style="text-align:right">${g.aPts}–${g.bPts}</span></div>`).join('')}
+        <div class="legend" style="margin-top:8px"><span><i style="background:var(--div-pos-2)"></i>${esc(r.a.team)} won</span><span><i style="background:var(--div-neg-2)"></i>${esc(r.b.team)} won</span></div></div>` : '<p class="muted">They have never played.</p>', { span: 7, note: `average margin ${r.avgMargin > 0 ? '+' : ''}${r.avgMargin} for ${esc(r.a.team)}` })}
+    ${card('Record book', `<div class="kpis" style="grid-template-columns:1fr">
+        ${r.biggestA ? `<div class="record"><span class="eyebrow">${esc(r.a.team)}'s biggest win</span><b>+${r.biggestA.margin}</b>${r.biggestA.aPts}–${r.biggestA.bPts} · ${r.biggestA.season} W${r.biggestA.week}</div>` : ''}
+        ${r.biggestB ? `<div class="record"><span class="eyebrow">${esc(r.b.team)}'s biggest win</span><b>+${Math.abs(r.biggestB.margin)}</b>${r.biggestB.bPts}–${r.biggestB.aPts} · ${r.biggestB.season} W${r.biggestB.week}</div>` : ''}
+        ${r.closest ? `<div class="record"><span class="eyebrow">Closest game</span><b>${Math.abs(r.closest.margin)}</b>${r.closest.aPts}–${r.closest.bPts} · ${r.closest.season} W${r.closest.week}</div>` : ''}</div>`, { span: 5 })}
+    ${card('Trades between them', r.trades.length ? r.trades.map((t) => `<div class="li"><div class="row" style="justify-content:space-between"><span class="small muted">${t.offseason ? 'Offseason' : `Week ${t.week}`} · ${new Date(t.at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}${t.teamsCount > 2 ? ' · 3-team' : ''}</span><span class="chip">${esc(t.verdict)}</span></div>
+        <div class="row" style="margin-top:6px"><span class="${gradeCls(t.a.grade)} sm">${esc(t.a.grade)}</span><span class="small">${esc(r.a.team)} got ${esc(t.a.received.join(', ') || 'FAAB')}</span></div>
+        <div class="row" style="margin-top:4px"><span class="${gradeCls(t.b.grade)} sm">${esc(t.b.grade)}</span><span class="small">${esc(r.b.team)} got ${esc(t.b.received.join(', ') || 'FAAB')}</span></div></div>`).join('') : '<p class="muted">No trades between these two. Trust issues, presumably.</p>', { span: 12 })}
+  </div>`;
+  const go = () => { location.hash = `#/rivalry?a=${encodeURIComponent(document.getElementById('rv-a').value)}&b=${encodeURIComponent(document.getElementById('rv-b').value)}`; };
+  document.getElementById('rv-a').onchange = go; document.getElementById('rv-b').onchange = go;
+}
+
+// ---------- season wrapped ----------
+async function viewWrapped($) {
+  const d = await api(L('/wrapped'));
+  const owner = routeQuery.get('team') || session.userId;
+  const t = d.teams.find((x) => x.ownerId === owner) || d.teams[0];
+  const tile = (eyebrow, big, sub, tone = '') => `<div class="card wrap-tile ${tone}"><div class="eyebrow">${eyebrow}</div><div class="wrap-big">${big}</div><div class="wrap-sub">${sub}</div></div>`;
+  const tradeLine = (tr) => (tr ? `${esc(tr.received.slice(0, 2).join(' + ') || 'FAAB')} from ${esc(tr.partners.join(' & '))}` : '');
+  $.innerHTML = `${head(`${esc(d.season)} Wrapped`, `${d.complete ? 'The full season' : `The season so far (${d.weeksPlayed} weeks)`}, one team at a time. Pick a team to see theirs.`,
+    `<select id="wr-team">${d.teams.map((x) => `<option value="${esc(x.ownerId)}" ${x === t ? 'selected' : ''}>${esc(x.team)}</option>`).join('')}</select>`)}
+  <section class="card hero" style="margin-bottom:16px"><div class="hero-team">${teamAv({ name: t.team, avatar: t.avatar }, 'lg')}<div>
+    <div class="eyebrow">${t.persona ? `${esc(t.persona.archetype)} · ${esc(t.persona.voiceLabel)}` : 'Season Wrapped'}</div><h1>${esc(t.team)}</h1>
+    ${t.persona ? `<div class="muted"><i>${esc(t.persona.nickname)}</i>: “${esc(t.persona.catchphrase)}”</div>` : ''}</div></div>
+    <div class="hero-stats"><div><b>${esc(t.record)}</b><span>Record</span></div><div><b>${t.pf}</b><span>Points for</span></div><div><b>${t.ppg}</b><span>Per week</span></div>
+      ${t.allPlay ? `<div><b>${esc(t.allPlay)}</b><span>All-play</span></div>` : ''}<div><b>${t.luck > 0 ? '+' : ''}${t.luck}</b><span>Luck (wins)</span></div></div></section>
+  <div class="wrap-grid">
+    ${t.bestWeek ? tile('Your best week', `${t.bestWeek.pts}`, `Week ${t.bestWeek.week}${t.bestWeek.opp ? ` vs ${esc(t.bestWeek.opp)} (${t.bestWeek.oppPts})` : ''}`, 'good') : ''}
+    ${t.worstWeek ? tile('Your worst week', `${t.worstWeek.pts}`, `Week ${t.worstWeek.week}. We don't talk about Week ${t.worstWeek.week}.`, 'bad') : ''}
+    ${t.mvp ? tile('Your MVP', esc(t.mvp.name), `${t.mvp.pts} pts in ${t.mvp.games} starts · ${esc(t.mvp.pos)}`) : ''}
+    ${t.mostStarted && t.mostStarted.name !== t.mvp?.name ? tile('Most trusted', esc(t.mostStarted.name), `Started ${t.mostStarted.games} of ${d.weeksPlayed} weeks`) : ''}
+    ${t.biggestWin ? tile('Most disrespectful win', `+${Math.round((t.biggestWin.pts - t.biggestWin.oppPts) * 10) / 10}`, `${t.biggestWin.pts}–${t.biggestWin.oppPts} over ${esc(t.biggestWin.opp)}, Week ${t.biggestWin.week}`, 'good') : ''}
+    ${t.toughestLoss ? tile('The heartbreaker', `${Math.round((t.toughestLoss.pts - t.toughestLoss.oppPts) * 10) / 10}`, `Lost ${t.toughestLoss.pts}–${t.toughestLoss.oppPts} to ${esc(t.toughestLoss.opp)}, Week ${t.toughestLoss.week}`, 'bad') : ''}
+    ${t.worstCall ? tile('Worst lineup call', `−${t.worstCall.cost}`, `Week ${t.worstCall.week}: benched ${esc(t.worstCall.benched.name)} (${t.worstCall.benched.pts}) for ${esc(t.worstCall.started.name)} (${t.worstCall.started.pts})`, 'bad') : ''}
+    ${tile('Points left on the bench', `${t.benchTotal}`, `All season. The bench thanks you for the opportunity.`)}
+    ${t.bestAdd ? tile('Best waiver pickup', esc(t.bestAdd.name), `${t.bestAdd.pts} pts in your lineup${t.bestAdd.faab ? ` · $${t.bestAdd.faab}` : ''} · ${t.adds} pickups total`, 'good') : tile('Waiver activity', `${t.adds}`, 'pickups this season')}
+    ${t.bestTrade ? tile('Best trade', `${esc(t.bestTrade.grade)}`, tradeLine(t.bestTrade), 'good') : tile('Trades', '0', 'A committed monogamist with this roster.')}
+    ${t.worstTrade ? tile('Worst trade', `${esc(t.worstTrade.grade)}`, tradeLine(t.worstTrade), 'bad') : ''}
+    ${t.outlook ? tile(d.complete ? 'Final outlook' : 'What happens next', `${t.outlook.playoffOdds >= 99.95 ? '>99' : Math.round(t.outlook.playoffOdds)}%`, `playoff odds · ${t.outlook.titleOdds != null ? `${fmt(t.outlook.titleOdds)}% to win it all` : `projected ${t.outlook.projWins} wins`}`) : ''}
+  </div>
+  <p class="small muted" style="margin-top:12px">Grades and values use today's numbers. ${d.complete ? '' : 'Updates every week until the season ends.'}</p>`;
+  document.getElementById('wr-team').onchange = (e) => { location.hash = `#/wrapped?team=${encodeURIComponent(e.target.value)}`; };
+}
+
+// ---------- draft grades ----------
+async function viewDrafts($) {
+  const d = await api(L('/drafts'));
+  if (!d.drafts.length) { $.innerHTML = `${head('Draft Grades', '')}<div class="card"><p class="muted">No completed drafts found for this league yet.</p></div>`; return; }
+  const idx = Math.max(0, d.drafts.findIndex((x) => x.id === routeQuery.get('draft')));
+  const dr = d.drafts[idx];
+  const pick = (r) => `${posTag(r.pos)} <a href="#/player/${esc(r.playerId)}">${esc(r.player)}</a>`;
+  $.innerHTML = `${head('Draft Grades', 'Every completed draft, re-graded at today’s market values. Each pick is compared with what its slot should have produced: the value of the player that draft yielded at that rank.',
+    `<div class="seg">${d.drafts.map((x, i) => `<button data-d="${esc(x.id)}" class="${i === idx ? 'on' : ''}">${esc(x.season)} ${x.kind === 'Startup draft' ? 'Startup' : 'Rookie'}</button>`).join('')}</div>`)}
+  <div class="grid">
+    ${card(`${esc(dr.season)} ${esc(dr.kind)}: team grades`, `<div class="scroll"><table><thead><tr><th>Team</th><th class="num">Grade</th><th class="num">Value vs slots</th><th>Best pick</th><th>Worst pick</th></tr></thead><tbody>
+      ${dr.teams.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td><b>${esc(t.team)}</b> <span class="muted small">${t.picks.length} picks</span></td><td class="num"><span class="${gradeCls(t.grade)} sm">${esc(t.grade)}</span></td>
+        <td class="num ${trendCls(t.pct)}">${t.pct > 0 ? '+' : ''}${t.pct}%</td>
+        <td class="small">${t.best && t.best.surplus > 0 ? `${pick(t.best)} <span class="muted">${esc(t.best.label)} → #${t.best.redraftPick}</span>` : '—'}</td>
+        <td class="small">${t.worst && t.worst.surplus < 0 ? `${pick(t.worst)} <span class="muted">${esc(t.worst.label)} → #${t.worst.redraftPick}</span>` : '—'}</td></tr>`).join('')}</tbody></table></div>`, { span: 12, note: `${dr.picks} picks · ${dr.rounds} rounds` })}
+    ${card('Steals', dr.steals.map((r) => `<div class="li row" style="justify-content:space-between"><span>${pick(r)} <span class="muted small">${esc(r.team)}</span></span><span class="small"><b>${esc(r.label)}</b> → redraft #${r.redraftPick}</span></div>`).join('') || '<p class="muted">None.</p>', { span: 6, note: 'went later than they would today' })}
+    ${card('Busts', dr.busts.map((r) => `<div class="li row" style="justify-content:space-between"><span>${pick(r)} <span class="muted small">${esc(r.team)}</span></span><span class="small"><b>${esc(r.label)}</b> → redraft #${r.redraftPick}</span></div>`).join('') || '<p class="muted">None.</p>', { span: 6, note: 'went earlier than they would today' })}
+    ${card('If we redrafted today', `<div class="scroll"><table><thead><tr><th class="num">#</th><th>Player</th><th>Originally</th><th>By</th><th class="num">Value now</th></tr></thead><tbody>
+      ${dr.redraft.map((r, i) => `<tr><td class="rank num">${i + 1}</td><td>${pick(r)}</td><td class="num">${esc(r.label)} <span class="muted small">(#${r.pickNo})</span> ${r.pickNo > i + 1 ? `<span class="up small">▲${r.pickNo - i - 1}</span>` : r.pickNo < i + 1 ? `<span class="down small">▼${i + 1 - r.pickNo}</span>` : ''}</td><td class="small">${esc(r.team)}</td><td class="num">${k(r.value)}</td></tr>`).join('')}</tbody></table></div>`, { span: 12 })}
+  </div>
+  <p class="small muted">Value = median of KTC, FantasyCalc and DynastyProcess today. Retired or unvalued players count as 0. Hindsight, obviously.</p>`;
+  $.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/drafts?draft=${encodeURIComponent(b.dataset.d)}`; }));
+}
+
 // ---------- data status ----------
 async function viewStatus($) {
   const d = await api(`/status?league=${encodeURIComponent(session.leagueId)}`);
@@ -983,7 +1109,7 @@ async function viewStatus($) {
 }
 
 // ---------- router ----------
-const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, awards: viewAwards, rivalry: viewRivalry, wrapped: viewWrapped, drafts: viewDrafts, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');

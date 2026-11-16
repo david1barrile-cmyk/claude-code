@@ -146,6 +146,8 @@ export function buildHistory(seasons) {
       ...s, standings: s.standings.map(({ results, ...r }) => ({ ...r, form: results.slice(-5) })),
     })),
     owners: list, h2h, records, names,
+    // Every regular-season game, for rivalry pages: { season, week, a, b, ap, bp } (owner ids).
+    games: seasons.flatMap((s) => s.games.map(({ season, week, a, b, ap, bp }) => ({ season, week, a, b, ap: Math.round(ap * 100) / 100, bp: Math.round(bp * 100) / 100 }))),
   };
 }
 

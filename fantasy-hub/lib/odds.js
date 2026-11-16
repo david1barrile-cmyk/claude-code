@@ -52,6 +52,7 @@ export function simulate({ league, rosters, users, weeks, regEnd, strength, thro
   const byes = spots === 6 ? 2 : spots === 12 ? 4 : 0;
 
   const finish = owners.map(() => new Array(n).fill(0));
+  const madeFinal = new Array(n).fill(0), champs = new Array(n).fill(0);
   const winsDist = owners.map(() => []);
   const rand = rng(seed);
   const normal = () => { let u = 0; while (!u) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
@@ -69,6 +70,27 @@ export function simulate({ league, rosters, users, weeks, regEnd, strength, thro
     }
     order.sort((a, b) => W[b] - W[a] || PF[b] - PF[a]);
     order.forEach((t, place) => { finish[t][place]++; });
+    // Playoffs: single-elimination on Sleeper's fixed bracket for the seeds.
+    const play = (a, b) => (Math.max(0, mu[a] + sig[a] * normal()) >= Math.max(0, mu[b] + sig[b] * normal()) ? a : b);
+    const seeds = order.slice(0, spots);
+    let finalists;
+    if (spots === 4) finalists = [play(seeds[0], seeds[3]), play(seeds[1], seeds[2])];
+    else if (spots === 6) finalists = [play(seeds[0], play(seeds[3], seeds[4])), play(seeds[1], play(seeds[2], seeds[5]))];
+    else if (spots === 8) finalists = [play(play(seeds[0], seeds[7]), play(seeds[3], seeds[4])), play(play(seeds[1], seeds[6]), play(seeds[2], seeds[5]))];
+    else {
+      // generic: byes to the top seeds, then reseed highest vs lowest each round
+      let field = [...seeds];
+      while (field.length > 2) {
+        const size = 2 ** Math.floor(Math.log2(field.length));
+        const byes = field.length === size ? 0 : 2 * size - field.length;
+        const next = field.slice(0, byes), rest = field.slice(byes);
+        for (let i = 0; i < rest.length / 2; i++) next.push(play(rest[i], rest[rest.length - 1 - i]));
+        field = next.sort((x, y) => seeds.indexOf(x) - seeds.indexOf(y));
+      }
+      finalists = field;
+    }
+    for (const f of finalists) madeFinal[f]++;
+    if (finalists.length === 2) champs[play(finalists[0], finalists[1])]++; else if (finalists.length === 1) champs[finalists[0]]++;
     for (let i = 0; i < n; i++) winsDist[i].push(W[i]);
   }
   const pct = (x) => Math.round((x / sims) * 1000) / 10;
@@ -84,6 +106,7 @@ export function simulate({ league, rosters, users, weeks, regEnd, strength, thro
         playoffOdds: pct(finish[i].slice(0, spots).reduce((a, b) => a + b, 0)),
         byeOdds: byes ? pct(finish[i].slice(0, byes).reduce((a, b) => a + b, 0)) : null,
         firstOdds: pct(finish[i][0]),
+        finalOdds: pct(madeFinal[i]), titleOdds: pct(champs[i]),
         finishDist: finish[i].map(pct),
         projWins: Math.round((wd.reduce((a, b) => a + b, 0) / sims) * 10) / 10,
         winsP10: q(wd, 0.1), winsP90: q(wd, 0.9),
