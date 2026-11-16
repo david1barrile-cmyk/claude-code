@@ -10,6 +10,8 @@ export const config = {
   ktcEnabled: process.env.KTC_ENABLED !== '0',
   // Optional free key from collegefootballdata.com: adds college stats to rookie profiles.
   cfbdKey: process.env.CFBD_API_KEY || null,
+  // Optional league-written team personas for the Gazette (see data/personas.example.json).
+  personasFile: process.env.PERSONAS_FILE || new URL('./data/personas.json', import.meta.url).pathname,
   rookieNotesFile: process.env.ROOKIE_NOTES || new URL('./data/rookies.json', import.meta.url).pathname,
   cacheDir: process.env.CACHE_DIR || new URL('./.cache/', import.meta.url).pathname,
 

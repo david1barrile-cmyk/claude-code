@@ -822,11 +822,24 @@ async function viewGazette($) {
         ${e.median != null ? `<div class="small muted" style="font-family:var(--font)">Dashed line: league median (${fmt(e.median)})${e.medianGames ? ' · beat it for an extra win' : ''}</div>` : ''}</aside>
     </section>
     <section class="cols">${e.stories.map(story).join('')}</section>
+    ${e.interview ? `<section class="desk"><div class="section-title">The Locker Room</div>
+      <div class="item" style="grid-template-columns:minmax(0,1fr)"><div>
+        <div class="kicker">Exclusive interview${e.interview.voiceLabel ? ` · ${esc(e.interview.voiceLabel)}` : ''}</div>
+        <h3>${esc(e.interview.team)}${e.interview.nickname ? `, a.k.a. ${esc(e.interview.nickname)},` : ''} Takes Our Questions</h3>
+        ${e.interview.qa.map((x) => `<p style="margin:10px 0 2px"><b>GAZETTE:</b> ${esc(x.q)}</p><p style="margin:0"><b>${esc(e.interview.team.toUpperCase())}:</b> ${esc(x.a)}</p>`).join('')}
+        <p class="small muted" style="font-family:var(--font);margin-top:8px">Satire. Quotes are invented in the team's Gazette persona; no managers were harmed or actually interviewed.</p></div></div></section>` : ''}
     <section class="desk" id="gz-desk"></section>
     <section class="lower">
       <div><div class="section-title">Around the League</div><ul class="briefs">${e.briefs.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>
       <div class="ahead"><div class="section-title">Looking Ahead</div>${e.lookahead.length ? e.lookahead.map((x) => `<h4>${esc(x.headline)}</h4><p>${esc(x.body)}</p>`).join('') : '<p>The regular season is over. Pray for your playoff matchup.</p>'}</div>
     </section>
+    ${e.cast?.length ? `<section class="desk"><div class="section-title">Meet the Cast</div>
+      <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));padding-top:6px">${e.cast.map((c) => `<div>
+        <div class="kicker">${esc(c.archetype)}</div><h3 style="font-size:18px;margin-bottom:2px">${esc(c.team)}</h3>
+        <div class="small" style="font-family:var(--font);margin-bottom:4px"><i>${esc(c.nickname)}</i> · ${esc(c.voiceLabel)}</div>
+        <p style="font-size:14px">${esc(c.bio)}</p>
+        <p class="small" style="font-family:var(--font);margin-top:4px">Catchphrase: “${esc(c.catchphrase)}”${c.rival ? `<br>Rival: ${esc(c.rival)}` : ''}${c.mascot ? `<br>Mascot: ${esc(c.mascot)}` : ''}</p></div>`).join('')}</div>
+      <p class="small muted" style="font-family:var(--font)">Personas are generated from how each team plays; managers can write their own (data/personas.json).</p></section>` : ''}
     <div class="fine">Satire. Scores and stats are real; quotes, sources and experts are not. Any resemblance to competent management is coincidental.<br>
       ${e.generator === 'claude' ? `Written by Claude (${esc(e.model || 'AI')}) from this week's league data.` : "Written by the Gazette's in-house joke machine."}</div>
   </div>`;

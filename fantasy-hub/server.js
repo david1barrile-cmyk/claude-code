@@ -21,6 +21,7 @@ import { gradeLeagueTrades } from './lib/tradegrades.js';
 import { requestStats } from './lib/health.js';
 import { getOdds } from './lib/odds.js';
 import { hubWithPickLinks, getPickLinks } from './lib/picklink.js';
+import { getPersonas } from './lib/personas.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -383,6 +384,11 @@ const routes = [
   ['GET', /^\/api\/league\/(\d+)\/trade-grades$/, async ([id]) => {
     const ctx = await getLeagueContext(id);
     return { trades: await gradeLeagueTrades(ctx), sources: (await getValueHub(ctx)).sources };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/personas$/, async ([id]) => {
+    const { personas } = await getPersonas(await getLeagueContext(id));
+    return { personas: Object.values(personas).map(({ stats, ...p }) => ({ ...p, stats: { record: stats.record, trades: stats.trades, adds: stats.adds, faab: stats.faab, benchLeft: stats.benchLeft, luck: stats.luck, titles: stats.titles } })) };
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/gazette$/, async ([id], q) => {

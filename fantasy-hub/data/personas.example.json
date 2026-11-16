@@ -1,0 +1,21 @@
+{
+  "_readme": "Copy to data/personas.json to give teams league-written personas for the Gazette. Match a team by its Sleeper team name or the manager's Sleeper username. Every field is optional; anything left out stays auto-generated. voice is one of: showman, ceo, conspiracy, zen, optimist, oldtimer, nerd. quotes are keyed by situation: win, loss, blowoutWin, blowoutLoss, closeLoss, trade, bench, hot, cold, oddsUp, oddsDown. offLimits lists topics the Gazette must never joke about for this team.",
+  "teams": [
+    {
+      "team": "Example Team Name",
+      "nickname": "The Waiver Wire Vampire",
+      "voice": "conspiracy",
+      "catchphrase": "Sleeper knows what it did.",
+      "bio": "Has blamed the app for every loss since 2024. Has never once blamed the app for a win.",
+      "rival": "Another Team Name",
+      "signatureMove": "Starting a kicker at FLEX on purpose 'to send a message'",
+      "nemesisPlayer": "Any running back named after a month",
+      "mascot": "A raccoon in a referee shirt",
+      "quotes": {
+        "win": ["Even a broken algorithm is right twice a season."],
+        "blowoutLoss": ["I was testing a new lineup philosophy. It's called 'no.'"]
+      },
+      "offLimits": ["my 2024 draft", "the Tom Brady trade"]
+    }
+  ]
+}

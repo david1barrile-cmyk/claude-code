@@ -24,8 +24,17 @@ const SCHEMA = {
       type: 'array',
       items: { type: 'object', properties: { headline: { type: 'string' }, body: { type: 'string' } }, required: ['headline', 'body'], additionalProperties: false },
     },
+    interview: {
+      type: 'object',
+      properties: {
+        team: { type: 'string' },
+        qa: { type: 'array', items: { type: 'object', properties: { q: { type: 'string' }, a: { type: 'string' } }, required: ['q', 'a'], additionalProperties: false } },
+      },
+      required: ['team', 'qa'],
+      additionalProperties: false,
+    },
   },
-  required: ['lead', 'stories', 'briefs', 'lookahead', 'tradeDesk'],
+  required: ['lead', 'stories', 'briefs', 'lookahead', 'tradeDesk', 'interview'],
   additionalProperties: false,
 };
 
@@ -39,6 +48,8 @@ Rules:
 - Team names are how managers are known; refer to teams by name. NFL players may be mentioned only in terms of their fantasy output in the facts; do not invent off-field events about them.
 - "lead": the week's biggest story (an upset, blowout, nail-biter, or bench disaster). "stories": 4-6 more, each a different angle, covering as many different teams as the facts allow. "briefs": 4-6 one-sentence items. "lookahead": 2-3 items previewing next week and the playoff race (empty if there is no next week).
 - "tradeDesk": exactly one item per entry in the facts' "tradeDesk" array, in the same order (empty array if there are none). Each is a satirical headline plus 3-5 sentences of trade analysis that uses the provided grades, value edges, lineup changes and notes. Never change or invent a grade; quote the grades given.
+- "personas" gives each team a recurring character: nickname, voice, catchphrase, bio, rival, and sometimes a signature move, nemesis player, mascot or sample quotes written by the manager. Quote teams in their persona's voice, use nicknames and rivalries for running jokes, and reuse their own sample quotes when they fit. Never mention anything in a team's "offLimits" list, not even indirectly.
+- "interview": a 3-question mock "Locker Room" interview with the team behind the lead story, answered fully in that team's persona voice, ending with its catchphrase.
 - "kicker" is a 1-3 word section label (e.g. "Upset Alert", "Manager Malpractice", "Transactions").
 - Headlines in Title Case, under 16 words. Bodies 2-4 sentences.`;
 
@@ -77,5 +88,7 @@ export function validate(e) {
     briefs: (Array.isArray(e.briefs) ? e.briefs : []).filter(str).slice(0, 8),
     lookahead: (Array.isArray(e.lookahead) ? e.lookahead : []).filter((x) => x && str(x.headline) && str(x.body)).slice(0, 4),
     tradeDesk: (Array.isArray(e.tradeDesk) ? e.tradeDesk : []).filter((x) => x && str(x.headline) && str(x.body)),
+    interview: e.interview && str(e.interview.team) && Array.isArray(e.interview.qa) && e.interview.qa.some((x) => str(x?.q) && str(x?.a))
+      ? { team: e.interview.team, qa: e.interview.qa.filter((x) => str(x?.q) && str(x?.a)).slice(0, 5) } : null,
   };
 }
