@@ -2,8 +2,11 @@
 import { cached } from './cache.js';
 import { getKtc, getDynastyProcess, getFantasyCalc } from './sources.js';
 import { leagueValueParams, productionValues } from './values.js';
-import { leaguePicks, resolvePickValue } from './picks.js';
+import { leaguePicks, marketPickValue } from './picks.js';
 import { projectValue } from './dynasty.js';
+import { leagueDemand, standardDemand, adjustValues, consolidatedTotal, depthDiscount } from './leagueadjust.js';
+
+const median = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return !v.length ? null : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
 
 export function leagueFormat(league) {
   const p = leagueValueParams(league);
@@ -45,10 +48,27 @@ export function getValueHub(ctx) {
       getDynastyProcess({ superflex: fmt.superflex, players: ctx.players }),
     ]);
     const model = modelSource(ctx, picks, fmt);
-    const sources = [ktc, fc, dp, model];
     const n = ctx.teams.length;
+
+    // League-adjusted layer (shown alongside market values, never instead of them).
+    // KTC and DynastyProcess assume a typical 12-team league, so they get the replacement-level
+    // shift; FantasyCalc was already asked for this league's size and is used as-is.
+    const demandLeague = leagueDemand(ctx), demandStd = standardDemand(fmt.superflex);
+    const shiftOf = (src) => (src.ok ? adjustValues(Object.fromEntries(Object.entries(src.players).map(([id, x]) => [id, x.value])), ctx.players, demandLeague, demandStd) : null);
+    const ktcAdj = shiftOf(ktc), dpAdj = shiftOf(dp);
+    const adjIds = new Set([...Object.keys(ktcAdj?.values || {}), ...Object.keys(dpAdj?.values || {}), ...Object.keys(fc.ok ? fc.players : {})]);
+    const adjPlayers = {};
+    for (const id of adjIds) {
+      const v = median([ktcAdj?.values[id], dpAdj?.values[id], fc.ok ? fc.players[id]?.value : null]);
+      if (v != null) adjPlayers[id] = { value: Math.round(v) };
+    }
+    const marketPick = (src, pk) => (src.ok ? marketPickValue(src.picks, pk, n, src.short === 'FC' ? n : 12) : null);
+    const adjPickVals = Object.fromEntries(picks.map((pk) => [pk.key, median([marketPick(ktc, pk), marketPick(fc, pk), marketPick(dp, pk)])]));
+    const adjusted = { name: 'League-adjusted', short: 'Adj', ok: true, layer: true, format: `${n}-team lineup & depth`, players: adjPlayers, pickVals: adjPickVals };
+    const sources = [ktc, fc, dp, model, adjusted];
     const value = (src, id) => src.ok ? src.players?.[id]?.value ?? null : null;
-    const pickValue = (src, pk) => (!src.ok ? null : src.pickVals ? src.pickVals[pk.key] : resolvePickValue(src.picks, pk, n));
+    // KTC and DynastyProcess price picks for 12-team drafts; FantasyCalc was asked for this league's size.
+    const pickValue = (src, pk) => (!src.ok ? null : src.pickVals ? src.pickVals[pk.key] : marketPickValue(src.picks, pk, n, src.short === 'FC' ? n : 12));
 
     const playerRow = (id) => {
       const p = ctx.players[id];
@@ -68,9 +88,10 @@ export function getValueHub(ctx) {
     }));
     return {
       format: fmt,
-      sources: sources.map((s) => ({ short: s.short, name: s.name, ok: s.ok, format: s.format ?? null, error: s.error ?? null })),
+      sources: sources.map((s) => ({ short: s.short, name: s.name, ok: s.ok, format: s.format ?? null, error: s.error ?? null, layer: !!s.layer })),
+      adjust: { demandLeague, demandStd, shifts: { KTC: ktcAdj?.shifts ?? null, DP: dpAdj?.shifts ?? null }, depthDiscount: depthDiscount(n), teams: n },
       teams,
-      _raw: { ktc, dp, fc, model, picks },
+      _raw: { ktc, dp, fc, model, picks, adjusted },
     };
   });
 }
@@ -84,7 +105,7 @@ export function compareSides(hub, sideA, sideB) {
   }
   const assets = (ids) => ids.map((id) => lookup.get(id)).filter(Boolean);
   const A = assets(sideA), B = assets(sideB);
-  const perSource = hub.sources.filter((s) => s.ok).map((s) => {
+  const perSource = hub.sources.filter((s) => s.ok && !s.layer).map((s) => {
     const tot = (xs) => xs.reduce((sum, x) => sum + (x.values[s.short] ?? 0), 0);
     const missing = [...A, ...B].filter((x) => x.values[s.short] == null).map((x) => x.label);
     const a = tot(A), b = tot(B), big = Math.max(a, b);
@@ -102,9 +123,25 @@ export function compareSides(hub, sideA, sideB) {
     return vs.length ? vs.reduce((s, v) => s + v, 0) / vs.length : 0;
   };
   const all = [...A.map((x) => ({ ...x, side: 'A' })), ...B.map((x) => ({ ...x, side: 'B' }))].sort((x, y) => consensusValue(y) - consensusValue(x));
+  // League-adjusted layer with the consolidation discount for uneven piece counts.
+  let adjustedResult = null;
+  if (hub.sources.some((s) => s.short === 'Adj' && s.ok) && A.length && B.length) {
+    const n = hub.adjust?.teams ?? 12;
+    const va = A.map((x) => x.values.Adj ?? 0), vb = B.map((x) => x.values.Adj ?? 0);
+    const sendA = consolidatedTotal(va, vb.length, n), sendB = consolidatedTotal(vb, va.length, n);
+    const big = Math.max(sendA, sendB);
+    const edgeA = big ? Math.round(((sendB - sendA) / big) * 100) : 0;
+    const ab = Math.abs(edgeA);
+    adjustedResult = {
+      sendA: Math.round(sendA), sendB: Math.round(sendB), edgeA,
+      verdict: ab <= 5 ? 'Fair trade' : ab <= 15 ? `Slight edge to ${edgeA > 0 ? 'side A' : 'side B'}` : `Lopsided in favor of ${edgeA > 0 ? 'side A' : 'side B'}`,
+      consolidation: va.length !== vb.length ? `Pieces beyond the ${Math.min(va.length, vb.length)} the other side sends count at ${Math.round((hub.adjust?.depthDiscount ?? 1) * 100)}% (deep waiver wire in ${[8, 11, 18].includes(n) ? 'an' : 'a'} ${n}-team league).` : null,
+    };
+  }
   return {
+    adjusted: adjustedResult,
     perSource, consensus, verdict, sourcesAgree: agree,
     bestAsset: all[0] ? { label: all[0].label, side: all[0].side } : null,
-    assets: all.map((x) => ({ id: x.id ?? x.key, label: x.label, kind: x.kind, pos: x.pos ?? 'PICK', side: x.side, values: x.values })),
+    assets: all.map((x) => ({ id: x.id ?? x.key, label: x.label, kind: x.kind, pos: x.pos ?? 'PICK', side: x.side, values: x.values, linked: x.linked ?? null })),
   };
 }

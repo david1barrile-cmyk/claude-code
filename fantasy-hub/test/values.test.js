@@ -147,3 +147,43 @@ test('rookie tiers break at real value cliffs inside the draftable range', () =>
   assert.equal(board[1].tier, 'Tier 2');
   assert.equal(board.at(-1).tier, 'Depth');
 });
+
+import { equivalentPick } from '../lib/picks.js';
+import { adjustValues, consolidatedTotal, depthDiscount } from '../lib/leagueadjust.js';
+test('8-team picks map to 12-team equivalents by overall pick', () => {
+  assert.deepEqual([equivalentPick({ round: 2, slot: 5 }, 8)].map((e) => [e.overall, e.round, e.slot]), [[13, 2, 1]]);
+  assert.deepEqual([equivalentPick({ round: 3, slot: 8 }, 8)].map((e) => [e.overall, e.round, e.slot]), [[24, 2, 12]]);
+  assert.equal(equivalentPick({ round: 1, slot: 3 }, 12).round, 1); // 12-team leagues unchanged
+});
+test('league adjustment shifts by replacement level and discounts extra pieces', () => {
+  const players = {}, values = {};
+  for (let i = 1; i <= 30; i++) { players[`q${i}`] = { pos: 'QB' }; values[`q${i}`] = 10000 - i * 300; }
+  for (let i = 1; i <= 20; i++) { players[`t${i}`] = { pos: 'TE' }; values[`t${i}`] = 6000 - i * 250; }
+  const { values: adj, shifts } = adjustValues(values, players, { QB: 16, RB: 0, WR: 0, TE: 18 }, { QB: 24, RB: 0, WR: 0, TE: 14 });
+  assert.equal(shifts.QB.shift, 2400); // QB16 (5200) - QB24 (2800)
+  assert.equal(adj.q1, 9700 - 2400);
+  assert.equal(shifts.TE.shift, -1000); // deeper TE demand raises TEs
+  assert.equal(adj.t1, 5750 + 1000);
+  assert.equal(depthDiscount(8), 0.6);
+  assert.equal(depthDiscount(12), 1);
+  assert.equal(consolidatedTotal([100, 50, 50], 1, 8), 100 + 30 + 30);
+});
+
+import { slotChances, expectedPick } from '../lib/picklink.js';
+test('pick linked to the prospects it can land on', () => {
+  const teams = [1, 2, 3, 4].map((r) => ({ rosterId: r, ownerId: `o${r}`, wins: 5 - r, losses: r, ties: 0, pf: 100 }));
+  // o4 is 80% to finish last (-> 1.01), 20% third (-> 1.02)
+  const odds = { teams: [{ ownerId: 'o4', finishDist: [0, 0, 20, 80] }, { ownerId: 'o1', finishDist: [100, 0, 0, 0] }] };
+  const ch = slotChances(teams, odds);
+  assert.deepEqual(ch[4], [{ slot: 1, p: 0.8 }, { slot: 2, p: 0.2 }]);
+  assert.deepEqual(ch[1], [{ slot: 4, p: 1 }]);
+  assert.equal(ch[2].length, 1); // falls back to projected order when the sim has no row
+  const board = [{ name: 'Star', pos: 'WR', slug: 's', value: 10000 }, { name: 'Next', pos: 'QB', slug: 'n', value: 7000 }, { name: 'C', value: 6000 }, { name: 'D', value: 5000 }, { name: 'E', value: 3000 }];
+  const e = expectedPick({ round: 1, chances: ch[4], board, n: 4, market: 6600, weight: 0.5 });
+  assert.equal(e.linked, 9400); // 0.8*10000 + 0.2*7000
+  assert.equal(e.value, 8000);  // 50/50 with market
+  assert.equal(e.outcomes[0].prospect.name, 'Star');
+  assert.equal(e.outcomes[0].prob, 80);
+  const r2 = expectedPick({ round: 2, chances: ch[1], board, n: 4, market: null, weight: 0.5 });
+  assert.equal(r2, null); // round 2 slot 4 = overall 8, past the end of the board
+});

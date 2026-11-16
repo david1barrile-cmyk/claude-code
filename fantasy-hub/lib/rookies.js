@@ -9,6 +9,7 @@ import { normName } from './sources.js';
 import { getValueHub } from './valuehub.js';
 import { draftSeason, leaguePicks } from './picks.js';
 import { getDynastyRankings } from './dynasty.js';
+import { shiftValue } from './leagueadjust.js';
 
 const POS = new Set(['QB', 'RB', 'WR', 'TE']);
 export const slugify = (name) => normName(name).replace(/ /g, '-');
@@ -42,7 +43,7 @@ export function assignTiers(board, draftable = 24) {
   return { cuts, draftable, range: n };
 }
 
-export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = [], draftable = 24 }) {
+export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = [], draftable = 24, shifts = null }) {
   const map = new Map();
   const get = (name, pos) => {
     const k = normName(name);
@@ -81,6 +82,17 @@ export function buildBoard({ season, ktcRookies = [], dpRookies = [], notes = []
     if (!vals.length && r.sources.Notes) vals.push(100 * (1 - (r.sources.Notes.rank - 1) / Math.max(noteRanks, 1)));
     r.score = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0;
   }
+  // League-adjusted layer: shift each source's value by this league's replacement level
+  // at the position, rescale, average; ranked separately from the market board.
+  if (shifts) {
+    const adjTops = {};
+    for (const src of ['KTC', 'DP']) adjTops[src] = Math.max(0, ...rows.map((r) => (r.sources[src]?.value ? shiftValue(r.sources[src].value, r.pos, shifts[src]) : 0)));
+    for (const r of rows) {
+      const vals = ['KTC', 'DP'].filter((src) => r.sources[src]?.value && adjTops[src]).map((src) => (100 * shiftValue(r.sources[src].value, r.pos, shifts[src])) / adjTops[src]);
+      r.adjScore = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+    }
+    rows.filter((r) => r.adjScore != null).sort((a, b) => b.adjScore - a.adjScore).forEach((r, i) => { r.adjRank = i + 1; });
+  }
   const board = rows.filter((r) => r.score > 0).sort((a, b) => b.score - a.score);
   // Within-class rank per source, so sources can be compared like for like.
   for (const src of ['KTC', 'DP']) {
@@ -99,7 +111,7 @@ export function getRookieBoard(ctx) {
     const season = draftSeason(ctx.league);
     const { ktc, dp } = hub._raw;
     const draftable = (ctx.teams.length || 12) * (ctx.league.settings?.draft_rounds || 4);
-    const board = buildBoard({ season, ktcRookies: ktc.ok ? ktc.rookies : [], dpRookies: dp.ok ? dp.rookies : [], notes: readNotes(), draftable });
+    const board = buildBoard({ season, ktcRookies: ktc.ok ? ktc.rookies : [], dpRookies: dp.ok ? dp.rookies : [], notes: readNotes(), draftable, shifts: hub.adjust?.shifts });
     return {
       season, format: hub.format, draftable,
       sources: [

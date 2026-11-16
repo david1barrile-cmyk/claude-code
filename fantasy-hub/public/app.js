@@ -251,7 +251,9 @@ async function viewDashboard($) {
 // ---------- power rankings ----------
 async function viewPower($) {
   const d = await api(L('/power'));
-  const dyn = d.dynasty.teams;
+  const adjMode = routeQuery.get('values') === 'adj' && d.dynastyAdj;
+  const dyn = (adjMode ? d.dynastyAdj : d.dynasty).teams;
+  if (adjMode) d.dynasty = d.dynastyAdj;
   const season = d.season;
   const yearLbl = (y) => (y === 0 ? 'Now' : `${Number(d.draftSeason) - 1 + y}`);
   const move = (a, b) => (b < a ? `<span class="rankmove up">▲${a - b}</span>` : b > a ? `<span class="rankmove down">▼${b - a}</span>` : '<span class="rankmove muted">–</span>');
@@ -271,6 +273,16 @@ async function viewPower($) {
       <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
     ${card('This season', `<div id="c-season"></div>`, { span: 5, note: 'score 0–100' })}
     ${card('Contender or rebuilder?', `<div id="c-quad"></div>`, { span: 7, note: 'current strength vs. long-term value' })}
+    ${d.dynastyAdj ? `<section class="span-12 row" style="justify-content:space-between">
+      <div class="seg" id="valmode"><button data-v="" class="${adjMode ? '' : 'on'}">Market values</button><button data-v="adj" class="${adjMode ? 'on' : ''}">League-adjusted</button></div>
+      <span class="small muted">Applies to the dynasty sections below. Market = trade-value sites as-is; league-adjusted = re-priced for this league's lineup and size.</span></section>` : ''}
+    ${adjMode && d.adjust ? card('How the league adjustment works', `<p class="small" style="margin-top:0">Trade-value sites assume a typical 12-team league. Here, a player's value also depends on how easy it is to find a startable replacement. We count the players who actually start at each position across this league's ${d.adjust.teams} best lineups (flex and superflex included), compare with a typical 12-team league, and shift every player at the position by the value gap between the two replacement-level players. FantasyCalc is already asked for this league's size and is used as-is; the layer is the median of KTC adjusted, DynastyProcess adjusted and FantasyCalc.</p>
+      <div class="scroll"><table><thead><tr><th>Position</th><th class="num">Starters here</th><th class="num">Typical 12-team</th><th class="num">KTC shift</th><th class="num">DP shift</th><th>Effect</th></tr></thead><tbody>
+      ${['QB', 'RB', 'WR', 'TE'].map((p) => { const k2 = d.adjust.shifts.KTC?.[p], dp2 = d.adjust.shifts.DP?.[p]; const sh = k2?.shift ?? 0;
+        return `<tr><td>${posTag(p)}</td><td class="num">${d.adjust.demandLeague[p]}</td><td class="num">${d.adjust.demandStd[p]}</td><td class="num ${sh > 0 ? 'down' : sh < 0 ? 'up' : ''}">${sh > 0 ? '−' : '+'}${Math.abs(sh).toLocaleString()}</td><td class="num">${dp2 ? `${dp2.shift > 0 ? '−' : '+'}${Math.abs(dp2.shift).toLocaleString()}` : '—'}</td>
+          <td class="small">${sh > 300 ? 'Easier to replace here: worth less' : sh < -150 ? 'Harder to replace here: worth more' : 'About the same'}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="small muted">Trades also discount extra pieces: anything beyond the number of assets the other side sends counts at ${Math.round(d.adjust.depthDiscount * 100)}%, because ${[8, 11, 18].includes(d.adjust.teams) ? 'an' : 'a'} ${d.adjust.teams}-team waiver wire is deep. Picks are valued by overall pick number (your 2.05 is overall pick ${(2 - 1) * d.adjust.teams + 5}).</p>
+      <p class="small muted"><b>Next year's picks are tied to prospects.</b> Each pick's chance of landing in each slot comes from the season simulation (draft order = reverse regular-season standings), and each slot is matched to the prospect the rookie board has there. The expected value is blended with the market pick value: 50/50 until the NFL Draft, 90/10 after, because rankings and landing spots still move.</p>`, { span: 12 }) : ''}
     ${card('Dynasty value by position', `<div class="row" style="justify-content:space-between;margin-bottom:6px">${legend(Object.entries(POS_COLORS).map(([label, color]) => ({ label, color })))}
       <div class="seg" id="yr">${[0, 1, 2, 3].map((y) => `<button data-y="${y}" class="${y ? '' : 'on'}">${yearLbl(y)}</button>`).join('')}</div></div><div id="c-dyn"></div>`, { span: 12 })}
     ${card('Dynasty outlook', `<div class="scroll"><table id="dyn-t">
@@ -290,6 +302,7 @@ async function viewPower($) {
   </div>`;
 
   if (d.odds) renderOdds(d.odds);
+  document.querySelectorAll('#valmode button').forEach((b) => b.addEventListener('click', () => { location.hash = `#/power${b.dataset.v ? '?values=adj' : ''}`; }));
   hbars(document.getElementById('c-season'), {
     rows: season.map((t) => ({ label: `${t.rank}. ${t.name}`, value: t.score, highlight: t.ownerId === session.userId, t })), max: 100, fmt: (v) => v,
     tipFn: (r) => `<b>${esc(r.t.name)}</b>Record ${pct(r.t.components.record)} · All-play ${pct(r.t.components.allPlay)} · Lineup ${pct(r.t.components.lineup)} (percentile within league)`,
@@ -495,6 +508,18 @@ async function viewTrades($) {
 }
 
 // ---------- trade analyzer ----------
+// "→ 1.01 Jeremiah Smith (85%)" for picks linked to likely prospects, with all outcomes on hover.
+const linkedNote = (l) => {
+  if (!l?.outcomes?.length) return '';
+  const top = l.outcomes[0];
+  const tip = `Likely outcomes:\n${l.outcomes.slice(0, 5).map((o) => `${o.label} ${o.prospect.name} (${o.prospect.pos}): ${o.prob}%`).join('\n')}\n\nProspect-linked ${l.linked.toLocaleString()}${l.market != null ? `, market ${l.market.toLocaleString()}` : ''} → league-adjusted ${l.value.toLocaleString()} (${Math.round(l.weight * 100)}% prospect-linked)`;
+  return ` <span class="small muted" title="${esc(tip)}">→ ${esc(top.label)} ${esc(top.prospect.name)} (${top.prob}%)</span>`;
+};
+const shiftTxt = (adj, pos) => {
+  const sh = adj?.shifts?.KTC?.[pos];
+  if (!sh) return 'n/a';
+  return `${adj.demandLeague[pos]} starters vs ${adj.demandStd[pos]} in a typical league (${sh.shift > 0 ? '−' : '+'}${Math.abs(sh.shift).toLocaleString()} KTC)`;
+};
 const SRC_LABEL = { KTC: 'KeepTradeCut', FC: 'FantasyCalc', DP: 'DynastyProcess', Model: 'Fantasy Hub model' };
 const consensusVal = (values, sources) => {
   const v = sources.map((s) => values[s]).filter((x) => x != null);
@@ -502,7 +527,8 @@ const consensusVal = (values, sources) => {
 };
 async function viewAnalyzer($) {
   const hub = await api(L('/values'));
-  const okSrc = hub.sources.filter((s) => s.ok).map((s) => s.short);
+  const okSrc = hub.sources.filter((s) => s.ok && !s.layer).map((s) => s.short);
+  const hasAdj = hub.sources.some((s) => s.layer && s.ok);
   const me = hub.teams.find((t) => t.ownerId === session.userId) || hub.teams[0];
   const q = routeQuery;
   const state = {
@@ -535,7 +561,7 @@ async function viewAnalyzer($) {
         <input data-filter="${k}" placeholder="Search players or picks…" value="${esc(state.filter[k])}" style="flex:1;min-width:140px"></div>
       <div class="row" style="margin:10px 0;min-height:28px">${chosen.map((x) => `<span class="chip" style="gap:6px">${x.kind === 'pick' ? '🎟' : posTag(x.pos)} ${esc(x.name)} <button class="link" data-rm="${k}" data-id="${esc(x.id)}" aria-label="Remove">✕</button></span>`).join('') || '<span class="muted small">Nothing selected</span>'}</div>
       <div style="max-height:360px;overflow:auto;border-top:1px solid var(--border)">${list.map((x) => `<label class="pick"><input type="checkbox" data-side="${k}" value="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}>
-        ${x.kind === 'pick' ? `<span class="pos" data-p="PICK" style="--pc:var(--pick)">PICK</span> <span>${esc(x.name)}</span>` : `${posTag(x.pos)} <span>${esc(x.name)}</span> <span class="muted small">${esc(x.team || '')}${x.age ? ` · ${x.age}` : ''}</span>`}
+        ${x.kind === 'pick' ? `<span class="pos" data-p="PICK" style="--pc:var(--pick)">PICK</span> <span>${esc(x.name)}${linkedNote(x.linked)}</span>` : `${posTag(x.pos)} <span>${esc(x.name)}</span> <span class="muted small">${esc(x.team || '')}${x.age ? ` · ${x.age}` : ''}</span>`}
         <span class="small num" style="margin-left:auto;white-space:nowrap" title="${esc(okSrc.map((s) => `${SRC_LABEL[s]}: ${x.values[s] == null ? '—' : Math.round(x.values[s]).toLocaleString()}`).join('\n'))}"><b>${k2(consensusVal(x.values, okSrc))}</b> <span class="muted">avg</span></span></label>`).join('')}</div>
       <p class="small muted" style="margin:8px 0 0">Value shown is the average across sources; hover for each site's number.</p>`;
     el.querySelector('select').onchange = (e) => { if (k === 'A') state.a = Number(e.target.value); else state.b = Number(e.target.value); state[k].clear(); renderAll(); };
@@ -567,15 +593,20 @@ async function viewAnalyzer($) {
       <div class="row small muted" style="justify-content:space-between;max-width:620px"><span>◀ better for ${esc(nB)}</span><span>better for ${esc(nA)} ▶</span></div>
       <div style="max-width:620px">${edgeBar(r.consensus)}</div>
       <p class="small muted">Consensus value edge: <b>${who(r.consensus)}</b>${r.bestAsset ? ` · Best single asset: <b>${esc(r.bestAsset.label)}</b> (${esc(r.bestAsset.side === 'A' ? nB : nA)} receives it)` : ''}</p>
+      ${r.adjusted ? `<div class="card" style="background:var(--surface-2);box-shadow:none;margin:14px 0 4px;max-width:720px">
+        <div class="row" style="justify-content:space-between"><b>League-adjusted view</b><span class="small muted">extra layer, not part of the verdict above</span></div>
+        <div class="row" style="margin-top:6px"><b>${esc(r.adjusted.verdict.replace('side A', nA).replace('side B', nB))}</b><span class="small ${Math.abs(r.adjusted.edgeA) <= 5 ? '' : r.adjusted.edgeA > 0 ? 'up' : 'down'}">${who(r.adjusted.edgeA)}</span></div>
+        <div style="margin-top:6px">${edgeBar(r.adjusted.edgeA)}</div>
+        <p class="small muted" style="margin:6px 0 0">Market values re-priced for this league's lineup and ${hub.adjust?.teams ?? ''}-team depth: QB ${shiftTxt(hub.adjust, 'QB')}, TE ${shiftTxt(hub.adjust, 'TE')}.${r.adjusted.consolidation ? ` ${esc(r.adjusted.consolidation)}` : ''}${r.assets.some((x) => x.linked) ? ` ${hub.pickLinks?.season ?? ''} picks are valued by the prospects they're likely to become (${Math.round((hub.pickLinks?.weight ?? 0.5) * 100)}% prospect-linked, the rest market).` : ''} <a href="#/power?values=adj">How it works →</a></p></div>` : ''}
       <h3>By source</h3><div class="scroll"><table><thead><tr><th>Source</th><th class="hide-sm">Format</th><th class="num">${esc(nA)} sends</th><th class="num">${esc(nB)} sends</th><th>Edge</th><th></th></tr></thead><tbody>
         ${r.perSource.map((p) => `<tr><td><b>${esc(p.name)}</b></td><td class="muted small hide-sm">${esc(p.format || '')}</td><td class="num">${p.sendA.toLocaleString()}</td><td class="num">${p.sendB.toLocaleString()}</td>
           <td>${edgeBar(p.edgeA)}</td><td class="small ${Math.abs(p.edgeA) <= 5 ? '' : p.edgeA > 0 ? 'up' : 'down'}">${who(p.edgeA)}${p.missing.length ? ` <span class="muted" title="${esc(p.missing.join(', '))}">· ${p.missing.length} unvalued</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
       ${r.lineup ? `<h3>Weekly lineup impact (rest of season)</h3><div class="kpis">
         <div class="kpi"><b class="${trendCls(r.lineup.you.delta)}">${sign(r.lineup.you.delta)}</b><span>${esc(nA)} pts/wk</span></div>
         <div class="kpi"><b class="${trendCls(r.lineup.them.delta)}">${sign(r.lineup.them.delta)}</b><span>${esc(nB)} pts/wk</span></div></div>` : ''}
-      <h3>Assets in this deal</h3><div class="scroll"><table><thead><tr><th>Asset</th><th>Goes to</th>${okSrc.map((s) => `<th class="num">${s}</th>`).join('')}</tr></thead><tbody>
-        ${r.assets.map((x) => `<tr><td>${x.kind === 'pick' ? '🎟 ' : `${posTag(x.pos)} `}${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>` : esc(x.label)}</td><td>${esc(x.side === 'A' ? nB : nA)}</td>
-          ${okSrc.map((s) => `<td class="num">${x.values[s] == null ? '—' : x.values[s].toLocaleString()}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <h3>Assets in this deal</h3><div class="scroll"><table><thead><tr><th>Asset</th><th>Goes to</th>${okSrc.map((s) => `<th class="num">${s}</th>`).join('')}${hasAdj ? '<th class="num" title="League-adjusted layer">League-adj</th>' : ''}</tr></thead><tbody>
+        ${r.assets.map((x) => `<tr><td>${x.kind === 'pick' ? '🎟 ' : `${posTag(x.pos)} `}${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>` : `${esc(x.label)}${linkedNote(x.linked)}`}</td><td>${esc(x.side === 'A' ? nB : nA)}</td>
+          ${okSrc.map((s) => `<td class="num">${x.values[s] == null ? '—' : x.values[s].toLocaleString()}</td>`).join('')}${hasAdj ? `<td class="num muted">${x.values.Adj == null ? '—' : x.values.Adj.toLocaleString()}</td>` : ''}</tr>`).join('')}</tbody></table></div>
       <p class="small muted">Each source uses its own scale, so compare edges, not raw numbers. DynastyProcess prices picks much lower than KTC, so pick-heavy deals often split the sources. Picks are valued at their projected slot (current standings) for next year's draft and at "mid" for later years.</p>`;
   }
   function renderAll() { renderSide('A'); renderSide('B'); evaluate(); }
@@ -592,7 +623,7 @@ async function viewRookies($) {
   const mode = routeQuery.get('mode') === 'bpa' ? 'bpa' : 'need';
   const posF = routeQuery.get('pos') || '';
   const d = await api(L('/rookies'));
-  const go = (o) => { const p = new URLSearchParams({ view: tab, mode, pos: posF, ...o }); location.hash = `#/rookies?${p}`; };
+  const go = (o) => { const p = new URLSearchParams({ view: tab, mode, pos: posF, values: routeQuery.get('values') || '', ...o }); location.hash = `#/rookies?${p}`; };
   const srcChips = `<div class="row">${d.sources.map((x) => `<span class="chip ${x.ok ? 'good' : ''}" title="${esc(x.ok ? x.name : `${x.name}: ${x.error || 'not available'}`)}">${x.ok ? '✓' : '–'} ${esc(x.short)}</span>`).join('')}</div>`;
   $.innerHTML = `${head(`${d.season} Rookie Class`, `${d.board.length} prospects ranked by consensus of ${d.sources.filter((x) => x.ok).map((x) => x.short).join(' + ') || 'no sources'} (${d.format.superflex ? 'Superflex' : '1QB'} values). Click a name for a scouting profile.`, srcChips)}
     <div class="row" style="margin-bottom:16px;justify-content:space-between">
@@ -612,24 +643,31 @@ async function viewRookies($) {
 }
 
 function renderBoard(el, d, posF) {
-  const rows = d.board.filter((r) => !posF || r.pos === posF);
+  const adjMode = routeQuery.get('values') === 'adj' && d.board.some((r) => r.adjRank);
+  const base = adjMode ? [...d.board].filter((r) => r.adjRank).sort((a, b) => a.adjRank - b.adjRank) : d.board;
+  const rows = base.filter((r) => !posF || r.pos === posF);
   const tiers = [...new Set(d.board.map((r) => r.tier))].filter((t) => t !== 'Depth');
   const range = (t) => { const rs = d.board.filter((r) => r.tier === t).map((r) => r.rank); return rs.length ? `#${rs[0]}${rs.length > 1 ? `–${rs.at(-1)}` : ''}` : ''; };
   const breaks = d.board.slice(0, 36).map((r, i) => (i > 0 && r.tier !== d.board[i - 1].tier && r.tier !== 'Depth' ? i : null)).filter((x) => x != null);
   el.innerHTML = `<div class="grid">
     ${card('Value curve', `${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}<div id="c-curve"></div>`, { span: 8, note: 'consensus score by rank (top 36) · dashed lines mark value cliffs (tier breaks)' })}
     ${card('Position mix by tier', `<div id="c-tiers"></div>${legend(Object.entries(POS4).map(([label, color]) => ({ label, color })))}<p class="small muted">Draftable range only: your rookie draft has ${d.draftable} picks. Tiers break where value drops off sharply.</p>`, { span: 4 })}
-    ${card(posF ? `${posF} rankings` : 'Big board', `<div class="scroll"><table id="bb">
-      <thead><tr><th class="num" data-sort>#</th><th data-sort>Prospect</th><th data-sort>College</th><th class="num" data-sort>Age</th><th class="num">Size</th><th data-sort>Tier</th><th class="num" data-sort>KTC</th><th class="num" data-sort title="FantasyPros overall rank among all players">FP ECR</th><th class="num" data-sort>Score</th></tr></thead>
-      <tbody>${rows.map((r) => `<tr><td class="rank num" data-v="${r.rank}">${r.rank}</td>
+    ${d.board.some((r) => r.adjRank) ? `<section class="span-12 row" style="justify-content:space-between"><div class="seg" id="rk-vals"><button data-v="" class="${adjMode ? '' : 'on'}">Market ranking</button><button data-v="adj" class="${adjMode ? 'on' : ''}">League-adjusted</button></div>
+      <span class="small muted">${adjMode ? 'Re-ranked for this league: values shifted by replacement level at each position (fewer QBs start here, more TEs). "Market #" shows the original rank.' : 'Switch to League-adjusted to re-rank for this league\'s lineup and size.'}</span></section>` : ''}
+    ${card(posF ? `${posF} rankings` : adjMode ? 'Big board: league-adjusted' : 'Big board', `<div class="scroll"><table id="bb">
+      <thead><tr><th class="num" data-sort>#</th>${adjMode ? '<th class="num" data-sort>Market #</th>' : ''}<th data-sort>Prospect</th><th data-sort>College</th><th class="num" data-sort>Age</th><th class="num">Size</th><th data-sort>Tier</th><th class="num" data-sort>KTC</th><th class="num" data-sort title="FantasyPros overall rank among all players">FP ECR</th><th class="num" data-sort>Score</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><td class="rank num" data-v="${adjMode ? r.adjRank : r.rank}">${adjMode ? r.adjRank : r.rank}</td>${adjMode ? `<td class="num small" data-v="${r.rank}">#${r.rank} ${r.rank > r.adjRank ? `<span class="up">▲${r.rank - r.adjRank}</span>` : r.rank < r.adjRank ? `<span class="down">▼${r.adjRank - r.rank}</span>` : ''}</td>` : ''}
         <td><a href="#/rookie/${esc(r.slug)}"><b>${esc(r.name)}</b></a><br><small>${posTag(r.pos)} <span class="muted">${r.pos}${r.posRank}</span></small></td>
         <td>${esc(r.college || '—')}</td><td class="num">${fmt(r.age)}</td><td class="num small">${height(r.height)}${r.weight ? ` · ${r.weight}` : ''}</td><td>${tierChip(r.tier)}</td>
         <td class="num" data-v="${r.sources.KTC?.value ?? -1}">${r.sources.KTC ? `${r.sources.KTC.value.toLocaleString()} <span class="muted small">#${r.sources.KTC.rank}</span>` : '—'}</td>
         <td class="num" data-v="${r.sources.DP?.ecr ?? 9999}">${r.sources.DP?.ecr ? Math.round(r.sources.DP.ecr) : '—'}</td>
-        <td class="num" data-v="${r.score}"><span style="display:inline-block;width:60px;height:8px;border-radius:4px;background:var(--surface-2);vertical-align:middle;margin-right:6px;overflow:hidden"><span style="display:block;height:100%;width:${r.score}%;background:${POS4[r.pos]}"></span></span>${fmt(r.score, 0)}</td></tr>`).join('')}</tbody></table></div>
+        <td class="num" data-v="${adjMode ? r.adjScore : r.score}"><span style="display:inline-block;width:60px;height:8px;border-radius:4px;background:var(--surface-2);vertical-align:middle;margin-right:6px;overflow:hidden"><span style="display:block;height:100%;width:${adjMode ? r.adjScore : r.score}%;background:${POS4[r.pos]}"></span></span>${fmt(adjMode ? r.adjScore : r.score, 0)}</td></tr>`).join('')}</tbody></table></div>
       <p class="small muted">Score = each source's value scaled to its #1 rookie (=100), averaged. FP ECR = FantasyPros overall rank via DynastyProcess.</p>`, { span: 12 })}
   </div>`;
   sortableTable(document.getElementById('bb'));
+  el.querySelectorAll('#rk-vals button').forEach((b) => b.addEventListener('click', () => {
+    const q2 = new URLSearchParams(routeQuery); if (b.dataset.v) q2.set('values', 'adj'); else q2.delete('values'); location.hash = `#/rookies?${q2}`;
+  }));
   const top = d.board.slice(0, 36);
   columns(document.getElementById('c-curve'), { data: top.map((r) => ({ x: r.rank, y: r.score, color: POS4[r.pos], r })), height: 220, yFmt: (v) => fmt(v, 0), breaks,
     tipFn: (x) => `<b>#${x.r.rank} ${esc(x.r.name)}</b>${x.r.pos}${x.r.posRank} · ${esc(x.r.college || '')} · ${esc(x.r.tier)}<br>Score ${fmt(x.r.score, 0)}` });
@@ -707,7 +745,7 @@ function assetLine(x) {
   const avg = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   const tip = Object.entries(x.values).map(([k2, n]) => `${k2}: ${n == null ? '—' : Math.round(n).toLocaleString()}`).join('\n');
   return `<li>${x.kind === 'pick' ? '<span class="pos" style="--pc:var(--pick)">PICK</span>' : posTag(x.pos)}
-    ${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>${x.age ? ` <span class="muted">${x.age}</span>` : ''}` : esc(x.label)}
+    ${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>${x.age ? ` <span class="muted">${x.age}</span>` : ''}` : `${esc(x.label)}${linkedNote(x.linked)}`}
     <span class="muted num" style="margin-left:auto" title="${esc(tip)}">${x.used ? 'used' : avg == null ? '—' : k(avg)}</span></li>`;
 }
 function tradeCard(t) {
@@ -716,7 +754,8 @@ function tradeCard(t) {
       <span class="chip ${t.winner ? 'warn' : 'good'}">${esc(t.verdict)}</span></div>
     <div class="sides">${t.sides.map((s) => `<div class="tside ${t.winner === s.team ? "won" : ""}">
       <div class="row"><span class="who">${teamAv({ name: s.team, avatar: s.avatar }, 'sm')}<span class="t"><span><b>${esc(s.team)}</b></span><small>${s.contender ? 'Contender' : 'Building'} · ${ordinal(s.recordRank)} in standings</small></span></span>
-        <span class="${gradeCls(s.grade)}" title="Score ${s.score}">${esc(s.grade)}</span></div>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:4px"><span class="${gradeCls(s.grade)}" title="Market grade · score ${s.score}">${esc(s.grade)}</span>
+          ${s.adjusted ? `<span class="small muted" title="League-adjusted grade: replacement level for this league + consolidation discount (edge ${s.adjusted.edge > 0 ? '+' : ''}${s.adjusted.edge}%)">Adj <b>${esc(s.adjusted.grade)}</b></span>` : ''}</span></div>
       <div class="small muted" style="margin-top:8px">Receives</div>
       <ul class="gets">${s.received.map(assetLine).join('') || '<li class="muted">FAAB only</li>'}${s.faabIn ? `<li>💵 $${s.faabIn} FAAB</li>` : ''}</ul>
       <div class="small muted" style="margin-top:6px">Sends: ${s.sent.map((x) => esc(x.label)).join(', ') || '—'}${s.faabOut ? `${s.sent.length ? ', ' : ''}$${s.faabOut} FAAB` : ''}</div>
@@ -738,13 +777,15 @@ async function viewGrades($) {
   const me = session.teamName;
   const list = d.trades.filter((t) => !mineOnly || t.sides.some((s) => s.team === me));
   const tally = {};
-  for (const t of d.trades) for (const s of t.sides) (tally[s.team] ||= []).push(s.score);
-  const gpa = Object.entries(tally).map(([team, xs]) => ({ team, n: xs.length, avg: xs.reduce((a, b) => a + b, 0) / xs.length })).sort((a, b) => b.avg - a.avg);
-  $.innerHTML = `${head('Trade Grades', `Report cards for all ${d.trades.length} league trades this year, newest first. Each team's grade blends value (the median edge across ${d.sources.filter((s) => s.ok && s.short !== 'Model').map((s) => s.short).join(', ')}), the change in its best lineup now, and whether the deal fits a contender or a rebuild. Grades use <b>today's</b> values (hindsight), so they update as players rise and fall; used draft picks count as the player they became.`,
+  const adjTally = {};
+  for (const t of d.trades) for (const s of t.sides) { (tally[s.team] ||= []).push(s.score); (adjTally[s.team] ||= []).push(s.adjusted?.score ?? s.score); }
+  const avgOf = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const gpa = Object.entries(tally).map(([team, xs]) => ({ team, n: xs.length, avg: avgOf(xs), adj: avgOf(adjTally[team]) })).sort((a, b) => b.avg - a.avg);
+  $.innerHTML = `${head('Trade Grades', `Report cards for all ${d.trades.length} league trades this year, newest first. Each team's grade blends value (the median edge across ${d.sources.filter((s) => s.ok && s.short !== 'Model').map((s) => s.short).join(', ')}), the change in its best lineup now, and whether the deal fits a contender or a rebuild. "Adj" is a second grade from league-adjusted values (re-priced for this league's lineup and depth, extra pieces discounted). Grades use <b>today's</b> values (hindsight), so they update as players rise and fall; used draft picks count as the player they became.`,
     `<div class="seg"><button data-mine="0" class="${mineOnly ? '' : 'on'}">All trades</button><button data-mine="1" class="${mineOnly ? 'on' : ''}">My trades</button></div>`)}
   <div class="grid">
     <section class="span-8">${list.map(tradeCard).join('') || '<div class="card"><p class="muted">No trades yet.</p></div>'}</section>
-    <aside class="span-4">${card('Trader report card', `<p class="small muted">Average trade grade per team this year.</p>${gpa.map((g) => `<div class="li row" style="justify-content:space-between"><span>${g.team === me ? '<b>' : ''}${esc(g.team)}${g.team === me ? '</b>' : ''} <span class="muted small">${g.n} trade${g.n === 1 ? '' : 's'}</span></span><span class="${gradeCls(gradeFromScore(g.avg))} sm">${gradeFromScore(g.avg)}</span></div>`).join('')}`, { span: 12 })}</aside>
+    <aside class="span-4">${card('Trader report card', `<p class="small muted">Average trade grade per team this year.</p>${gpa.map((g) => `<div class="li row" style="justify-content:space-between"><span>${g.team === me ? '<b>' : ''}${esc(g.team)}${g.team === me ? '</b>' : ''} <span class="muted small">${g.n} trade${g.n === 1 ? '' : 's'}</span></span><span class="row" style="gap:6px"><span class="${gradeCls(gradeFromScore(g.avg))} sm" title="Market">${gradeFromScore(g.avg)}</span><span class="small muted" title="League-adjusted">Adj ${gradeFromScore(g.adj)}</span></span></div>`).join('')}`, { span: 12 })}</aside>
   </div>`;
   $.querySelectorAll('[data-mine]').forEach((b) => b.onclick = () => { location.hash = `#/grades${b.dataset.mine === '1' ? '?mine=1' : ''}`; });
 }

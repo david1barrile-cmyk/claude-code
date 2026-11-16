@@ -91,6 +91,18 @@ Scoring always uses **your league's `scoring_settings`**, so PPR, TE premium,
 - **Player pages**: an auto-written scouting report (outlook, strengths, concerns), usage profile, weekly chart, game log, matching news and highlights.
 - **News & Highlights**: RSS from ESPN, CBS, Yahoo, PFT and RotoBaller, plus YouTube channel feeds. Edit the lists in `config.js`.
 
+## League-adjusted values (an extra layer)
+
+Trade-value sites assume a typical 12-team league. Next to the market numbers (never instead of them), the site shows a **league-adjusted** layer:
+
+- **Replacement level:** count how many players at each position actually start in this league (every team's best lineup, flex and superflex included) vs. a typical 12-team league, and shift every player at the position by the value gap between the two replacement-level players. In an 8-team superflex league with two TE slots, QBs shift down and TEs up. KTC and DynastyProcess are shifted; FantasyCalc is already asked for the league's size and used as-is; the layer is the median of the three.
+- **Consolidation:** in trades, pieces beyond the number the other side sends count at a discount that scales with league size (60% at 8 teams, none at 12+).
+- **Where it shows:** Trade Analyzer (separate "League-adjusted view" panel and column), Trade Grades ("Adj" grade beside each grade), Power Rankings dynasty sections (Market / League-adjusted toggle with a "how it works" table) and the rookie board (toggle).
+
+**Next year's picks are linked to prospects** (adjusted layer only): each pick's chance of landing in each slot comes from the season simulation (draft order = reverse regular-season standings), each slot is matched to the prospect at that overall pick on the league-adjusted rookie board, and the expected value is blended with KTC's market value for the pick (50/50 until the NFL Draft, 90/10 after). Pick rows show the likely outcome, e.g. "→ 1.01 Jeremiah Smith (85%)".
+
+Draft picks are valued by **overall pick number** for every source (an 8-team 2.05 is overall pick 13, priced like a 12-team 2.01); FantasyCalc is asked for the league's size directly.
+
 ## Data sources and caveats
 
 - Trade values come from [FantasyCalc](https://fantasycalc.com) (redraft or dynasty, 1QB or superflex, PPR, team count, all matched to your league). If FantasyCalc is unreachable, values are derived from production instead.
@@ -121,6 +133,8 @@ lib/picks.js     pick ownership, projected draft order, pick valuation
 lib/rookies.js   rookie board, scouting reports, college stats, mock draft
 lib/gazette.js   weekly facts + built-in satirical writer
 lib/gazette-ai.js optional Claude writer (structured output, refusal fallback)
+lib/leagueadjust.js league-adjusted layer (replacement level, consolidation)
+lib/picklink.js  next-draft picks valued by the prospects they're likely to become
 lib/odds.js      season simulation (playoff odds, projected finish)
 lib/health.js    per-source request log for the status page
 lib/tradegrades.js trade report cards (value, lineup impact, fit, results)
