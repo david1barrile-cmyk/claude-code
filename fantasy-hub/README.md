@@ -99,6 +99,8 @@ Trade-value sites assume a typical 12-team league. Next to the market numbers (n
 - **Consolidation:** in trades, pieces beyond the number the other side sends count at a discount that scales with league size (60% at 8 teams, none at 12+).
 - **Where it shows:** Trade Analyzer (separate "League-adjusted view" panel and column), Trade Grades ("Adj" grade beside each grade), Power Rankings dynasty sections (Market / League-adjusted toggle with a "how it works" table) and the rookie board (toggle).
 
+**Next year's picks are linked to prospects** (adjusted layer only): each pick's chance of landing in each slot comes from the season simulation (draft order = reverse regular-season standings), each slot is matched to the prospect at that overall pick on the league-adjusted rookie board, and the expected value is blended with KTC's market value for the pick (50/50 until the NFL Draft, 90/10 after). Pick rows show the likely outcome, e.g. "→ 1.01 Jeremiah Smith (85%)".
+
 Draft picks are valued by **overall pick number** for every source (an 8-team 2.05 is overall pick 13, priced like a 12-team 2.01); FantasyCalc is asked for the league's size directly.
 
 ## Data sources and caveats
@@ -132,6 +134,7 @@ lib/rookies.js   rookie board, scouting reports, college stats, mock draft
 lib/gazette.js   weekly facts + built-in satirical writer
 lib/gazette-ai.js optional Claude writer (structured output, refusal fallback)
 lib/leagueadjust.js league-adjusted layer (replacement level, consolidation)
+lib/picklink.js  next-draft picks valued by the prospects they're likely to become
 lib/odds.js      season simulation (playoff odds, projected finish)
 lib/health.js    per-source request log for the status page
 lib/tradegrades.js trade report cards (value, lineup impact, fit, results)

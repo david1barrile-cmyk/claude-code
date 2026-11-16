@@ -20,6 +20,7 @@ import { makeAiWriter } from './lib/gazette-ai.js';
 import { gradeLeagueTrades } from './lib/tradegrades.js';
 import { requestStats } from './lib/health.js';
 import { getOdds } from './lib/odds.js';
+import { hubWithPickLinks, getPickLinks } from './lib/picklink.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -319,8 +320,10 @@ const routes = [
     const ctx = await getLeagueContext(id);
     const hub = await getValueHub(ctx);
     const adjValues = Object.fromEntries(Object.entries(hub._raw.adjusted.players).map(([pid, x]) => [pid, x.value]));
+    const links = await getPickLinks(ctx).catch(() => null);
+    const pickOverride = links ? Object.fromEntries(Object.entries(links.picks).map(([k, v]) => [k, v.value])) : null;
     const [cur, dynasty, dynastyAdj, odds] = await Promise.all([currentSeasonSummary(ctx), getDynastyRankings(ctx),
-      getDynastyRankings(ctx, { altValues: adjValues, key: 'adjusted' }), getOdds(ctx).catch((err) => { console.warn('[odds]', err.message); return null; })]);
+      getDynastyRankings(ctx, { altValues: adjValues, pickOverride, key: 'adjusted' }), getOdds(ctx).catch((err) => { console.warn('[odds]', err.message); return null; })]);
     return { season: seasonPower(ctx, cur), dynasty, dynastyAdj, adjust: hub.adjust, odds, draftSeason: Number(ctx.league.season) + 1 };
   }],
 
@@ -341,13 +344,13 @@ const routes = [
 
   ['GET', /^\/api\/league\/(\d+)\/values$/, async ([id]) => {
     const ctx = await getLeagueContext(id);
-    const { _raw, ...hub } = await getValueHub(ctx);
+    const { _raw, ...hub } = await hubWithPickLinks(ctx);
     return hub;
   }],
 
   ['POST', /^\/api\/league\/(\d+)\/analyze$/, async ([id], _q, body) => {
     const ctx = await getLeagueContext(id);
-    const hub = await getValueHub(ctx);
+    const hub = await hubWithPickLinks(ctx);
     const a = body.a || {}, b = body.b || {};
     const ids = (side) => [...(side.players || []), ...(side.picks || [])].map(String).slice(0, 30);
     const result = compareSides(hub, ids(a), ids(b));

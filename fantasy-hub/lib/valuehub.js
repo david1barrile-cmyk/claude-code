@@ -142,6 +142,6 @@ export function compareSides(hub, sideA, sideB) {
     adjusted: adjustedResult,
     perSource, consensus, verdict, sourcesAgree: agree,
     bestAsset: all[0] ? { label: all[0].label, side: all[0].side } : null,
-    assets: all.map((x) => ({ id: x.id ?? x.key, label: x.label, kind: x.kind, pos: x.pos ?? 'PICK', side: x.side, values: x.values })),
+    assets: all.map((x) => ({ id: x.id ?? x.key, label: x.label, kind: x.kind, pos: x.pos ?? 'PICK', side: x.side, values: x.values, linked: x.linked ?? null })),
   };
 }

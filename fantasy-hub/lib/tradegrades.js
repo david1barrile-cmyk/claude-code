@@ -13,6 +13,7 @@ import { getValueHub } from './valuehub.js';
 import { marketPickValue, draftSeason, tierForSlot, projectedOrder } from './picks.js';
 import { bestLineup, lineupInfo } from './lineup.js';
 import { consolidatedTotal } from './leagueadjust.js';
+import { getPickLinks } from './picklink.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -58,7 +59,7 @@ async function allTrades(ctx) {
 
 export function gradeLeagueTrades(ctx) {
   return cached(`tgrades:${ctx.league.league_id}`, 30 * 60e3, async () => {
-    const [trades, hub, usedPicks] = await Promise.all([allTrades(ctx), getValueHub(ctx), draftedPicks(ctx)]);
+    const [trades, hub, usedPicks, links] = await Promise.all([allTrades(ctx), getValueHub(ctx), draftedPicks(ctx), getPickLinks(ctx).catch(() => null)]);
     const { ktc, fc, dp, model, adjusted } = hub._raw;
     const med = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return !v.length ? null : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
     const sources = [ktc, fc, dp, model].filter((s) => s.ok);
@@ -94,7 +95,8 @@ export function gradeLeagueTrades(ctx) {
       const label = `${season} ${slot ? `${round}.${String(slot).padStart(2, '0')}` : `Round ${round}`}${orig !== dp_.owner_id ? ` (${name(orig)})` : ''}`;
       const values = Object.fromEntries(sources.map((s) => [s.short, used ? null
         : s.short === 'Model' ? s.pickFn(pk) : marketPickValue(s.picks, pk, n, s.short === 'FC' ? n : 12)]));
-      return { kind: 'pick', id: pk.key, label, pos: 'PICK', used, values, adj: used ? null : med([values.KTC, values.FC, values.DP]) };
+      const link = links?.picks[pk.key];
+      return { kind: 'pick', id: pk.key, label, pos: 'PICK', used, values, adj: used ? null : link ? link.value : med([values.KTC, values.FC, values.DP]), linked: link ?? null };
     };
 
     return trades.map((t) => {

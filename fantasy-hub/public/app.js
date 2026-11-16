@@ -281,7 +281,8 @@ async function viewPower($) {
       ${['QB', 'RB', 'WR', 'TE'].map((p) => { const k2 = d.adjust.shifts.KTC?.[p], dp2 = d.adjust.shifts.DP?.[p]; const sh = k2?.shift ?? 0;
         return `<tr><td>${posTag(p)}</td><td class="num">${d.adjust.demandLeague[p]}</td><td class="num">${d.adjust.demandStd[p]}</td><td class="num ${sh > 0 ? 'down' : sh < 0 ? 'up' : ''}">${sh > 0 ? '−' : '+'}${Math.abs(sh).toLocaleString()}</td><td class="num">${dp2 ? `${dp2.shift > 0 ? '−' : '+'}${Math.abs(dp2.shift).toLocaleString()}` : '—'}</td>
           <td class="small">${sh > 300 ? 'Easier to replace here: worth less' : sh < -150 ? 'Harder to replace here: worth more' : 'About the same'}</td></tr>`; }).join('')}</tbody></table></div>
-      <p class="small muted">Trades also discount extra pieces: anything beyond the number of assets the other side sends counts at ${Math.round(d.adjust.depthDiscount * 100)}%, because ${[8, 11, 18].includes(d.adjust.teams) ? 'an' : 'a'} ${d.adjust.teams}-team waiver wire is deep. Picks are valued by overall pick number (your 2.05 is overall pick ${(2 - 1) * d.adjust.teams + 5}).</p>`, { span: 12 }) : ''}
+      <p class="small muted">Trades also discount extra pieces: anything beyond the number of assets the other side sends counts at ${Math.round(d.adjust.depthDiscount * 100)}%, because ${[8, 11, 18].includes(d.adjust.teams) ? 'an' : 'a'} ${d.adjust.teams}-team waiver wire is deep. Picks are valued by overall pick number (your 2.05 is overall pick ${(2 - 1) * d.adjust.teams + 5}).</p>
+      <p class="small muted"><b>Next year's picks are tied to prospects.</b> Each pick's chance of landing in each slot comes from the season simulation (draft order = reverse regular-season standings), and each slot is matched to the prospect the rookie board has there. The expected value is blended with the market pick value: 50/50 until the NFL Draft, 90/10 after, because rankings and landing spots still move.</p>`, { span: 12 }) : ''}
     ${card('Dynasty value by position', `<div class="row" style="justify-content:space-between;margin-bottom:6px">${legend(Object.entries(POS_COLORS).map(([label, color]) => ({ label, color })))}
       <div class="seg" id="yr">${[0, 1, 2, 3].map((y) => `<button data-y="${y}" class="${y ? '' : 'on'}">${yearLbl(y)}</button>`).join('')}</div></div><div id="c-dyn"></div>`, { span: 12 })}
     ${card('Dynasty outlook', `<div class="scroll"><table id="dyn-t">
@@ -507,6 +508,13 @@ async function viewTrades($) {
 }
 
 // ---------- trade analyzer ----------
+// "→ 1.01 Jeremiah Smith (85%)" for picks linked to likely prospects, with all outcomes on hover.
+const linkedNote = (l) => {
+  if (!l?.outcomes?.length) return '';
+  const top = l.outcomes[0];
+  const tip = `Likely outcomes:\n${l.outcomes.slice(0, 5).map((o) => `${o.label} ${o.prospect.name} (${o.prospect.pos}): ${o.prob}%`).join('\n')}\n\nProspect-linked ${l.linked.toLocaleString()}${l.market != null ? `, market ${l.market.toLocaleString()}` : ''} → league-adjusted ${l.value.toLocaleString()} (${Math.round(l.weight * 100)}% prospect-linked)`;
+  return ` <span class="small muted" title="${esc(tip)}">→ ${esc(top.label)} ${esc(top.prospect.name)} (${top.prob}%)</span>`;
+};
 const shiftTxt = (adj, pos) => {
   const sh = adj?.shifts?.KTC?.[pos];
   if (!sh) return 'n/a';
@@ -553,7 +561,7 @@ async function viewAnalyzer($) {
         <input data-filter="${k}" placeholder="Search players or picks…" value="${esc(state.filter[k])}" style="flex:1;min-width:140px"></div>
       <div class="row" style="margin:10px 0;min-height:28px">${chosen.map((x) => `<span class="chip" style="gap:6px">${x.kind === 'pick' ? '🎟' : posTag(x.pos)} ${esc(x.name)} <button class="link" data-rm="${k}" data-id="${esc(x.id)}" aria-label="Remove">✕</button></span>`).join('') || '<span class="muted small">Nothing selected</span>'}</div>
       <div style="max-height:360px;overflow:auto;border-top:1px solid var(--border)">${list.map((x) => `<label class="pick"><input type="checkbox" data-side="${k}" value="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}>
-        ${x.kind === 'pick' ? `<span class="pos" data-p="PICK" style="--pc:var(--pick)">PICK</span> <span>${esc(x.name)}</span>` : `${posTag(x.pos)} <span>${esc(x.name)}</span> <span class="muted small">${esc(x.team || '')}${x.age ? ` · ${x.age}` : ''}</span>`}
+        ${x.kind === 'pick' ? `<span class="pos" data-p="PICK" style="--pc:var(--pick)">PICK</span> <span>${esc(x.name)}${linkedNote(x.linked)}</span>` : `${posTag(x.pos)} <span>${esc(x.name)}</span> <span class="muted small">${esc(x.team || '')}${x.age ? ` · ${x.age}` : ''}</span>`}
         <span class="small num" style="margin-left:auto;white-space:nowrap" title="${esc(okSrc.map((s) => `${SRC_LABEL[s]}: ${x.values[s] == null ? '—' : Math.round(x.values[s]).toLocaleString()}`).join('\n'))}"><b>${k2(consensusVal(x.values, okSrc))}</b> <span class="muted">avg</span></span></label>`).join('')}</div>
       <p class="small muted" style="margin:8px 0 0">Value shown is the average across sources; hover for each site's number.</p>`;
     el.querySelector('select').onchange = (e) => { if (k === 'A') state.a = Number(e.target.value); else state.b = Number(e.target.value); state[k].clear(); renderAll(); };
@@ -589,7 +597,7 @@ async function viewAnalyzer($) {
         <div class="row" style="justify-content:space-between"><b>League-adjusted view</b><span class="small muted">extra layer, not part of the verdict above</span></div>
         <div class="row" style="margin-top:6px"><b>${esc(r.adjusted.verdict.replace('side A', nA).replace('side B', nB))}</b><span class="small ${Math.abs(r.adjusted.edgeA) <= 5 ? '' : r.adjusted.edgeA > 0 ? 'up' : 'down'}">${who(r.adjusted.edgeA)}</span></div>
         <div style="margin-top:6px">${edgeBar(r.adjusted.edgeA)}</div>
-        <p class="small muted" style="margin:6px 0 0">Market values re-priced for this league's lineup and ${hub.adjust?.teams ?? ''}-team depth: QB ${shiftTxt(hub.adjust, 'QB')}, TE ${shiftTxt(hub.adjust, 'TE')}.${r.adjusted.consolidation ? ` ${esc(r.adjusted.consolidation)}` : ''} <a href="#/power?values=adj">How it works →</a></p></div>` : ''}
+        <p class="small muted" style="margin:6px 0 0">Market values re-priced for this league's lineup and ${hub.adjust?.teams ?? ''}-team depth: QB ${shiftTxt(hub.adjust, 'QB')}, TE ${shiftTxt(hub.adjust, 'TE')}.${r.adjusted.consolidation ? ` ${esc(r.adjusted.consolidation)}` : ''}${r.assets.some((x) => x.linked) ? ` ${hub.pickLinks?.season ?? ''} picks are valued by the prospects they're likely to become (${Math.round((hub.pickLinks?.weight ?? 0.5) * 100)}% prospect-linked, the rest market).` : ''} <a href="#/power?values=adj">How it works →</a></p></div>` : ''}
       <h3>By source</h3><div class="scroll"><table><thead><tr><th>Source</th><th class="hide-sm">Format</th><th class="num">${esc(nA)} sends</th><th class="num">${esc(nB)} sends</th><th>Edge</th><th></th></tr></thead><tbody>
         ${r.perSource.map((p) => `<tr><td><b>${esc(p.name)}</b></td><td class="muted small hide-sm">${esc(p.format || '')}</td><td class="num">${p.sendA.toLocaleString()}</td><td class="num">${p.sendB.toLocaleString()}</td>
           <td>${edgeBar(p.edgeA)}</td><td class="small ${Math.abs(p.edgeA) <= 5 ? '' : p.edgeA > 0 ? 'up' : 'down'}">${who(p.edgeA)}${p.missing.length ? ` <span class="muted" title="${esc(p.missing.join(', '))}">· ${p.missing.length} unvalued</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
@@ -597,7 +605,7 @@ async function viewAnalyzer($) {
         <div class="kpi"><b class="${trendCls(r.lineup.you.delta)}">${sign(r.lineup.you.delta)}</b><span>${esc(nA)} pts/wk</span></div>
         <div class="kpi"><b class="${trendCls(r.lineup.them.delta)}">${sign(r.lineup.them.delta)}</b><span>${esc(nB)} pts/wk</span></div></div>` : ''}
       <h3>Assets in this deal</h3><div class="scroll"><table><thead><tr><th>Asset</th><th>Goes to</th>${okSrc.map((s) => `<th class="num">${s}</th>`).join('')}${hasAdj ? '<th class="num" title="League-adjusted layer">League-adj</th>' : ''}</tr></thead><tbody>
-        ${r.assets.map((x) => `<tr><td>${x.kind === 'pick' ? '🎟 ' : `${posTag(x.pos)} `}${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>` : esc(x.label)}</td><td>${esc(x.side === 'A' ? nB : nA)}</td>
+        ${r.assets.map((x) => `<tr><td>${x.kind === 'pick' ? '🎟 ' : `${posTag(x.pos)} `}${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>` : `${esc(x.label)}${linkedNote(x.linked)}`}</td><td>${esc(x.side === 'A' ? nB : nA)}</td>
           ${okSrc.map((s) => `<td class="num">${x.values[s] == null ? '—' : x.values[s].toLocaleString()}</td>`).join('')}${hasAdj ? `<td class="num muted">${x.values.Adj == null ? '—' : x.values.Adj.toLocaleString()}</td>` : ''}</tr>`).join('')}</tbody></table></div>
       <p class="small muted">Each source uses its own scale, so compare edges, not raw numbers. DynastyProcess prices picks much lower than KTC, so pick-heavy deals often split the sources. Picks are valued at their projected slot (current standings) for next year's draft and at "mid" for later years.</p>`;
   }
@@ -737,7 +745,7 @@ function assetLine(x) {
   const avg = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   const tip = Object.entries(x.values).map(([k2, n]) => `${k2}: ${n == null ? '—' : Math.round(n).toLocaleString()}`).join('\n');
   return `<li>${x.kind === 'pick' ? '<span class="pos" style="--pc:var(--pick)">PICK</span>' : posTag(x.pos)}
-    ${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>${x.age ? ` <span class="muted">${x.age}</span>` : ''}` : esc(x.label)}
+    ${x.kind === 'player' ? `<a href="#/player/${esc(x.id)}">${esc(x.label)}</a>${x.age ? ` <span class="muted">${x.age}</span>` : ''}` : `${esc(x.label)}${linkedNote(x.linked)}`}
     <span class="muted num" style="margin-left:auto" title="${esc(tip)}">${x.used ? 'used' : avg == null ? '—' : k(avg)}</span></li>`;
 }
 function tradeCard(t) {

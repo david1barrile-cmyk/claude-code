@@ -52,7 +52,7 @@ async function dynastyValues(league) {
  * @param {object} [opts.altValues] player id -> value; replaces FantasyCalc player values
  *   (used for the league-adjusted view). Picks keep their market values.
  */
-export function getDynastyRankings(ctx, { altValues = null, key = 'market' } = {}) {
+export function getDynastyRankings(ctx, { altValues = null, pickOverride = null, key = 'market' } = {}) {
   return cached(`dyn:${ctx.league.league_id}:${key}`, 30 * 60e3, async () => {
     const { league, players, teams } = ctx;
     const dv = await dynastyValues(league);
@@ -82,7 +82,8 @@ export function getDynastyRankings(ctx, { altValues = null, key = 'market' } = {
       if (k in owned) owned[k] = tp.owner_id;
     }
     // Future picks are discounted ~10%/yr for uncertainty when estimated.
-    const pickVal = (season, round) => (dv?.picks.length ? resolvePickValue(dv.picks, { season, round, slot: null, tier: 'mid' }, n) : null)
+    const pickVal = (season, round, orig) => pickOverride?.[`${season}:${round}:${orig}`]
+      ?? (dv?.picks.length ? resolvePickValue(dv.picks, { season, round, slot: null, tier: 'mid' }, n) : null)
       ?? Math.round(genericPick(round) * 0.9 ** (season - firstDraft));
 
     const out = teams.map((t) => {
@@ -90,7 +91,7 @@ export function getDynastyRankings(ctx, { altValues = null, key = 'market' } = {
         .filter((a) => a.value > 0 && ['QB', 'RB', 'WR', 'TE'].includes(a.pos));
       const picks = Object.entries(owned).filter(([, o]) => o === t.rosterId).map(([k]) => {
         const [season, round, orig] = k.split(':').map(Number);
-        return { season, round, from: orig === t.rosterId ? null : teams.find((x) => x.rosterId === orig)?.name ?? `Team ${orig}`, value: pickVal(season, round) };
+        return { season, round, from: orig === t.rosterId ? null : teams.find((x) => x.rosterId === orig)?.name ?? `Team ${orig}`, value: pickVal(season, round, orig) };
       });
       const byPos = { QB: 0, RB: 0, WR: 0, TE: 0, Picks: 0 };
       assets.forEach((a) => { byPos[a.pos] += a.value; });
