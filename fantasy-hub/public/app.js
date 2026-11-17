@@ -81,13 +81,14 @@ const ICONS = {
 const GROUPS = [
   { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['awards', 'Awards'], ['power', 'Power Rankings'], ['history', 'League History'], ['rivalry', 'Rivalries'], ['wrapped', 'Season Wrapped']] },
   { name: 'My Team', icon: 'team', items: [['team', 'My Team'], ['waivers', 'Waivers']] },
-  { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder']] },
+  { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['decks', 'Pitch Decks'], ['trades', 'Trade Finder']] },
   { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['drafts', 'Draft Grades'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
 ];
 ICONS.status = '<path d="M3 12h4l3-8 4 16 3-8h4"/>';
 ICONS.awards = '<circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/>';
 ICONS.rivalry = '<path d="M5 19 19 5M9 5H5v4M19 15v4h-4M15 9l4-4M5 19l4-4"/>';
 ICONS.wrapped = '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 11h18M12 7v14M12 7c-2-4-6-4-6-1s4 1 6 1c2 0 6 2 6-1s-4-3-6 1"/>';
+ICONS.decks = '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v4M8 20h8M7 12l3-3 2 2 4-4"/>';
 ICONS.drafts = '<path d="M4 4h16v16H4zM4 9h16M9 4v16"/>';
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
 
@@ -760,6 +761,7 @@ function tradeCard(t) {
       <div class="row"><span class="who">${teamAv({ name: s.team, avatar: s.avatar }, 'sm')}<span class="t"><span><b>${esc(s.team)}</b></span><small>${s.contender ? 'Contender' : 'Building'} · ${ordinal(s.recordRank)} in standings</small></span></span>
         <span style="display:flex;flex-direction:column;align-items:center;gap:4px"><span class="${gradeCls(s.grade)}" title="Market grade · score ${s.score}">${esc(s.grade)}</span>
           ${s.adjusted ? `<span class="small muted" title="League-adjusted grade: replacement level for this league + consolidation discount (edge ${s.adjusted.edge > 0 ? '+' : ''}${s.adjusted.edge}%)">Adj <b>${esc(s.adjusted.grade)}</b></span>` : ''}</span></div>
+      ${s.ownerId ? `<a class="small deck-link" href="#/deck/${esc(t.id)}?owner=${esc(s.ownerId)}">📊 ${esc(s.team)}'s pitch deck</a>` : ''}
       <div class="small muted" style="margin-top:8px">Receives</div>
       <ul class="gets">${s.received.map(assetLine).join('') || '<li class="muted">FAAB only</li>'}${s.faabIn ? `<li>💵 $${s.faabIn} FAAB</li>` : ''}</ul>
       <div class="small muted" style="margin-top:6px">Sends: ${s.sent.map((x) => esc(x.label)).join(', ') || '—'}${s.faabOut ? `${s.sent.length ? ', ' : ''}$${s.faabOut} FAAB` : ''}</div>
@@ -1089,6 +1091,180 @@ async function viewDrafts($) {
   $.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/drafts?draft=${encodeURIComponent(b.dataset.d)}`; }));
 }
 
+// ---------- pitch decks ----------
+async function viewDecks($) {
+  const d = await api(L('/decks'));
+  const bySeason = {};
+  for (const t of d.trades) (bySeason[t.season] ||= []).push(t);
+  const mine = (t) => t.sides.some((x) => x.ownerId === session.userId);
+  $.innerHTML = `${head('Pitch Decks', `Every trade in league history (${d.trades.length}) as an investor presentation, from either side: the deal, the assets, stats as of the trade, the strategic rationale, the chain of trades that funded it, and how the market sees it today. Open one, then present it full screen or save it as a PDF for the group chat.`)}
+  ${Object.keys(bySeason).sort((a, b) => b - a).map((season) => card(`${esc(season)} season`, `<div class="deck-list">${bySeason[season].map((t) => `<div class="deck-row ${mine(t) ? 'me' : ''}">
+      <div class="small muted">${t.offseason ? 'Offseason' : `Week ${t.week}`} · ${new Date(t.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+      <div class="deck-sides">${t.sides.map((x) => `<a class="deck-side" href="#/deck/${esc(t.id)}?owner=${esc(x.ownerId)}"><b>${esc(x.team)}</b><span class="small muted">gets ${esc(x.received.join(', ') || 'FAAB')}</span><span class="small deck-open">Open deck →</span></a>`).join('')}</div>
+    </div>`).join('')}</div>`, { span: 12, note: `${bySeason[season].length} trade${bySeason[season].length === 1 ? '' : 's'}` })).join('')}`;
+}
+
+const headshot = (id, cls = '') => `<img class="hs ${cls}" src="https://sleepercdn.com/content/nfl/players/${esc(id)}.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+const nflLogo = (t) => (t ? `<img class="logo" src="https://sleepercdn.com/images/team_logos/nfl/${esc(String(t).toLowerCase())}.png" alt="" onerror="this.remove()">` : '');
+const ordWord = (r) => ['', '1ST', '2ND', '3RD', '4TH', '5TH'][r] || `${r}TH`;
+
+function deckAsset(a, d, { dark = false, funded = false, small = false } = {}) {
+  if (a.kind === 'pick' && !a.became) {
+    const via = a.origOwner === d.presenter.ownerId ? `${esc(d.presenter.team)}'s own` : `via ${esc(a.origTeam)}`;
+    return `<div class="pk ${dark ? 'dark' : ''} ${funded ? 'funded' : ''} ${small ? 'sm' : ''}"><span class="yr">${esc(a.season)}</span><b>${ordWord(a.round)} ROUND</b><i>${a.slot && a.round ? `${a.round}.${String(a.slot).padStart(2, '0')} · ` : ''}${via}</i></div>`;
+  }
+  const id = a.became ? a.became.playerId : a.id, name = a.became ? a.became.name : a.name;
+  return `<div class="pl ${funded ? 'funded' : ''} ${small ? 'sm' : ''}" style="--tc:${esc(a.color || '#1b2a44')}">${nflLogo(a.nfl)}${headshot(id)}<div class="cap"><b>${esc(name)}</b><span>${a.became ? `${esc(a.season)} ${a.round}.${String(a.became.slot).padStart(2, '0')} pick` : `${esc(a.pos)}${a.nfl ? ` | ${esc(NFLshort(a))}` : ''}`}</span></div></div>`;
+}
+// Players as tall tiles, then picks stacked two to a column beside them.
+function stackTiles(xs, d, small) {
+  const isPick = (a) => a.kind === 'pick' && !a.became;
+  const pls = xs.filter((a) => !isPick(a)), pks = xs.filter(isPick);
+  const cols = [];
+  for (let i = 0; i < pks.length; i += 2) cols.push(`<div class="pkcol">${pks.slice(i, i + 2).map((a) => deckAsset(a, d, { small })).join('')}</div>`);
+  return pls.map((a) => deckAsset(a, d, { small })).join('') + cols.join('');
+}
+const NFLshort = (a) => String(a.nflName || a.nfl || '').split(' ').slice(0, -1).join(' ') || a.nfl;
+
+function deckSlides(d) {
+  const P = d.presenter, partners = d.partners.map((p) => p.team).join(' & ');
+  const foot = (n, note = '') => `<div class="foot"><span>${note || `${esc(P.team)} | Investor Presentation | ${esc(session.leagueName)} | ${esc(d.dateLabel)}`}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${n}</b></span></div>`;
+  const top = (eyebrow, title) => `<div class="eyebrow">${eyebrow}</div><h2>${esc(title)}</h2><hr>`;
+  const slides = [];
+  const tx = d.transaction;
+  const heroA = d.spotlights[0]?.asset;
+
+  // 1. Cover
+  slides.push(`<section class="slide s-cover">
+    <div class="cover-l">
+      <div class="brandrow">${teamAv({ name: P.team, avatar: P.avatar })}<div><b>${esc(P.team.toUpperCase())}</b><span>${esc(session.leagueName)}</span></div></div>
+      <h1>${esc(d.title)}</h1><div class="grn"></div>
+      <div class="sub">Investor Presentation &nbsp;|&nbsp; ${esc(d.dateLabel)}</div>
+      ${d.coverHeads.length ? `<div class="heads">${d.coverHeads.map((h) => `<div>${headshot(h.id)}</div>`).join('')}</div><div class="headnames">${d.coverHeads.map((h) => esc(h.name)).join(' &nbsp;|&nbsp; ')}</div>` : ''}
+    </div>
+    <div class="cover-r" style="--tc:${esc(heroA?.color || '#1b2a44')}">${heroA?.kind === 'player' ? `${nflLogo(heroA.nfl)}${headshot(heroA.id, 'big')}` : `<div class="bigpick">${heroA ? `${esc(heroA.season)}<b>${ordWord(heroA.round)}</b>ROUND` : ''}</div>`}</div>
+  </section>`);
+
+  // 2. Disclaimer
+  slides.push(`<section class="slide s-text">${top('DISCLAIMER', 'Forward-Looking Statements and Other Important Information')}
+    <ul class="disc">${d.disclaimers.map((x) => `<li><b>${esc(x.h)}</b> ${esc(x.t)}</li>`).join('')}</ul>${foot(2)}</section>`);
+
+  // 3. The transaction
+  const many = tx.received.length + tx.sent.length > 7;
+  slides.push(`<section class="slide s-text">${top('THE TRANSACTION', tx.headline)}
+    <div class="tx ${many ? 'many' : ''}">
+      <div class="tx-col send"><div class="lab">${esc(P.team.toUpperCase())} SENDS</div><div class="tiles">${tx.sent.map((a) => deckAsset(a, d, { dark: true, small: many })).join('') || '<div class="muted">Nothing but goodwill</div>'}${tx.faabOut ? `<div class="pk sm"><b>$${tx.faabOut}</b><i>FAAB</i></div>` : ''}</div></div>
+      <div class="arrow">➜</div>
+      <div class="tx-col"><div class="lab">${esc(P.team.toUpperCase())} RECEIVES${d.partners.length > 1 ? ` <span>(from ${esc(partners)})</span>` : ''}</div><div class="tiles">${stackTiles(tx.received, d, many)}${tx.faabIn ? `<div class="pk sm"><b>$${tx.faabIn}</b><i>FAAB</i></div>` : ''}</div></div>
+    </div>
+    <div class="txbar"><div class="cnt">${tx.sent.length} asset${tx.sent.length === 1 ? '' : 's'}</div><div class="cnt dark"><span>${tx.received.length} asset${tx.received.length === 1 ? '' : 's'}.</span><p>${esc(tx.tagline)}</p></div></div>
+    <div class="src">Source: Sleeper trade between ${esc(P.team)} and ${esc(partners)} (${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}). Headshots: Sleeper.</div>${foot(3)}</section>`);
+
+  // 4+. Spotlights
+  for (const sp of d.spotlights) {
+    const a = sp.asset;
+    const isPick = a.kind === 'pick';
+    slides.push(`<section class="slide s-spot">
+      <div class="spot-l" style="--tc:${esc(a.color || '#1b2a44')}">${isPick ? `<div class="bigpick">${esc(a.season)}<b>${ordWord(a.round)}</b>ROUND<i>${a.origOwner === P.ownerId ? `${esc(P.team)}'s own` : `via ${esc(a.origTeam)}`}</i></div>` : `${nflLogo(a.nfl)}${headshot(a.id, 'big')}`}</div>
+      <div class="spot-r">
+        <div class="who">${isPick ? '' : headshot(a.id, 'round')}<div><div class="eb">${esc(sp.eyebrow)}</div><h3>${esc(isPick ? a.label : a.name)}</h3><div class="meta">${isPick ? `${esc(a.season)} rookie draft` : `${esc(a.pos)} &nbsp;|&nbsp; ${esc(a.nflName)}${a.age ? ` &nbsp;|&nbsp; Age ${a.age}` : ''}${a.viaPick ? ` &nbsp;|&nbsp; via ${esc(a.viaPick.split(' → ')[0])}` : ''}`}</div></div></div>
+        <hr>
+        <div class="kpis3">${sp.stats.map((x) => `<div><b>${esc(x.big)}</b><span>${esc(x.label)}</span></div>`).join('')}</div>
+        <blockquote>${esc(sp.callout)}</blockquote>
+        <div class="foot dark"><span>${esc(sp.statsNote)}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${slides.length + 1}</b></span></div>
+      </div></section>`);
+  }
+
+  // Strategic rationale
+  const R = d.rationale;
+  const cell = (c, solid) => `<div class="tl-cell">${c.assets.length ? `<div class="tl-assets">${c.assets.slice(0, 4).map((a) => (a.kind === 'player' || a.became ? `<div class="tl-hs">${headshot(a.became ? a.became.playerId : a.id)}</div>` : deckAsset(a, d, { dark: !solid, small: true }))).join('')}${c.assets.length > 4 ? `<span class="more">+${c.assets.length - 4}</span>` : ''}</div>` : '<div class="tl-dot"></div>'}<div class="tl-note ${c.assets.length && solid ? 'b' : ''}">${esc(c.note)}</div></div>`;
+  slides.push(`<section class="slide s-text">${top('STRATEGIC RATIONALE', R.headline)}
+    <div class="tl" style="--cols:${R.cols.length}">
+      <div></div>${R.cols.map((c) => `<div class="tl-h">${esc(c)}</div>`).join('')}
+      <div class="tl-row"><b>Hold</b><span>Status quo</span></div><div class="tl-line dashed" style="grid-column:span ${R.cols.length}">${R.hold.map((c) => cell(c, false)).join('')}</div>
+      <div class="tl-row"><b>Execute the trade</b><span>Agreed with ${esc(partners)}</span></div><div class="tl-line" style="grid-column:span ${R.cols.length}">${R.execute.map((c) => cell(c, true)).join('')}</div>
+    </div>
+    <div class="banner"><b>${esc(R.banner.h)}</b><p>${esc(R.banner.t)}</p></div>${foot(slides.length + 1)}</section>`);
+
+  // Case study
+  if (d.caseStudy) {
+    const C = d.caseStudy;
+    slides.push(`<section class="slide s-text">${top('CASE STUDY | VALUE CREATION', C.headline)}
+      <div class="cs-lab">TRADE I &nbsp;|&nbsp; WITH ${esc(C.trade.partners.toUpperCase())} · ${new Date(C.trade.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()}</div>
+      <div class="cs-row"><div class="tiles">${C.trade.sent.map((a) => deckAsset(a, d, { dark: true, small: true })).join('')}</div><div class="arrow">➜</div><div class="tiles">${C.trade.received.map((a) => deckAsset(a, d, { funded: a.funded, small: true })).join('')}</div></div>
+      <div class="cs-link">${esc(C.fundedLabel)} ↓</div>
+      <div class="cs-lab">TRADE ${C.trades > 2 ? C.trades : 'II'} &nbsp;|&nbsp; THIS DEAL</div>
+      <div class="cs-row"><div class="tiles">${C.current.sent.map((a) => deckAsset(a, d, { dark: true, funded: a.funded, small: true })).join('')}</div><div class="arrow">➜</div><div class="tiles">${C.current.received.map((a) => deckAsset(a, d, { small: true })).join('')}</div></div>
+      <div class="src">Source: Sleeper trade records.${C.trades > 2 ? ` This deal is the end of a chain of ${C.trades} trades; the scoreboard counts all of them.` : ''}</div>${foot(slides.length + 1)}</section>`);
+  }
+
+  // Scoreboard
+  if (d.scoreboard) {
+    const B = d.scoreboard;
+    const o = B.original;
+    slides.push(`<section class="slide s-dark">
+      <div class="eyebrow">THE SCOREBOARD</div><h2>${esc(B.headline)}</h2><p class="lede">${esc(B.lede)}</p>
+      <div class="sb">
+        <div class="sb-o">${o.slice(0, 2).map((a) => deckAsset(a, d, { small: true })).join('')}${o.length > 2 ? `<span class="more">+${o.length - 2}</span>` : ''}</div>
+        <div class="sb-x"><span>➜</span><b>${esc(B.multiple)}</b></div>
+        <div class="sb-h">${[...B.holdings].sort((x, y) => (x.kind === 'pick' && !x.became) - (y.kind === 'pick' && !y.became)).map((a) => `<div class="${a.stillHeld === false ? 'gone' : ''}">${deckAsset(a, d, { small: true })}</div>`).join('')}</div>
+      </div>
+      <div class="sb-k"><div><b>${esc(B.counts.total)}</b><span>total assets</span></div><div><b>+${B.counts.players}</b><span>players</span></div><div><b>+${B.counts.firsts}</b><span>first-round picks</span></div><div><b>+${B.counts.otherPicks}</b><span>other picks</span></div></div>
+      <div class="src">${B.market.multiple != null ? `Multiple by asset count. By today's market value it is <b>${B.market.multiple}x</b> (${B.market.original.toLocaleString()} → ${B.market.holdings.toLocaleString()})${B.adjusted.multiple != null ? `; league-adjusted with the consolidation discount, <b>${B.adjusted.multiple}x</b>` : ''}. ` : ''}${esc(B.footnote)}</div>
+      ${foot(slides.length + 1)}</section>`);
+  }
+
+  // Analyst coverage
+  const Cv = d.coverage;
+  const verdictLine = Cv.edge >= 15 ? 'Analysts are unanimous. The counterparty has been asked to stop answering its phone.' : Cv.edge <= -15 ? 'Analysts have questions. Management has answers. They are not the same questions.' : 'Analysts call it fair. Both sides will say they won anyway.';
+  slides.push(`<section class="slide s-text">${top('ANALYST COVERAGE', `The market's view today: ${Cv.edge > 0 ? '+' : ''}${Cv.edge}% in value for ${P.team}`)}
+    <div class="cov">
+      <div>
+        <div class="grades">${Cv.grade ? `<div><span class="${gradeCls(Cv.grade)}">${esc(Cv.grade)}</span><b>${esc(P.team)}</b>${Cv.adjustedGrade ? `<span class="small">League-adjusted ${esc(Cv.adjustedGrade)}</span>` : ''}</div>` : ''}${Cv.partnerGrades.map((g) => `<div><span class="${gradeCls(g.grade)}">${esc(g.grade)}</span><b>${esc(g.team)}</b></div>`).join('')}</div>
+        <div class="vals"><div><span>Received, today's value</span><b>${Cv.received.toLocaleString()}</b></div><div><span>Sent, today's value</span><b>${Cv.sent.toLocaleString()}</b></div></div>
+        ${Cv.perSource.length ? `<div class="srcs">${Cv.perSource.map((x) => `<div><span>${esc(x.source)}</span><div class="bar"><i style="${x.edge >= 0 ? 'left:50%' : `right:50%`};width:${Math.min(50, Math.abs(x.edge) / 2)}%;background:${x.edge >= 0 ? '#2f7d57' : '#b3412f'}"></i></div><b>${x.edge > 0 ? '+' : ''}${x.edge}%</b></div>`).join('')}</div>` : ''}
+        ${Cv.sincePts && !d.offseason && (Cv.sincePts.acquired || Cv.sincePts.departed) ? `<p class="small">Since the deal: acquired players ${Cv.sincePts.acquired} pts, departed players ${Cv.sincePts.departed} pts.</p>` : ''}
+        <p class="small">Still on the roster: ${Cv.stillHeld.map((x) => `${esc(x.label)} ${x.held === false ? '✗' : '✓'}`).join(' · ')}</p>
+      </div>
+      <div>
+        <p class="vline">${esc(verdictLine)}</p>
+        ${Cv.management ? `<blockquote>${esc(Cv.management)}</blockquote>` : ''}${Cv.counterparty ? `<blockquote class="cp">${esc(Cv.counterparty)}</blockquote>` : ''}
+      </div>
+    </div>
+    <div class="src">Values: median of KeepTradeCut, FantasyCalc and DynastyProcess today${Cv.grade ? '. Grades from the Trade Grades page (value, lineup impact and fit).' : '.'} Quotes are satire, generated from each team's Gazette persona.</div>${foot(slides.length + 1)}</section>`);
+  return slides;
+}
+
+async function viewDeck($, tradeId) {
+  const owner = routeQuery.get('owner') || '';
+  const d = await api(L(`/deck/${encodeURIComponent(tradeId)}${owner ? `?owner=${encodeURIComponent(owner)}` : ''}`));
+  const slides = deckSlides(d);
+  $.innerHTML = `${head('Pitch Deck', `${esc(d.season)} · ${d.offseason ? 'Offseason' : `Week ${d.week}`} trade between ${d.sides.map((x) => esc(x.team)).join(', ')}. ${slides.length} slides, told from one side.`,
+    `<div class="row deck-bar"><div class="seg">${d.sides.map((x) => `<button data-o="${esc(x.ownerId)}" class="${x.ownerId === d.presenter.ownerId ? 'on' : ''}">${esc(x.team)}'s deck</button>`).join('')}</div>
+      <button id="dk-present" class="primary">▶ Present</button><button id="dk-print">Save as PDF</button><a class="chip" href="#/decks">All decks</a></div>`)}
+  <div class="deck" id="deck">${slides.join('')}<div class="deck-nav"><button data-n="-1">‹</button><span id="dk-n"></span><button data-n="1">›</button><button data-x>✕</button></div></div>`;
+  $.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/deck/${encodeURIComponent(tradeId)}?owner=${encodeURIComponent(b.dataset.o)}`; }));
+  const deck = document.getElementById('deck');
+  const all = [...deck.querySelectorAll('.slide')];
+  let cur = 0;
+  const show = (i) => { cur = Math.max(0, Math.min(all.length - 1, i)); all.forEach((s, j) => s.classList.toggle('on', j === cur)); document.getElementById('dk-n').textContent = `${cur + 1} / ${all.length}`; };
+  const stop = () => { deck.classList.remove('presenting'); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const keys = (e) => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+    else if (['ArrowLeft', 'PageUp'].includes(e.key)) show(cur - 1);
+    else if (e.key === 'Escape') stop();
+  };
+  document.getElementById('dk-present').onclick = () => {
+    deck.classList.add('presenting'); show(0); document.addEventListener('keydown', keys);
+    deck.requestFullscreen?.().catch(() => {});
+  };
+  deck.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) stop(); });
+  deck.querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => show(cur + Number(b.dataset.n))));
+  deck.querySelector('[data-x]').onclick = stop;
+  deck.addEventListener('click', (e) => { if (deck.classList.contains('presenting') && e.target.closest('.slide')) show(cur + 1); });
+  document.getElementById('dk-print').onclick = () => window.print();
+}
+
 // ---------- data status ----------
 async function viewStatus($) {
   const d = await api(`/status?league=${encodeURIComponent(session.leagueId)}`);
@@ -1109,7 +1285,7 @@ async function viewStatus($) {
 }
 
 // ---------- router ----------
-const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, awards: viewAwards, rivalry: viewRivalry, wrapped: viewWrapped, drafts: viewDrafts, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, awards: viewAwards, decks: viewDecks, deck: viewDeck, rivalry: viewRivalry, wrapped: viewWrapped, drafts: viewDrafts, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');
@@ -1117,7 +1293,7 @@ async function route() {
   routeQuery = new URLSearchParams(qs);
   if (siteConfig.leagueId && session && session.leagueId !== siteConfig.leagueId) { store.del('fh.session'); session = null; }
   if (!session?.leagueId || name === 'connect') return viewConnect();
-  const $ = renderShell(views[name] ? (name === 'rookie' ? 'rookies' : name) : '');
+  const $ = renderShell(views[name] ? (name === 'rookie' ? 'rookies' : name === 'deck' ? 'decks' : name) : '');
   try {
     await (views[name] || viewDashboard)($, arg ? decodeURIComponent(arg) : undefined);
   } catch (err) {

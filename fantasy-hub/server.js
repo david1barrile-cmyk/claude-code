@@ -26,6 +26,7 @@ import { getSeasonStats } from './lib/seasonstats.js';
 import { getRivalry } from './lib/rivalry.js';
 import { getDraftGrades } from './lib/draftgrades.js';
 import { getAwards } from './lib/awards.js';
+import { getDeckIndex, getDeck } from './lib/tradedecks.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -398,6 +399,12 @@ const routes = [
   ['GET', /^\/api\/league\/(\d+)\/wrapped$/, async ([id]) => getSeasonStats(await getLeagueContext(id))],
   ['GET', /^\/api\/league\/(\d+)\/awards$/, async ([id]) => getAwards(await getLeagueContext(id))],
   ['GET', /^\/api\/league\/(\d+)\/drafts$/, async ([id]) => getDraftGrades(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/decks$/, async ([id]) => getDeckIndex(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/deck\/([\w-]+)$/, async ([id, tid], q) => {
+    const deck = await getDeck(await getLeagueContext(id), tid, q.get('owner'));
+    if (!deck) throw new HttpError(404, 'Trade not found');
+    return deck;
+  }],
   ['GET', /^\/api\/league\/(\d+)\/rivalry$/, async ([id], q) => {
     const ctx = await getLeagueContext(id);
     const a = q.get('a'), b = q.get('b');

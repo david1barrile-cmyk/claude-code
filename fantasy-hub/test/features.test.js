@@ -67,3 +67,21 @@ test('drafts and awards respond', async () => {
   const keys = w.body.awards.map((x) => x.key);
   assert.equal(new Set(keys).size, keys.length);
 });
+
+test('pitch decks: every trade in history, from either side', async () => {
+  const idx = await get('/league/9001/decks');
+  assert.equal(idx.status, 200);
+  assert.ok(Array.isArray(idx.body.trades));
+  for (const t of idx.body.trades.slice(0, 5)) {
+    for (const s of t.sides) {
+      const { status, body: d } = await get(`/league/9001/deck/${t.id}?owner=${s.ownerId}`);
+      assert.equal(status, 200);
+      assert.equal(d.presenter.ownerId, s.ownerId);
+      assert.ok(d.title && d.disclaimers.length === 5 && d.rationale.cols.length >= 1);
+      assert.equal(d.transaction.received.length, s.count);
+      assert.ok(d.coverage && typeof d.coverage.edge === 'number');
+      if (d.scoreboard) assert.ok(d.scoreboard.holdings.length && d.scoreboard.original.length);
+    }
+  }
+  assert.equal((await get('/league/9001/deck/123')).status, 404);
+});

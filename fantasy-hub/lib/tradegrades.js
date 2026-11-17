@@ -165,7 +165,7 @@ export function gradeLeagueTrades(ctx) {
         const adjEdge = adjBig ? ((adjIn - adjOut) / adjBig) * 100 : 0;
         const adjScore = gradeScore({ edge: adjEdge, lineupDelta, ageGain, futureShift, contender });
         return {
-          rosterId: rid, team: name(rid), avatar: tm?.avatar ?? null, grade: letter(score), score: Math.round(score), movedOn: !stillHere,
+          rosterId: rid, ownerId: tm?.ownerId ?? null, team: name(rid), avatar: tm?.avatar ?? null, grade: letter(score), score: Math.round(score), movedOn: !stillHere,
           adjusted: { grade: letter(adjScore), score: Math.round(adjScore), edge: Math.round(adjEdge) },
           contender, recordRank: recordRank(rid),
           received, sent, faabIn, faabOut,
