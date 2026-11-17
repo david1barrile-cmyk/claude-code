@@ -85,3 +85,28 @@ test('pitch decks: every trade in history, from either side', async () => {
   }
   assert.equal((await get('/league/9001/deck/123')).status, 404);
 });
+
+test('pitch decks: proposed trades from the analyzer, and pick what-ifs', async () => {
+  const vals = (await get('/league/9001/values')).body;
+  const [A, B] = vals.teams;
+  const pick = B.picks.find((p) => p.round === 1) || B.picks[0];
+  const q = `a=${A.rosterId}&b=${B.rosterId}&ga=${A.players[0].id}&gb=${B.players[0].id},${pick.key}&owner=${A.ownerId}`;
+  const { status, body: d } = await get(`/league/9001/deck/proposal?${q}`);
+  assert.equal(status, 200);
+  assert.equal(d.proposal, true);
+  assert.equal(d.presenter.ownerId, A.ownerId);
+  assert.equal(d.transaction.received.length, 2);
+  assert.ok(d.disclaimers.some((x) => x.h === 'This is an offer.'));
+  assert.equal((await get(`/league/9001/deck/proposal?a=${A.rosterId}&b=${B.rosterId}&ga=${A.players[0].id}`)).status, 400);
+  // What if the pick becomes the top prospect?
+  const sp = d.scenario.picks[0];
+  if (sp && d.scenario.options.length) {
+    const top = d.scenario.options[0];
+    const w = (await get(`/league/9001/deck/proposal?${q}&assume=${sp.key}:${top.slug}`)).body;
+    const became = w.transaction.received.find((a) => a.became?.prospect);
+    assert.equal(became.became.name, top.name);
+    assert.equal(w.scenario.assumed.slug, top.slug);
+    assert.ok(w.coverage.scenario?.text.includes(top.name));
+    assert.equal(w.coverage.grade, null);
+  }
+});

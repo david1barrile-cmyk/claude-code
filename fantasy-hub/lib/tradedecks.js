@@ -15,6 +15,7 @@ import { gradeLeagueTrades } from './tradegrades.js';
 import { getPersonas, quoteFor, attribute } from './personas.js';
 import { consolidatedTotal } from './leagueadjust.js';
 import { draftSeason } from './picks.js';
+import { getRookieBoard } from './rookies.js';
 
 const median = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return !v.length ? null : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
 const r1 = (x) => Math.round(x * 10) / 10;
@@ -127,6 +128,7 @@ function statsThrough(season, through, scoring) {
 const pickTitle = (a) => `${a.season} ${ROUND[a.round] || ord(a.round)}-Round Pick`;
 function headline(a, presenter) {
   if (a.kind === 'player') return a.name;
+  if (a.became?.prospect) return a.became.name;
   if (a.became) return `${a.season} ${a.round}.${String(a.became.slot).padStart(2, '0')} (${a.became.name})`;
   return a.origOwner === presenter.ownerId ? `${presenter.team}'s Own ${pickTitle(a)}` : `the ${a.origTeam} ${pickTitle(a)}`;
 }
@@ -152,12 +154,14 @@ function tagline(sent, recv, seed) {
   return pickOne(['A balanced exchange of value, vibes and roster spots. Both parties are expected to claim victory in the group chat.', 'Fair value, mutually agreed, immediately second-guessed.'], seed);
 }
 
-function disclaimers(presenter, partner, statsNote, seed) {
+function disclaimers(presenter, partner, statsNote, seed, proposal = false) {
   return [
     { h: 'Forward-looking statements.', t: `This presentation contains forward-looking statements regarding player development, roster availability, draft position and ${partner}'s ability to continue being ${pickOne(['terrible', 'exactly as good as it has been', 'a willing trade partner'], seed)}. Words such as "expects," "believes," "will" and "obviously" are intended to identify such statements.` },
     { h: 'Risk factors.', t: 'Actual results may differ materially due to, among other things, unexpected competence by counterparties, favorable injury luck, coaching changes, depth-chart volatility, bye-week clustering and intervention by the fantasy football gods.' },
     { h: 'Non-GAAP measures.', t: `This presentation references "assets," "value" and "vibes." Vibes are not a recognized accounting measure and have been provided by ${presenter} Holdings without independent verification.` },
-    { h: 'No offer or solicitation.', t: `This presentation does not constitute an offer to acquire any ${presenter} asset. However, management notes that its phone is on.` },
+    proposal
+      ? { h: 'This is an offer.', t: `Unlike most investor presentations, this one does constitute an offer, made to ${partner} in good faith and with excellent slide design. Acceptance is encouraged. Counteroffers will be reviewed by the Board, eventually.` }
+      : { h: 'No offer or solicitation.', t: `This presentation does not constitute an offer to acquire any ${presenter} asset. However, management notes that its phone is on.` },
     { h: 'Market and industry data.', t: `Player statistics are drawn from Sleeper and reflect ${statsNote}. Trade values are today's KeepTradeCut, FantasyCalc and DynastyProcess figures, not the values at the time of the deal.` },
   ];
 }
@@ -303,12 +307,65 @@ function valuer(ctx) {
   });
 }
 
-export async function getDeck(ctx, tradeId, ownerId) {
+/**
+ * A trade that hasn't happened: built from the Trade Analyzer's two sides.
+ * aRid/bRid are roster ids; aSends/bSends are player ids and pick keys "season:round:origRosterId".
+ */
+export function proposalTrade(ctx, { aRid, bRid, aSends, bSends }) {
+  const A = ctx.teams.find((t) => t.rosterId === Number(aRid)), B = ctx.teams.find((t) => t.rosterId === Number(bRid));
+  if (!A || !B || A === B) return null;
+  const raw = (id, from, to) => {
+    const m = /^(\d{4}):(\d+):(\d+)$/.exec(id);
+    if (m) {
+      const orig = ctx.teams.find((t) => t.rosterId === Number(m[3]));
+      if (!orig) return null;
+      return { kind: 'pick', season: Number(m[1]), round: Number(m[2]), origOwner: orig.ownerId, key: `${m[1]}:${m[2]}:${orig.ownerId}`, fromOwner: from.ownerId, toOwner: to.ownerId };
+    }
+    return from.ids.includes(id) ? { kind: 'player', id, fromOwner: from.ownerId, toOwner: to.ownerId } : null;
+  };
+  const aOut = aSends.map((id) => raw(String(id), A, B)).filter(Boolean).slice(0, 15);
+  const bOut = bSends.map((id) => raw(String(id), B, A)).filter(Boolean).slice(0, 15);
+  if (!aOut.length || !bOut.length) return null;
+  const start = Date.parse(ctx.state.season_start_date || `${ctx.league.season}-09-04`);
+  const at = Date.now();
+  return {
+    id: 'proposal', proposal: true, leagueId: ctx.league.league_id, season: String(ctx.league.season), at,
+    week: at < start || !ctx.currentWeek ? 0 : ctx.currentWeek, offseason: at < start || !ctx.currentWeek,
+    sides: [
+      { rosterId: A.rosterId, ownerId: A.ownerId, received: bOut, sent: aOut, faabIn: 0, faabOut: 0 },
+      { rosterId: B.rosterId, ownerId: B.ownerId, received: aOut, sent: bOut, faabIn: 0, faabOut: 0 },
+    ],
+  };
+}
+
+export async function getDeck(ctx, tradeId, ownerId, proposal = null, assume = null) {
   const [trades, val, cast, grades, hist] = await Promise.all([
     chainTrades(ctx), valuer(ctx), getPersonas(ctx).catch(() => null), gradeLeagueTrades(ctx).catch(() => []), getHistory(ctx.league.league_id).catch(() => null),
   ]);
-  const t = trades.find((x) => String(x.id) === String(tradeId));
+  const t = proposal || trades.find((x) => String(x.id) === String(tradeId));
   if (!t) return null;
+
+  // "What if" scenario: a next-draft pick in this trade becomes a named prospect.
+  const nextDraft = draftSeason(ctx.league);
+  const rook = await getRookieBoard(ctx).catch(() => null);
+  const prospect = assume && rook ? rook.board.find((r) => r.slug === assume.slug) : null;
+  const assetOf = (a) => {
+    const base = val.asset(a);
+    if (!prospect || a.kind !== 'pick' || a.key !== assume.key) return base;
+    const slot = base.slot ?? 1;
+    const v = prospect.sources.KTC?.value ?? base.value;
+    return {
+      ...base, value: Math.round(v), adj: Math.round(v),
+      became: { prospect: true, playerId: null, name: prospect.name, pos: prospect.pos, slot, college: prospect.college, height: prospect.height, weight: prospect.weight,
+        classRank: prospect.sources.KTC?.classRank ?? prospect.rank, slug: prospect.slug, pickValue: base.value },
+      label: `${a.season} ${a.round}.${String(slot).padStart(2, '0')} → ${prospect.name}`,
+    };
+  };
+  // A scenario prospect isn't on a roster yet: "still held" means the pick still is.
+  const heldOf = (a) => val.held(a.became?.prospect ? { ...a, became: null } : a, side.ownerId);
+  const scenarioPicks = rook ? t.sides.flatMap((s) => s.received).filter((a) => a.kind === 'pick' && a.season === nextDraft)
+    .map((a) => ({ key: a.key, label: val.asset(a).label, assumed: !!prospect && a.key === assume.key })) : [];
+  const scenarioOptions = rook ? rook.board.slice(0, 16).map((r) => ({ slug: r.slug, name: r.name, pos: r.pos })) : [];
   const side = t.sides.find((s) => s.ownerId === ownerId) || [...t.sides].sort((a, b) => b.received.length - a.received.length)[0];
   const others = t.sides.filter((s) => s !== side);
   const seed = `${t.id}:${side.ownerId}`;
@@ -320,8 +377,8 @@ export async function getDeck(ctx, tradeId, ownerId) {
   const presenter = teamInfo(side.ownerId);
   const partners = others.map((s) => teamInfo(s.ownerId));
   const partnerNames = partners.map((p) => p.team).join(' and ');
-  const recv = side.received.map(val.asset).map((a) => ({ ...a, from: val.nameOf(a.fromOwner) }));
-  const sent = side.sent.map(val.asset).map((a) => ({ ...a, to: val.nameOf(a.toOwner) }));
+  const recv = side.received.map(assetOf).map((a) => ({ ...a, from: val.nameOf(a.fromOwner) }));
+  const sent = side.sent.map(assetOf).map((a) => ({ ...a, to: val.nameOf(a.toOwner) }));
   const date = new Date(t.at);
   const dateLabel = `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 
@@ -339,24 +396,27 @@ export async function getDeck(ctx, tradeId, ownerId) {
   }
 
   // Spotlights: the most valuable players received (used picks count as the player), then picks.
-  const recvPlayers = recv.filter((a) => a.kind === 'player' || a.became).map((a) => (a.became ? { ...val.asset({ kind: 'player', id: a.became.playerId }), viaPick: a.label } : a))
+  const recvPlayers = recv.filter((a) => a.kind === 'player' || a.became)
+    .map((a) => (a.became?.prospect ? a : a.became ? { ...assetOf({ kind: 'player', id: a.became.playerId }), viaPick: a.label } : a))
     .sort((a, b) => b.value - a.value).slice(0, 3);
-  const spot = recvPlayers.map((a, i) => spotlight(a, stats, ranks, window, `${seed}:${i}`));
+  const spot = recvPlayers.map((a, i) => (a.became?.prospect ? prospectSpotlight(a, presenter, rook) : spotlight(a, stats, ranks, window, `${seed}:${i}`)));
   if (spot.length < 3) {
     for (const a of recv.filter((x) => x.kind === 'pick' && !x.became).sort((x, y) => y.value - x.value).slice(0, 3 - spot.length)) spot.push(pickSpotlight(a, a.link, presenter));
   }
 
   // Strategic rationale timeline.
   const nowLabel = t.offseason ? `NOW | ${season} OFFSEASON` : `NOW | WEEK ${t.week}, ${season}`;
-  const pickYears = [...new Set([...recv, ...sent].filter((a) => a.kind === 'pick' && !a.became).map((a) => a.season))].sort().slice(0, 2);
+  const pickYears = [...new Set([...recv, ...sent].filter((a) => a.kind === 'pick' && (!a.became || a.became.prospect)).map((a) => a.season))].sort().slice(0, 2);
   const cols = [nowLabel, ...pickYears.map((y) => `${y} ROOKIE DRAFT`)];
-  const place = (xs) => cols.map((c, i) => (i === 0 ? xs.filter((a) => a.kind === 'player' || a.became) : xs.filter((a) => a.kind === 'pick' && !a.became && a.season === pickYears[i - 1])));
+  // A pick assumed to become a prospect stays in its draft-year column.
+  const isNow = (a) => a.kind === 'player' || (a.became && !a.became.prospect);
+  const place = (xs) => cols.map((c, i) => (i === 0 ? xs.filter(isNow) : xs.filter((a) => !isNow(a) && a.kind === 'pick' && a.season === pickYears[i - 1])));
   const holdCells = place(sent), execCells = place(recv);
   const posList = [...new Set(execCells[0].map((a) => (a.became ? a.became.pos : a.pos)))];
   const rationale = {
     cols,
     hold: holdCells.map((xs, i) => ({ assets: xs, note: xs.length ? (i === 0 ? 'Producing, for now' : 'Draft seat') : i === 0 ? 'No production until the draft' : 'Nothing further' })),
-    execute: execCells.map((xs, i) => ({ assets: xs, note: xs.length ? (i === 0 ? `${posList.join(', ')} producing now` : i === 1 ? 'Draft seat retained' : 'Added optionality') : i === 0 ? 'Patience, as a strategy' : '—' })),
+    execute: execCells.map((xs, i) => ({ assets: xs, note: xs.length ? (i === 0 ? `${posList.join(', ')} producing now` : xs.some((a) => a.became?.prospect) ? `${xs.find((a) => a.became?.prospect).became.name}, eventually` : i === 1 ? 'Draft seat retained' : 'Added optionality') : i === 0 ? 'Patience, as a strategy' : '—' })),
     headline: execCells[0].length && !holdCells[0].length ? `The transaction converts ${sent.length === 1 ? 'a single speculative asset' : 'speculative assets'} into immediate production${posList.length > 1 ? ` at ${posList.length === 2 ? 'two' : posList.length === 3 ? 'three' : posList.length} positions` : ''}`
       : !execCells[0].length && holdCells[0].length ? 'The transaction converts current production into long-dated draft capital'
         : recv.length < sent.length ? 'The transaction concentrates value into fewer, better assets' : 'The transaction rebalances the portfolio across timelines',
@@ -388,18 +448,18 @@ export async function getDeck(ctx, tradeId, ownerId) {
     const sides = chain.map((x) => x.sides.find((s) => s.ownerId === side.ownerId));
     const recvKeys = new Set(sides.flatMap((s) => s.received.map(assetKey)));
     const sentKeys = new Set(sides.flatMap((s) => s.sent.map(assetKey)));
-    const original = sides.flatMap((s) => s.sent).filter((a) => !recvKeys.has(assetKey(a))).map(val.asset);
-    const holdings = sides.flatMap((s) => s.received).filter((a) => !sentKeys.has(assetKey(a))).map(val.asset)
-      .map((a) => ({ ...a, stillHeld: val.held(a, side.ownerId) }));
+    const original = sides.flatMap((s) => s.sent).filter((a) => !recvKeys.has(assetKey(a))).map(assetOf);
+    const holdings = sides.flatMap((s) => s.received).filter((a) => !sentKeys.has(assetKey(a))).map(assetOf)
+      .map((a) => ({ ...a, stillHeld: heldOf(a) }));
     const prev = funding[0].trade;
     const prevSide = prev.sides.find((s) => s.ownerId === side.ownerId);
     const fundedKeys = new Set(funding.map((f) => assetKey(f.a)));
     caseStudy = {
       trade: { date: new Date(prev.at).toISOString(), partners: prev.sides.filter((s) => s !== prevSide).map((s) => val.nameOf(s.ownerId)).join(' and '),
-        sent: prevSide.sent.map(val.asset), received: prevSide.received.map(val.asset).map((a) => ({ ...a, funded: fundedKeys.has(a.key) })) },
+        sent: prevSide.sent.map(assetOf), received: prevSide.received.map(assetOf).map((a) => ({ ...a, funded: fundedKeys.has(a.key) })) },
       current: { sent: sent.map((a) => ({ ...a, funded: fundedKeys.has(a.key) })), received: recv },
       fundedLabel: funding.length === 1 ? 'THIS ASSET ALONE FUNDED THIS TRADE' : `THESE ${funding.length} ASSETS FUNDED THIS TRADE`,
-      headline: `How the ${headline(val.asset(prevSide.sent[0] || prevSide.received[0]), presenter)} trade became this one: ${funding.length === 1 ? 'one asset' : `${funding.length} assets`} from ${chain.length > 2 ? 'earlier trades' : 'Trade I'} funded ${sent.length === funding.length ? 'all' : 'part'} of Trade ${chain.length > 2 ? chain.length : 'II'}`,
+      headline: `How the ${headline(assetOf(prevSide.sent[0] || prevSide.received[0]), presenter)} trade became this one: ${funding.length === 1 ? 'one asset' : `${funding.length} assets`} from ${chain.length > 2 ? 'earlier trades' : 'Trade I'} funded ${sent.length === funding.length ? 'all' : 'part'} of Trade ${chain.length > 2 ? chain.length : 'II'}`,
       trades: chain.length,
     };
     const sum = (xs) => xs.reduce((s, a) => s + (a.value || 0), 0);
@@ -426,28 +486,57 @@ export async function getDeck(ctx, tradeId, ownerId) {
   const inV = sumV(recv), outV = sumV(sent), big = Math.max(inV, outV);
   const edge = big ? Math.round(((inV - outV) / big) * 100) : 0;
   const p = cast?.personas?.[side.ownerId], pp = cast?.personas?.[others[0]?.ownerId];
+  // In a scenario the official grades (which price the pick, not the prospect) don't apply.
+  const official = prospect ? null : gs;
+  const assumed = prospect ? recv.concat(sent).find((a) => a.became?.prospect) : null;
   const coverage = {
     received: Math.round(inV), sent: Math.round(outV), edge,
-    grade: gs?.grade ?? null, partnerGrades: g ? g.sides.filter((s) => s !== gs).map((s) => ({ team: s.team, grade: s.grade })) : [],
-    adjustedGrade: gs?.adjusted?.grade ?? null, sincePts: gs?.sincePts ?? null, verdict: g?.verdict ?? (Math.abs(edge) <= 8 ? 'Fair deal' : `Edge: ${edge > 0 ? presenter.team : partnerNames}`),
-    perSource: gs?.perSource?.filter((x) => x.inGrade).map((x) => ({ source: x.name, edge: x.edge })) ?? [],
-    stillHeld: recv.map((a) => ({ label: a.label, held: val.held(a, side.ownerId) })),
+    grade: official?.grade ?? null, partnerGrades: g && official ? g.sides.filter((s) => s !== gs).map((s) => ({ team: s.team, grade: s.grade })) : [],
+    adjustedGrade: official?.adjusted?.grade ?? null, sincePts: official?.sincePts ?? null,
+    verdict: (official && g?.verdict) || (Math.abs(edge) <= 8 ? 'Fair deal' : `Edge: ${edge > 0 ? presenter.team : partnerNames}`),
+    perSource: official?.perSource?.filter((x) => x.inGrade).map((x) => ({ source: x.name, edge: x.edge })) ?? [],
+    scenario: assumed ? {
+      text: `Scenario: the ${assumed.season} ${assumed.round}.${String(assumed.became.slot).padStart(2, '0')} becomes ${assumed.became.name}, valued at his KeepTradeCut devy value (${commas(assumed.value)}) instead of the pick's market value (${commas(assumed.became.pickValue)}). KTC's devy scale tops out near 10,000 like its NFL scale, so treat this as the best case: it prices him like an established star before he has played an NFL snap.`,
+      prospectValue: assumed.value, pickValue: assumed.became.pickValue,
+    } : null,
+    stillHeld: recv.map((a) => ({ label: a.label, held: heldOf(a) })),
     management: p ? attribute(quoteFor(p, edge >= 0 ? 'trade' : 'cold', `deck:${seed}`), `${presenter.team}, Chief Executive`) : null,
     counterparty: pp ? attribute(quoteFor(pp, edge <= 0 ? 'trade' : 'cold', `deck:cp:${seed}`), `${val.nameOf(others[0].ownerId)}, counterparty`) : null,
   };
 
   const title = deckTitle(sent, recv, presenter, partnerNames);
   return {
-    id: t.id, season: t.season, at: t.at, week: t.week, offseason: t.offseason, dateLabel,
+    id: t.id, proposal: !!t.proposal, season: t.season, at: t.at, week: t.week, offseason: t.offseason, dateLabel,
     presenter, partners, sides: t.sides.map((s) => ({ ownerId: s.ownerId, team: val.nameOf(s.ownerId) })),
     title: title.title, verb: title.verb,
-    coverHeads: recvPlayers.slice(0, 3).map((a) => ({ id: a.id, name: a.name.split(' ').slice(-1)[0] })),
+    coverHeads: recvPlayers.slice(0, 3).map((a) => (a.became?.prospect
+      ? { id: null, initials: a.became.name.split(' ').map((w) => w[0]).join(''), name: a.became.name.split(' ').slice(-1)[0] }
+      : { id: a.id, name: a.name.split(' ').slice(-1)[0] })),
     transaction: {
       headline: `${sent.length === 1 ? 'One' : sent.length} ${sent.length === 1 ? (sent[0].kind === 'pick' && !sent[0].became ? 'pick' : 'asset') : 'assets'} out; ${recv.length === 1 ? 'one asset' : `${recv.length} assets`} in`,
       sent, received: recv, faabIn: side.faabIn, faabOut: side.faabOut, tagline: tagline(sent, recv, seed),
     },
-    disclaimers: disclaimers(presenter.team, partnerNames, window.note.replace(/^Statistics /, '').replace(/^from /, 'games from ').replace(/^through/, 'games played through'), seed),
+    disclaimers: disclaimers(presenter.team, partnerNames, window.note.replace(/^Statistics /, '').replace(/^from /, 'games from ').replace(/^through/, 'games played through'), seed, !!t.proposal),
     spotlights: spot, rationale, caseStudy, scoreboard, coverage,
+    scenario: { picks: scenarioPicks, options: scenarioOptions, assumed: assumed ? { key: assume.key, slug: assume.slug, name: assumed.became.name } : null },
+  };
+}
+
+function prospectSpotlight(a, presenter, rook) {
+  const b = a.became;
+  const ft = b.height ? `${Math.floor(b.height / 12)}'${b.height % 12}"` : null;
+  const posRank = rook?.board.filter((r) => r.pos === b.pos).findIndex((r) => r.slug === b.slug) + 1;
+  return {
+    asset: a, eyebrow: b.classRank === 1 ? 'THE GENERATIONAL PROSPECT' : 'THE PROSPECT',
+    statsNote: `Scenario: ${presenter.team} drafts him at ${a.season} ${a.round}.${String(b.slot).padStart(2, '0')}`,
+    stats: [
+      { big: `#${b.classRank}`, label: `in the ${a.season} class (KeepTradeCut devy rankings)${posRank ? `, ${b.pos}${posRank}` : ''}` },
+      { big: commas(a.value), label: `KTC devy value, vs. ${commas(b.pickValue)} for the pick on today's market` },
+      ft ? { big: ft, label: `${b.weight ? `${b.weight} lbs, ` : ''}${b.college ?? ''}` } : { big: b.pos, label: b.college ?? '' },
+    ],
+    callout: b.classRank === 1
+      ? `Has not played an NFL snap. Has been described, accurately, as the reason to finish last.`
+      : 'Pre-revenue. Strong vision. Excellent highlight tape.',
   };
 }
 

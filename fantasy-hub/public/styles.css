@@ -577,3 +577,15 @@ details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin
   .deck { gap: 0; }
   .deck .slide { width: 13.333in; border-radius: 0; box-shadow: none; break-after: page; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+/* pitch deck: prospects and what-if scenarios */
+.deck-whatif { gap: 8px; margin: -6px 0 14px; flex-wrap: wrap; }
+.deck-whatif-note { margin: -8px 0 14px; color: var(--ink-2); }
+.slide .pl.prospect { --tc: #2a3f63; background: linear-gradient(160deg, #2f4a74, #13203a); }
+.slide .pl.prospect .ini { position: absolute; inset: 0 0 4cqw; display: grid; place-items: center; font: 400 6cqw/1 'Source Serif 4', Georgia, serif; color: #fff; opacity: .9; }
+.slide .pl.prospect.sm .ini { font-size: 3.8cqw; inset: 0 0 3cqw; }
+.s-cover .heads .ini { display: grid; place-items: center; width: 100%; height: 100%; background: #2f4a74; color: #fff; font: 400 2.6cqw/1 'Source Serif 4', Georgia, serif; }
+.spot-l.prospect { background: radial-gradient(90% 90% at 50% 40%, #2f4a74, #0d1628); }
+.spot-l.prospect .bigpick { font-size: 1.6cqw; letter-spacing: .02em; text-align: center; padding: 0 3cqw; }
+.spot-l.prospect .bigpick span { font: 700 1.3cqw/1 Inter, sans-serif; color: #49a77a; letter-spacing: .08em; margin-bottom: 1cqw; }
+.spot-l.prospect .bigpick b { font-size: 8cqw; }

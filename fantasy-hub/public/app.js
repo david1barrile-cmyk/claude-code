@@ -595,6 +595,7 @@ async function viewAnalyzer($) {
     const who = (e) => (Math.abs(e) <= 5 ? 'even' : `${e > 0 ? esc(nA) : esc(nB)} +${Math.abs(e)}%`);
     out.innerHTML = `<div class="card-head"><h2>Verdict</h2><span class="muted">${r.sourcesAgree ? '✓ sources agree' : '⚠ sources disagree'}</span></div>
       <div class="verdict" style="margin-top:0">${esc(verdict)}</div>
+      <div class="row" style="margin:-4px 0 12px;gap:8px"><span class="small muted">Make the pitch deck:</span>${[[state.a, nA], [state.b, nB]].map(([rid, nm]) => `<a class="chip" href="#/deck/proposal?a=${state.a}&b=${state.b}&ga=${encodeURIComponent([...state.A].join(','))}&gb=${encodeURIComponent([...state.B].join(','))}&owner=${encodeURIComponent(team(rid).ownerId)}">📊 ${esc(nm)}'s pitch</a>`).join('')}</div>
       <div class="row small muted" style="justify-content:space-between;max-width:620px"><span>◀ better for ${esc(nB)}</span><span>better for ${esc(nA)} ▶</span></div>
       <div style="max-width:620px">${edgeBar(r.consensus)}</div>
       <p class="small muted">Consensus value edge: <b>${who(r.consensus)}</b>${r.bestAsset ? ` · Best single asset: <b>${esc(r.bestAsset.label)}</b> (${esc(r.bestAsset.side === 'A' ? nB : nA)} receives it)` : ''}</p>
@@ -1113,6 +1114,10 @@ function deckAsset(a, d, { dark = false, funded = false, small = false } = {}) {
     const via = a.origOwner === d.presenter.ownerId ? `${esc(d.presenter.team)}'s own` : `via ${esc(a.origTeam)}`;
     return `<div class="pk ${dark ? 'dark' : ''} ${funded ? 'funded' : ''} ${small ? 'sm' : ''}"><span class="yr">${esc(a.season)}</span><b>${ordWord(a.round)} ROUND</b><i>${a.slot && a.round ? `${a.round}.${String(a.slot).padStart(2, '0')} · ` : ''}${via}</i></div>`;
   }
+  if (a.became?.prospect) {
+    const b = a.became;
+    return `<div class="pl prospect ${funded ? 'funded' : ''} ${small ? 'sm' : ''}"><div class="ini">${esc(b.name.split(' ').map((w) => w[0]).join(''))}</div><div class="cap"><b>${esc(b.name)}</b><span>${esc(b.pos)} | ${esc(String(b.college || '').split(' ')[0] || 'Prospect')} · ${esc(a.season)} ${a.round}.${String(b.slot).padStart(2, '0')}</span></div></div>`;
+  }
   const id = a.became ? a.became.playerId : a.id, name = a.became ? a.became.name : a.name;
   return `<div class="pl ${funded ? 'funded' : ''} ${small ? 'sm' : ''}" style="--tc:${esc(a.color || '#1b2a44')}">${nflLogo(a.nfl)}${headshot(id)}<div class="cap"><b>${esc(name)}</b><span>${a.became ? `${esc(a.season)} ${a.round}.${String(a.became.slot).padStart(2, '0')} pick` : `${esc(a.pos)}${a.nfl ? ` | ${esc(NFLshort(a))}` : ''}`}</span></div></div>`;
 }
@@ -1140,9 +1145,9 @@ function deckSlides(d) {
       <div class="brandrow">${teamAv({ name: P.team, avatar: P.avatar })}<div><b>${esc(P.team.toUpperCase())}</b><span>${esc(session.leagueName)}</span></div></div>
       <h1>${esc(d.title)}</h1><div class="grn"></div>
       <div class="sub">Investor Presentation &nbsp;|&nbsp; ${esc(d.dateLabel)}</div>
-      ${d.coverHeads.length ? `<div class="heads">${d.coverHeads.map((h) => `<div>${headshot(h.id)}</div>`).join('')}</div><div class="headnames">${d.coverHeads.map((h) => esc(h.name)).join(' &nbsp;|&nbsp; ')}</div>` : ''}
+      ${d.coverHeads.length ? `<div class="heads">${d.coverHeads.map((h) => `<div>${h.id ? headshot(h.id) : `<span class="ini">${esc(h.initials)}</span>`}</div>`).join('')}</div><div class="headnames">${d.coverHeads.map((h) => esc(h.name)).join(' &nbsp;|&nbsp; ')}</div>` : ''}
     </div>
-    <div class="cover-r" style="--tc:${esc(heroA?.color || '#1b2a44')}">${heroA?.kind === 'player' ? `${nflLogo(heroA.nfl)}${headshot(heroA.id, 'big')}` : `<div class="bigpick">${heroA ? `${esc(heroA.season)}<b>${ordWord(heroA.round)}</b>ROUND` : ''}</div>`}</div>
+    <div class="cover-r" style="--tc:${esc(heroA?.color || '#1b2a44')}">${heroA?.became?.prospect ? `<div class="bigpick"><span style="font-size:1.4cqw;color:#49a77a">${esc(heroA.season)} ${heroA.round}.${String(heroA.became.slot).padStart(2, '0')}</span><b>${esc(heroA.became.name.split(' ').slice(-1)[0].toUpperCase())}</b>${esc(heroA.became.college || '')}</div>` : heroA?.kind === 'player' ? `${nflLogo(heroA.nfl)}${headshot(heroA.id, 'big')}` : `<div class="bigpick">${heroA ? `${esc(heroA.season)}<b>${ordWord(heroA.round)}</b>ROUND` : ''}</div>`}</div>
   </section>`);
 
   // 2. Disclaimer
@@ -1151,19 +1156,32 @@ function deckSlides(d) {
 
   // 3. The transaction
   const many = tx.received.length + tx.sent.length > 7;
-  slides.push(`<section class="slide s-text">${top('THE TRANSACTION', tx.headline)}
+  slides.push(`<section class="slide s-text">${top(d.proposal ? 'THE PROPOSED TRANSACTION' : 'THE TRANSACTION', tx.headline)}
     <div class="tx ${many ? 'many' : ''}">
       <div class="tx-col send"><div class="lab">${esc(P.team.toUpperCase())} SENDS</div><div class="tiles">${tx.sent.map((a) => deckAsset(a, d, { dark: true, small: many })).join('') || '<div class="muted">Nothing but goodwill</div>'}${tx.faabOut ? `<div class="pk sm"><b>$${tx.faabOut}</b><i>FAAB</i></div>` : ''}</div></div>
       <div class="arrow">➜</div>
       <div class="tx-col"><div class="lab">${esc(P.team.toUpperCase())} RECEIVES${d.partners.length > 1 ? ` <span>(from ${esc(partners)})</span>` : ''}</div><div class="tiles">${stackTiles(tx.received, d, many)}${tx.faabIn ? `<div class="pk sm"><b>$${tx.faabIn}</b><i>FAAB</i></div>` : ''}</div></div>
     </div>
     <div class="txbar"><div class="cnt">${tx.sent.length} asset${tx.sent.length === 1 ? '' : 's'}</div><div class="cnt dark"><span>${tx.received.length} asset${tx.received.length === 1 ? '' : 's'}.</span><p>${esc(tx.tagline)}</p></div></div>
-    <div class="src">Source: Sleeper trade between ${esc(P.team)} and ${esc(partners)} (${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}). Headshots: Sleeper.</div>${foot(3)}</section>`);
+    <div class="src">${d.proposal ? `Source: proposed trade from ${esc(P.team)} to ${esc(partners)}, prepared ${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}. Subject to acceptance, counteroffers and vibes.` : `Source: Sleeper trade between ${esc(P.team)} and ${esc(partners)} (${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}).`} Headshots: Sleeper.</div>${foot(3)}</section>`);
 
   // 4+. Spotlights
   for (const sp of d.spotlights) {
     const a = sp.asset;
-    const isPick = a.kind === 'pick';
+    const pro = a.became?.prospect ? a.became : null;
+    const isPick = a.kind === 'pick' && !pro;
+    if (pro) {
+      slides.push(`<section class="slide s-spot">
+      <div class="spot-l prospect"><div class="bigpick"><span>${esc(a.season)} ${a.round}.${String(pro.slot).padStart(2, '0')}</span><b>${esc(pro.name.split(' ').slice(-1)[0].toUpperCase())}</b>${esc(pro.college || '')}<i>If ${esc(P.team)} drafts him</i></div></div>
+      <div class="spot-r">
+        <div class="who"><div><div class="eb">${esc(sp.eyebrow)}</div><h3>${esc(pro.name)}</h3><div class="meta">${esc(pro.pos)} &nbsp;|&nbsp; ${esc(pro.college || '')} &nbsp;|&nbsp; ${esc(a.season)} NFL Draft class</div></div></div>
+        <hr>
+        <div class="kpis3">${sp.stats.map((x) => `<div><b>${esc(x.big)}</b><span>${esc(x.label)}</span></div>`).join('')}</div>
+        <blockquote>${esc(sp.callout)}</blockquote>
+        <div class="foot dark"><span>${esc(sp.statsNote)}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${slides.length + 1}</b></span></div>
+      </div></section>`);
+      continue;
+    }
     slides.push(`<section class="slide s-spot">
       <div class="spot-l" style="--tc:${esc(a.color || '#1b2a44')}">${isPick ? `<div class="bigpick">${esc(a.season)}<b>${ordWord(a.round)}</b>ROUND<i>${a.origOwner === P.ownerId ? `${esc(P.team)}'s own` : `via ${esc(a.origTeam)}`}</i></div>` : `${nflLogo(a.nfl)}${headshot(a.id, 'big')}`}</div>
       <div class="spot-r">
@@ -1177,12 +1195,12 @@ function deckSlides(d) {
 
   // Strategic rationale
   const R = d.rationale;
-  const cell = (c, solid) => `<div class="tl-cell">${c.assets.length ? `<div class="tl-assets">${c.assets.slice(0, 4).map((a) => (a.kind === 'player' || a.became ? `<div class="tl-hs">${headshot(a.became ? a.became.playerId : a.id)}</div>` : deckAsset(a, d, { dark: !solid, small: true }))).join('')}${c.assets.length > 4 ? `<span class="more">+${c.assets.length - 4}</span>` : ''}</div>` : '<div class="tl-dot"></div>'}<div class="tl-note ${c.assets.length && solid ? 'b' : ''}">${esc(c.note)}</div></div>`;
+  const cell = (c, solid) => `<div class="tl-cell">${c.assets.length ? `<div class="tl-assets">${c.assets.slice(0, 4).map((a) => (a.kind === 'player' || (a.became && !a.became.prospect) ? `<div class="tl-hs">${headshot(a.became ? a.became.playerId : a.id)}</div>` : deckAsset(a, d, { dark: !solid, small: true }))).join('')}${c.assets.length > 4 ? `<span class="more">+${c.assets.length - 4}</span>` : ''}</div>` : '<div class="tl-dot"></div>'}<div class="tl-note ${c.assets.length && solid ? 'b' : ''}">${esc(c.note)}</div></div>`;
   slides.push(`<section class="slide s-text">${top('STRATEGIC RATIONALE', R.headline)}
     <div class="tl" style="--cols:${R.cols.length}">
       <div></div>${R.cols.map((c) => `<div class="tl-h">${esc(c)}</div>`).join('')}
       <div class="tl-row"><b>Hold</b><span>Status quo</span></div><div class="tl-line dashed" style="grid-column:span ${R.cols.length}">${R.hold.map((c) => cell(c, false)).join('')}</div>
-      <div class="tl-row"><b>Execute the trade</b><span>Agreed with ${esc(partners)}</span></div><div class="tl-line" style="grid-column:span ${R.cols.length}">${R.execute.map((c) => cell(c, true)).join('')}</div>
+      <div class="tl-row"><b>${d.proposal ? 'Accept the offer' : 'Execute the trade'}</b><span>${d.proposal ? 'Proposed to' : 'Agreed with'} ${esc(partners)}</span></div><div class="tl-line" style="grid-column:span ${R.cols.length}">${R.execute.map((c) => cell(c, true)).join('')}</div>
     </div>
     <div class="banner"><b>${esc(R.banner.h)}</b><p>${esc(R.banner.t)}</p></div>${foot(slides.length + 1)}</section>`);
 
@@ -1224,26 +1242,46 @@ function deckSlides(d) {
         <div class="vals"><div><span>Received, today's value</span><b>${Cv.received.toLocaleString()}</b></div><div><span>Sent, today's value</span><b>${Cv.sent.toLocaleString()}</b></div></div>
         ${Cv.perSource.length ? `<div class="srcs">${Cv.perSource.map((x) => `<div><span>${esc(x.source)}</span><div class="bar"><i style="${x.edge >= 0 ? 'left:50%' : `right:50%`};width:${Math.min(50, Math.abs(x.edge) / 2)}%;background:${x.edge >= 0 ? '#2f7d57' : '#b3412f'}"></i></div><b>${x.edge > 0 ? '+' : ''}${x.edge}%</b></div>`).join('')}</div>` : ''}
         ${Cv.sincePts && !d.offseason && (Cv.sincePts.acquired || Cv.sincePts.departed) ? `<p class="small">Since the deal: acquired players ${Cv.sincePts.acquired} pts, departed players ${Cv.sincePts.departed} pts.</p>` : ''}
-        <p class="small">Still on the roster: ${Cv.stillHeld.map((x) => `${esc(x.label)} ${x.held === false ? '✗' : '✓'}`).join(' · ')}</p>
+        ${d.proposal ? '' : `<p class="small">Still on the roster: ${Cv.stillHeld.map((x) => `${esc(x.label)} ${x.held === false ? '✗' : '✓'}`).join(' · ')}</p>`}
       </div>
       <div>
         <p class="vline">${esc(verdictLine)}</p>
         ${Cv.management ? `<blockquote>${esc(Cv.management)}</blockquote>` : ''}${Cv.counterparty ? `<blockquote class="cp">${esc(Cv.counterparty)}</blockquote>` : ''}
       </div>
     </div>
-    <div class="src">Values: median of KeepTradeCut, FantasyCalc and DynastyProcess today${Cv.grade ? '. Grades from the Trade Grades page (value, lineup impact and fit).' : '.'} Quotes are satire, generated from each team's Gazette persona.</div>${foot(slides.length + 1)}</section>`);
+    <div class="src">${Cv.scenario ? `<b>${esc(Cv.scenario.text)}</b> ` : ''}Values: median of KeepTradeCut, FantasyCalc and DynastyProcess today${Cv.grade ? '. Grades from the Trade Grades page (value, lineup impact and fit).' : '.'} Quotes are satire, generated from each team's Gazette persona.</div>${foot(slides.length + 1)}</section>`);
   return slides;
 }
 
 async function viewDeck($, tradeId) {
   const owner = routeQuery.get('owner') || '';
-  const d = await api(L(`/deck/${encodeURIComponent(tradeId)}${owner ? `?owner=${encodeURIComponent(owner)}` : ''}`));
+  const isProposal = tradeId === 'proposal';
+  // A proposal carries the analyzer's selections (a, b, ga, gb) in the query string.
+  // Proposals carry the analyzer's selections (a, b, ga, gb); any deck can carry a what-if (assume).
+  const withParam = (k, v) => { const q = new URLSearchParams(routeQuery); if (v) q.set(k, v); else q.delete(k); return q.toString(); };
+  const withOwner = (o) => withParam('owner', o);
+  const d = await api(L(`/deck/${encodeURIComponent(tradeId)}?${routeQuery.toString()}`));
+  const sc = d.scenario || { picks: [], options: [] };
+  const assumedKey = sc.assumed?.key || sc.picks[0]?.key || '';
+  const scenarioBar = sc.picks.length && sc.options.length ? `<div class="row deck-whatif"><span class="small muted">What if</span>
+      <select id="dk-pick">${sc.picks.map((p) => `<option value="${esc(p.key)}" ${p.key === assumedKey ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
+      <span class="small muted">becomes</span>
+      <select id="dk-pros"><option value="">— keep the pick's market value —</option>${sc.options.map((o) => `<option value="${esc(o.slug)}" ${sc.assumed?.slug === o.slug ? 'selected' : ''}>${esc(o.name)} (${esc(o.pos)})</option>`).join('')}</select></div>` : '';
   const slides = deckSlides(d);
-  $.innerHTML = `${head('Pitch Deck', `${esc(d.season)} · ${d.offseason ? 'Offseason' : `Week ${d.week}`} trade between ${d.sides.map((x) => esc(x.team)).join(', ')}. ${slides.length} slides, told from one side.`,
+  const backToAnalyzer = isProposal ? `#/analyzer?a=${encodeURIComponent(routeQuery.get('a') || '')}&b=${encodeURIComponent(routeQuery.get('b') || '')}&ga=${encodeURIComponent(routeQuery.get('ga') || '')}&gb=${encodeURIComponent(routeQuery.get('gb') || '')}` : '';
+  $.innerHTML = `${head(isProposal ? 'Pitch Deck: Proposed Trade' : 'Pitch Deck', isProposal
+    ? `A proposed trade between ${d.sides.map((x) => esc(x.team)).join(' and ')}, pitched as an investor presentation. ${slides.length} slides. Save it as a PDF and send it with the offer.`
+    : `${esc(d.season)} · ${d.offseason ? 'Offseason' : `Week ${d.week}`} trade between ${d.sides.map((x) => esc(x.team)).join(', ')}. ${slides.length} slides, told from one side.`,
     `<div class="row deck-bar"><div class="seg">${d.sides.map((x) => `<button data-o="${esc(x.ownerId)}" class="${x.ownerId === d.presenter.ownerId ? 'on' : ''}">${esc(x.team)}'s deck</button>`).join('')}</div>
-      <button id="dk-present" class="primary">▶ Present</button><button id="dk-print">Save as PDF</button><a class="chip" href="#/decks">All decks</a></div>`)}
+      <button id="dk-present" class="primary">▶ Present</button><button id="dk-print">Save as PDF</button>${isProposal ? `<a class="chip" href="${backToAnalyzer}">← Edit in analyzer</a>` : '<a class="chip" href="#/decks">All decks</a>'}</div>`)}
+  ${scenarioBar}${sc.assumed ? `<p class="small deck-whatif-note">Scenario deck: ${esc(sc.assumed.name)} in place of the pick. Grades are hidden because they price the pick, not the player.</p>` : ''}
   <div class="deck" id="deck">${slides.join('')}<div class="deck-nav"><button data-n="-1">‹</button><span id="dk-n"></span><button data-n="1">›</button><button data-x>✕</button></div></div>`;
-  $.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/deck/${encodeURIComponent(tradeId)}?owner=${encodeURIComponent(b.dataset.o)}`; }));
+  $.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => {
+    location.hash = `#/deck/${encodeURIComponent(tradeId)}?${withOwner(b.dataset.o)}`;
+  }));
+  const pickSel = document.getElementById('dk-pick'), prosSel = document.getElementById('dk-pros');
+  const applyWhatIf = () => { location.hash = `#/deck/${encodeURIComponent(tradeId)}?${withParam('assume', prosSel.value ? `${pickSel.value}:${prosSel.value}` : '')}`; };
+  if (prosSel) { prosSel.onchange = applyWhatIf; pickSel.onchange = () => { if (prosSel.value) applyWhatIf(); }; }
   const deck = document.getElementById('deck');
   const all = [...deck.querySelectorAll('.slide')];
   let cur = 0;
