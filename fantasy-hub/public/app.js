@@ -300,6 +300,8 @@ async function viewPower($) {
         <td class="small">${t.top.slice(0, 3).map((p) => `<div style="white-space:nowrap;line-height:1.9">${posTag(p.pos)} <a href="#/player/${esc(p.id)}">${esc(p.name)}</a> <span class="muted">${p.age ?? ''}</span></div>`).join('')}</td>
         <td class="num" title="${esc(t.picks.map((p) => `${p.season} R${p.round}${p.from ? ` (from ${p.from})` : ''}`).join(', '))}">${t.picks.filter((p) => p.round === 1).length} 1sts · ${k(t.byPos.Picks)}</td></tr>`; }).join('')}</tbody></table></div>
       <p class="small muted">Hover the Picks column to see each team's picks. Tiers compare this season's power rank with the projected dynasty rank 3 years out.</p>`, { span: 12 })}
+    ${card('Average age by position', `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">Blue = younger than the league average at that position, red = older (darker = further from average). Hover a cell for the players.</span>
+      <div class="seg" id="agemode"><button data-m="avg" class="on">All rostered</button><button data-m="weighted">Value-weighted</button></div></div><div id="c-age"></div>`, { span: 12 })}
     ${card('Season power table', `<div class="scroll"><table>
       <thead><tr><th>#</th><th>Team</th><th class="num">Score</th><th class="num">Record</th><th class="num">All-play</th><th class="num">Best lineup</th><th>Last 5</th></tr></thead>
       <tbody>${season.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td class="rank">${t.rank}</td><td>${teamTag(t)}</td><td class="num"><b>${t.score}</b></td>
@@ -307,6 +309,11 @@ async function viewPower($) {
   </div>`;
 
   if (d.odds) renderOdds(d.odds);
+  renderAges(dyn, 'avg');
+  document.querySelectorAll('#agemode button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#agemode button').forEach((x) => x.classList.toggle('on', x === b));
+    renderAges(dyn, b.dataset.m);
+  }));
   document.querySelectorAll('#valmode button').forEach((b) => b.addEventListener('click', () => { location.hash = `#/power${b.dataset.v ? '?values=adj' : ''}`; }));
   hbars(document.getElementById('c-season'), {
     rows: season.map((t) => ({ label: `${t.rank}. ${t.name}`, value: t.score, highlight: t.ownerId === session.userId, t })), max: 100, fmt: (v) => v,
@@ -421,6 +428,31 @@ async function viewHistory($) {
   const byLuck = [...owners].sort((a, b) => b.luck - a.luck);
   columnsLuck(document.getElementById('c-luck'), byLuck);
 }
+// Team × position age table, shaded against the league average at each position.
+function renderAges(teams, mode) {
+  const el = document.getElementById('c-age');
+  if (!el) return;
+  const POS = ['QB', 'RB', 'WR', 'TE', 'All'];
+  const rows = teams.filter((t) => t.ageByPos);
+  const leagueAvg = Object.fromEntries(POS.map((p) => {
+    const v = rows.map((t) => t.ageByPos[p][mode]).filter((x) => x != null);
+    return [p, v.length ? v.reduce((a, b) => a + b, 0) / v.length : null];
+  }));
+  // Younger than average shades green; about 2.5 years either way reaches the strongest shade.
+  const shade = (v, avg) => (v == null || avg == null ? divColor(null) : divColor(Math.max(0, Math.min(1, 0.5 - (v - avg) / 5))));
+  const sorted = [...rows].sort((a, b) => (a.ageByPos.All[mode] ?? 99) - (b.ageByPos.All[mode] ?? 99));
+  el.innerHTML = `<div class="scroll"><table class="heat">
+    <thead><tr><th>Team</th>${POS.map((p) => `<th class="num">${p === 'All' ? 'All positions' : posTag(p)}</th>`).join('')}</tr></thead>
+    <tbody>${sorted.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td>${teamTag(t)}</td>${POS.map((p) => {
+      const a = t.ageByPos[p], v = a[mode];
+      const [bg, fg] = Math.abs((v ?? 0) - (leagueAvg[p] ?? 0)) < 0.3 ? ['transparent', 'var(--ink)'] : shade(v, leagueAvg[p]);
+      const tip = `<b>${esc(t.name)} · ${p === 'All' ? 'QB/RB/WR/TE' : p}</b>${a.n} player${a.n === 1 ? '' : 's'} · avg ${fmt(a.avg)}, value-weighted ${fmt(a.weighted)}<br>${a.players.slice(0, 8).map((x) => `${esc(x.name)} ${x.age}`).join('<br>')}${a.players.length > 8 ? `<br>+${a.players.length - 8} more` : ''}`;
+      return `<td class="cell num" style="background:${bg};color:${fg}${p === 'All' ? ';font-weight:700' : ''}" data-tip="${esc(tip)}">${v == null ? '—' : fmt(v)} <span class="small" style="opacity:.7">(${a.n})</span></td>`;
+    }).join('')}</tr>`).join('')}
+    <tr><td class="muted"><b>League average</b></td>${POS.map((p) => `<td class="num muted"><b>${fmt(leagueAvg[p])}</b></td>`).join('')}</tr></tbody></table></div>
+    <p class="small muted">${mode === 'weighted' ? 'Value-weighted: each player counts in proportion to his dynasty value, so the starters and stars set the number and end-of-bench players barely move it.' : 'Every rostered QB, RB, WR and TE counts equally, including taxi and IR. Player counts in brackets.'} Sorted youngest to oldest overall.</p>`;
+}
+
 function avgFinish(o) { const v = Object.values(o.finishes).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 99; }
 
 // Diverging bars around zero for luck.
