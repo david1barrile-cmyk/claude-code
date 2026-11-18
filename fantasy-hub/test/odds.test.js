@@ -33,3 +33,14 @@ test('median games add a second result each week', () => {
   const o1 = res.teams.find((t) => t.ownerId === 'o1');
   assert.equal(o1.wins, 2); // H2H win + above-median win in week 1
 });
+
+test('playoff bracket: title odds sum to 100% and favor the strongest team', () => {
+  const weeks = [wk(sched[0], [120, 90, 110, 80]), wk(sched[1]), wk(sched[2])];
+  const strength = { o1: { mean: 140, sd: 15 }, o2: { mean: 90, sd: 15 }, o3: { mean: 110, sd: 15 }, o4: { mean: 85, sd: 15 } };
+  const r = simulate({ league: { settings: { playoff_teams: 4 } }, rosters, users: [], weeks, regEnd: 3, strength, throughWeek: 1, sims: 3000, seed: 11 });
+  assert.ok(Math.abs(r.teams.reduce((s, t) => s + t.titleOdds, 0) - 100) < 0.5);
+  assert.ok(Math.abs(r.teams.reduce((s, t) => s + t.finalOdds, 0) - 200) < 0.5);
+  const best = r.teams.find((t) => t.ownerId === 'o1');
+  assert.ok(r.teams.every((t) => t === best || best.titleOdds > t.titleOdds));
+  assert.ok(best.titleOdds <= best.finalOdds && best.finalOdds <= best.playoffOdds);
+});

@@ -76,3 +76,37 @@ test('refusals and bad output fall back to the template writer', async () => {
   assert.equal(ai.generator, 'claude');
   assert.equal(ai.scoreboard.length, 12); // scoreboard always comes from real data
 });
+
+const { assignPersonas, applyOverrides, quoteFor, mockInterview, VOICES } = await import('../lib/personas.js');
+test('personas come from how teams play, spread voices, and accept league overrides', () => {
+  const mk = (i, o) => ({ ownerId: `o${i}`, team: `T${i}`, owner: `m${i}`, rank: i, record: '5-5', winPct: 1 - i / 10, contender: i <= 4, trades: 1, adds: 2, faab: 0, benchLeft: 50, luck: 0, titles: 0, lastChamp: false, picks1st: 0, ...o });
+  const stats = { o1: mk(1, {}), o2: mk(2, { trades: 12 }), o3: mk(3, { luck: -3 }), o4: mk(4, { benchLeft: 300 }), o5: mk(5, { adds: 40, faab: 90 }), o6: mk(6, {}), o7: mk(7, {}), o8: mk(8, {}) };
+  const p = assignPersonas(stats);
+  assert.equal(p.o1.archetype, 'The Juggernaut');
+  assert.equal(p.o2.archetype, 'Wheeler-Dealer');
+  assert.equal(p.o3.archetype, 'The Cursed');
+  assert.equal(p.o5.archetype, 'Waiver Hawk');
+  const voices = Object.values(p).map((x) => x.voice);
+  assert.ok(new Set(voices).size >= Object.keys(VOICES).length - 1, 'voices spread across the cast');
+  applyOverrides(p, [{ team: 't2', nickname: 'The Fleece Merchant', voice: 'zen', quotes: { trade: ['Nobody fleeces the fleecer.'] }, offLimits: ['2024 draft'] }]);
+  assert.equal(p.o2.nickname, 'The Fleece Merchant');
+  assert.equal(p.o2.voice, 'zen');
+  assert.equal(p.o2.source, 'league');
+  assert.equal(quoteFor(p.o2, 'trade'), '"Nobody fleeces the fleecer."');
+  assert.equal(quoteFor(p.o1, 'win', 'x'), quoteFor(p.o1, 'win', 'x')); // stable
+  const iv = mockInterview(p.o3, ['blowoutLoss', 'oddsDown'], 'k');
+  assert.equal(iv.qa.length, 3);
+  assert.equal(iv.qa[2].a, p.o3.catchphrase);
+});
+
+test('editions include a locker-room interview and the cast', async () => {
+  const ed = await getEdition(ctx, 9, {});
+  assert.ok(ed.interview && ed.interview.qa.length === 3);
+  assert.equal(ed.cast.length, 12);
+  assert.ok([ed.lead, ...ed.stories].some((s) => / said .+, known around the league as /.test(s.body)));
+});
+test('quote attribution punctuation', async () => {
+  const { attribute } = await import('../lib/personas.js');
+  assert.equal(attribute('"Seen worse."', 'X'), '"Seen worse," said X.');
+  assert.equal(attribute('"See?! SEE?!"', 'X'), '"See?! SEE?!" said X.');
+});

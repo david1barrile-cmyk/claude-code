@@ -10,6 +10,7 @@ import { bestLineup } from './lineup.js';
 import { winProbability } from './power.js';
 import { gradeLeagueTrades } from './tradegrades.js';
 import { getOdds } from './odds.js';
+import { getPersonas, quoteFor, mockInterview, attribute } from './personas.js';
 
 const r1 = (x) => Math.round(x * 10) / 10;
 
@@ -322,7 +323,32 @@ export function templateEdition(f, seedKey = '') {
     lookahead.push({ headline: `Playoff Picture: ${f.race.weeksLeft} Week${f.race.weeksLeft === 1 ? '' : 's'} Left, ${f.race.spots} Spots, Zero Chill`,
       body: `${f.race.lastIn} holds the last spot. Chasing: ${f.race.bubble.map((b) => `${b.team} (${b.gamesBack} back)`).join(', ')}. Every manager involved claims to be "not even looking at the standings."` });
   }
-  return { generator: 'templates', lead, stories: stories.slice(0, 7), briefs, lookahead };
+  // Personas: quote the team in its own voice, and interview the team behind the lead story.
+  const P = f.personas || {};
+  const SIT = {
+    'Blowout': [1, 'blowoutLoss'], 'Nail-Biter': [1, 'closeLoss'], 'Upset Alert': [1, 'loss'], 'Manager Malpractice': [0, 'bench'],
+    'Star Watch': [0, 'win'], 'Box Score Crime Scene': [0, 'loss'], 'The Median': [0, 'loss'], 'Transactions': [0, 'trade'],
+  };
+  const situationOf = (st) => {
+    if (st.kicker === 'Streak Watch') return [0, /Drops|Losing|Lost/.test(st.headline) ? 'cold' : 'hot'];
+    if (st.kicker === 'Odds Desk') return [0, /Plunge|Gives Up|Fall/.test(st.headline) ? 'oddsDown' : 'oddsUp'];
+    if (st.kicker === 'Analytics Desk') return [0, /Luckier|Horseshoe/.test(st.headline) ? 'win' : 'cold'];
+    return SIT[st.kicker] || null;
+  };
+  const withQuote = (st, i) => {
+    const sit = situationOf(st);
+    const team = sit && st.tags?.[sit[0]];
+    const persona = team && P[team];
+    if (!persona) return st;
+    const q = quoteFor(persona, sit[1], `${seedKey}:${f.week}:${i}`);
+    return { ...st, body: `${st.body} ${attribute(q, `${team}, known around the league as ${persona.nickname}`)}`, quoted: team };
+  };
+  const leadQ = withQuote(lead, 'lead');
+  const leadSit = situationOf(lead);
+  const featured = (leadSit && lead.tags?.[leadSit[0]]) || lead.tags?.[0];
+  const extraSit = (f.oddsMove || []).find((o) => o.team === featured && Math.abs(o.change) >= 5);
+  const interview = featured && P[featured] ? mockInterview(P[featured], [leadSit?.[1] || 'win', extraSit ? (extraSit.change > 0 ? 'oddsUp' : 'oddsDown') : (leadSit?.[1] === 'win' ? 'hot' : 'loss')], `${seedKey}:${f.week}`) : null;
+  return { generator: 'templates', lead: leadQ, stories: stories.slice(0, 7).map(withQuote), briefs, lookahead, interview };
 }
 
 function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
@@ -347,7 +373,7 @@ export function deskCards(trades) {
   }));
 }
 
-export function deskTemplates(cards, seedKey = '') {
+export function deskTemplates(cards, seedKey = '', personas = null) {
   return cards.map((c, i) => {
     const pick = picker(hash(`${seedKey}:${c.id}:${i}`));
     const [w, l] = [...c.sides].sort((a, b) => b.valueEdgePct - a.valueEdgePct);
@@ -362,7 +388,9 @@ export function deskTemplates(cards, seedKey = '') {
         `Trade Desk: ${c.sides.map((s) => s.team).join(' And ')} Swap Assets In Deal Analysts Call 'Annoyingly Fair'`,
         `${c.sides.map((s) => s.team).join(', ')} Make A Trade; Nobody Gets Fleeced, Group Chat Disappointed`,
       ]);
-    const body = `${w.team} gets ${got(w)}; ${l.team} gets ${got(l)}. ${c.notes.slice(0, 2).join(' ')}`;
+    const P = personas || {};
+    const q = (s) => (P[s.team] ? ` ${attribute(quoteFor(P[s.team], 'trade', `${seedKey}:${c.id}`), `${s.team} (${P[s.team].nickname})`)}` : '');
+    const body = `${w.team} gets ${got(w)}; ${l.team} gets ${got(l)}. ${c.notes.slice(0, 2).join(' ')}${q(w)}${q(l)}`;
     return { headline, body };
   });
 }
@@ -371,6 +399,11 @@ export async function getEdition(ctx, week, { aiWriter } = {}) {
   const facts = await cached(`gfacts:${ctx.league.league_id}:${week}`, 30 * 60e3, () => weekFacts(ctx, week));
   if (!facts) return null;
   const graded = await gradeLeagueTrades(ctx).catch(() => []);
+  const cast = await getPersonas(ctx).catch(() => null);
+  facts.personas = cast ? Object.fromEntries(Object.values(cast.personas).map((p) => [p.team, {
+    nickname: p.nickname, archetype: p.archetype, voice: p.voice, voiceLabel: p.voiceLabel, catchphrase: p.catchphrase, bio: p.bio, rival: p.rival,
+    signatureMove: p.signatureMove ?? null, nemesisPlayer: p.nemesisPlayer ?? null, mascot: p.mascot ?? null, offLimits: p.offLimits ?? [], quotes: p.quotes ?? null, team: p.team,
+  }])) : {};
   // Playoff-odds swing this week (simulated from standings after this week vs. the week before).
   if (!facts.oddsMove && week > 1 && facts.race.weeksLeft > 0) {
     const [now, prev] = await Promise.all([getOdds(ctx, { throughWeek: week }), getOdds(ctx, { throughWeek: week - 1 })]).catch(() => [null, null]);
@@ -381,18 +414,20 @@ export async function getEdition(ctx, week, { aiWriter } = {}) {
   }
   const cards = deskCards(graded.filter((t) => !t.offseason && t.week === week));
   facts.tradeDesk = cards;
-  const base = { week, season: facts.season, league: facts.league, scoreboard: facts.scoreboard, medianGames: facts.medianGames, median: facts.medianNotes?.median ?? null };
+  const base = { week, season: facts.season, league: facts.league, scoreboard: facts.scoreboard, medianGames: facts.medianGames, median: facts.medianNotes?.median ?? null,
+    cast: Object.values(facts.personas || {}).map(({ quotes, offLimits, ...p }) => p) };
   const withDesk = (ed) => {
-    const text = Array.isArray(ed.tradeDesk) && ed.tradeDesk.length === cards.length ? ed.tradeDesk : deskTemplates(cards, ctx.league.league_id);
+    const text = Array.isArray(ed.tradeDesk) && ed.tradeDesk.length === cards.length ? ed.tradeDesk : deskTemplates(cards, ctx.league.league_id, facts.personas);
     return { ...ed, tradeDesk: cards.map((c, i) => ({ card: c, headline: text[i].headline, body: text[i].body })) };
   };
   if (aiWriter) {
     // Past weeks never change: keep AI editions for 60 days on disk so each is written once.
-    const ai = await cached(`gazette:ai2:${ctx.league.league_id}:${facts.season}:${week}`, 60 * 24 * 3600e3, () => aiWriter(facts), { disk: true }).catch((err) => {
+    const personaKey = [...JSON.stringify(facts.personas || {})].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    const ai = await cached(`gazette:ai3:${ctx.league.league_id}:${facts.season}:${week}:${personaKey}`, 60 * 24 * 3600e3, () => aiWriter(facts), { disk: true }).catch((err) => {
       console.warn('[gazette] AI writer failed, using templates:', err.message);
       return null;
     });
-    if (ai) return withDesk({ ...base, ...ai });
+    if (ai) return withDesk({ ...base, ...ai, interview: ai.interview?.qa?.length ? { ...ai.interview, nickname: facts.personas?.[ai.interview.team]?.nickname ?? null, voiceLabel: facts.personas?.[ai.interview.team]?.voiceLabel ?? null } : templateEdition(facts, ctx.league.league_id).interview });
   }
   return withDesk({ ...base, ...templateEdition(facts, ctx.league.league_id) });
 }

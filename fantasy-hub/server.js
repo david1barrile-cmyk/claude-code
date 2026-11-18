@@ -21,6 +21,12 @@ import { gradeLeagueTrades } from './lib/tradegrades.js';
 import { requestStats } from './lib/health.js';
 import { getOdds } from './lib/odds.js';
 import { hubWithPickLinks, getPickLinks } from './lib/picklink.js';
+import { getPersonas } from './lib/personas.js';
+import { getSeasonStats } from './lib/seasonstats.js';
+import { getRivalry } from './lib/rivalry.js';
+import { getDraftGrades } from './lib/draftgrades.js';
+import { getAwards } from './lib/awards.js';
+import { getDeckIndex, getDeck, proposalTrade } from './lib/tradedecks.js';
 
 // AI-written Gazette when ANTHROPIC_API_KEY is set (GAZETTE_AI=0 turns it off); templates otherwise.
 const aiWriter = process.env.GAZETTE_AI === '0' ? null : makeAiWriter();
@@ -29,6 +35,12 @@ const PUBLIC = path.join(path.dirname(new URL(import.meta.url).pathname), 'publi
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+
+// Deck "what if": ?assume=<season>:<round>:<originalOwnerId>:<prospect-slug>
+function deckAssume(q) {
+  const m = /^(\d{4}):(\d+):([^:]+):([a-z0-9-]+)$/.exec(q.get('assume') || '');
+  return m ? { key: `${m[1]}:${m[2]}:${m[3]}`, slug: m[4] } : null;
+}
 
 function card(ctx, id) {
   const p = ctx.players[id];
@@ -383,6 +395,35 @@ const routes = [
   ['GET', /^\/api\/league\/(\d+)\/trade-grades$/, async ([id]) => {
     const ctx = await getLeagueContext(id);
     return { trades: await gradeLeagueTrades(ctx), sources: (await getValueHub(ctx)).sources };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/personas$/, async ([id]) => {
+    const { personas } = await getPersonas(await getLeagueContext(id));
+    return { personas: Object.values(personas).map(({ stats, ...p }) => ({ ...p, stats: { record: stats.record, trades: stats.trades, adds: stats.adds, faab: stats.faab, benchLeft: stats.benchLeft, luck: stats.luck, titles: stats.titles } })) };
+  }],
+
+  ['GET', /^\/api\/league\/(\d+)\/wrapped$/, async ([id]) => getSeasonStats(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/awards$/, async ([id]) => getAwards(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/drafts$/, async ([id]) => getDraftGrades(await getLeagueContext(id))],
+  ['GET', /^\/api\/league\/(\d+)\/decks$/, async ([id]) => getDeckIndex(await getLeagueContext(id))],
+  // A deck for a trade that hasn't happened, from the Trade Analyzer's selections.
+  ['GET', /^\/api\/league\/(\d+)\/deck\/proposal$/, async ([id], q) => {
+    const ctx = await getLeagueContext(id);
+    const list = (k) => (q.get(k) || '').split(',').filter(Boolean).slice(0, 15);
+    const t = proposalTrade(ctx, { aRid: q.get('a'), bRid: q.get('b'), aSends: list('ga'), bSends: list('gb') });
+    if (!t) throw new HttpError(400, 'Pick at least one asset from each team');
+    return getDeck(ctx, null, q.get('owner'), t, deckAssume(q));
+  }],
+  ['GET', /^\/api\/league\/(\d+)\/deck\/([\w-]+)$/, async ([id, tid], q) => {
+    const deck = await getDeck(await getLeagueContext(id), tid, q.get('owner'), null, deckAssume(q));
+    if (!deck) throw new HttpError(404, 'Trade not found');
+    return deck;
+  }],
+  ['GET', /^\/api\/league\/(\d+)\/rivalry$/, async ([id], q) => {
+    const ctx = await getLeagueContext(id);
+    const a = q.get('a'), b = q.get('b');
+    if (!a || !b || a === b) throw new HttpError(400, 'Pick two different teams (a and b are owner ids)');
+    return getRivalry(ctx, a, b);
   }],
 
   ['GET', /^\/api\/league\/(\d+)\/gazette$/, async ([id], q) => {

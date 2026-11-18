@@ -79,12 +79,17 @@ const ICONS = {
   gazette: '<path d="M3 6h15v13H4a1 1 0 0 1-1-1zM18 10h3v8a1 1 0 0 1-2 0v-8M6 9h9M6 12h4M6 15h4M12 12h3v3h-3z"/>',
 };
 const GROUPS = [
-  { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['power', 'Power Rankings'], ['history', 'League History']] },
+  { name: 'League', icon: '', items: [['', 'Dashboard'], ['gazette', 'League Gazette'], ['awards', 'Awards'], ['power', 'Power Rankings'], ['history', 'League History'], ['rivalry', 'Rivalries'], ['wrapped', 'Season Wrapped']] },
   { name: 'My Team', icon: 'team', items: [['team', 'My Team'], ['waivers', 'Waivers']] },
-  { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['trades', 'Trade Finder']] },
-  { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
+  { name: 'Trades', icon: 'analyzer', items: [['analyzer', 'Trade Analyzer'], ['grades', 'Trade Grades'], ['decks', 'Pitch Decks'], ['trades', 'Trade Finder']] },
+  { name: 'Players', icon: 'rookies', items: [['rookies', 'Rookies'], ['drafts', 'Draft Grades'], ['metrics', 'Metrics'], ['news', 'News & Highlights']] },
 ];
 ICONS.status = '<path d="M3 12h4l3-8 4 16 3-8h4"/>';
+ICONS.awards = '<circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/>';
+ICONS.rivalry = '<path d="M5 19 19 5M9 5H5v4M19 15v4h-4M15 9l4-4M5 19l4-4"/>';
+ICONS.wrapped = '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 11h18M12 7v14M12 7c-2-4-6-4-6-1s4 1 6 1c2 0 6 2 6-1s-4-3-6 1"/>';
+ICONS.decks = '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v4M8 20h8M7 12l3-3 2 2 4-4"/>';
+ICONS.drafts = '<path d="M4 4h16v16H4zM4 9h16M9 4v16"/>';
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
 
 function renderShell(active) {
@@ -267,10 +272,10 @@ async function viewPower($) {
   $.innerHTML = `${head('Power Rankings', `Two views of the league. <b>This season</b> blends record (25%), all-play record (35%) and current lineup strength (40%). <b>Dynasty</b> totals roster and draft-pick trade value (${esc(d.dynasty.source)}; picks valued by ${esc(d.dynasty.pickSource === 'Estimated' ? 'an estimate' : d.dynasty.pickSource)}) and projects it 1–3 years out with position-specific age curves.`)}
   <div class="grid">
     ${d.odds ? card('Projected season finish', `<div class="grid" style="gap:24px">
-        <div class="span-5"><h3 style="margin-top:0">Projected final wins</h3><div id="c-wins"></div>
-          <div class="legend" style="margin-top:8px"><span><i style="background:var(--bar-muted)"></i>80% range</span><span><i style="background:var(--series-me);border-radius:50%"></i>Average</span><span><i style="background:var(--ink);width:2px"></i>Wins today</span></div></div>
-        <div class="span-7"><h3 style="margin-top:0">Chance of each final standing</h3><div id="c-finish"></div></div></div>
-      <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
+        <div class="span-12"><h3 style="margin-top:0">Chance of each final standing</h3><div id="c-finish"></div></div>
+        <div class="span-12"><h3 style="margin-top:0">Projected final wins</h3><div id="c-wins" style="max-width:760px"></div>
+          <div class="legend" style="margin-top:8px"><span><i style="background:var(--bar-muted)"></i>80% range</span><span><i style="background:var(--series-me);border-radius:50%"></i>Average</span><span><i style="background:var(--ink);width:2px"></i>Wins today</span></div></div></div>
+      <p class="small muted">${d.odds.sims.toLocaleString()} simulated seasons over the remaining ${d.odds.remaining.length} week${d.odds.remaining.length === 1 ? '' : 's'} (${d.odds.remaining.length ? `weeks ${d.odds.remaining[0]}–${d.odds.remaining.at(-1)}` : 'none left'}) on your real schedule${d.odds.gamesTotal > d.odds.throughWeek + d.odds.remaining.length ? ', including the weekly game against the median' : ''}. Each team's weekly score is drawn around its strength (best lineup today blended with points per week so far) with its own week-to-week swing. Top ${d.odds.spots} make the playoffs${d.odds.byes ? `; top ${d.odds.byes} get a bye` : ''}; the bracket is simulated too, for final and title odds.</p>`, { span: 12, note: 'playoff odds by simulation' }) : ''}
     ${card('This season', `<div id="c-season"></div>`, { span: 5, note: 'score 0–100' })}
     ${card('Contender or rebuilder?', `<div id="c-quad"></div>`, { span: 7, note: 'current strength vs. long-term value' })}
     ${d.dynastyAdj ? `<section class="span-12 row" style="justify-content:space-between">
@@ -354,11 +359,11 @@ function renderOdds(o) {
     return [`var(${steps[k]})`, (dark ? k <= 3 : k >= 4) ? '#ffffff' : 'var(--ink)'];
   };
   document.getElementById('c-finish').innerHTML = `<div class="scroll"><table class="heat">
-    <thead><tr><th>Team</th>${Array.from({ length: n }, (_, i) => `<th class="rot">${ordinal(i + 1)}</th>`).join('')}<th class="num">Playoffs</th>${o.byes ? '<th class="num">Bye</th>' : ''}<th class="num">#1 seed</th></tr></thead>
+    <thead><tr><th>Team</th>${Array.from({ length: n }, (_, i) => `<th class="rot">${ordinal(i + 1)}</th>`).join('')}<th class="num">Playoffs</th>${o.byes ? '<th class="num">Bye</th>' : ''}<th class="num" title="Chance to reach the championship game">Final</th><th class="num" title="Chance to win the title">Title</th></tr></thead>
     <tbody>${o.teams.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td>${teamTag({ name: t.name, avatar: t.avatar }, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''}`)}</td>
       ${t.finishDist.map((p, i) => { const [bg, fg] = cellColor(p); return `<td class="cell" style="background:${bg};color:${fg}" data-tip="${esc(`<b>${esc(t.name)}</b>${p}% chance to finish ${ordinal(i + 1)}`)}">${p >= 0.5 ? Math.round(p) : ''}</td>`; }).join('')}
       <td class="num"><span class="chip ${t.playoffOdds >= 75 ? 'good' : t.playoffOdds <= 25 ? 'bad' : 'warn'}">${t.playoffOdds >= 99.95 ? 'Clinched*' : t.playoffOdds < 0.05 ? 'Out*' : `${fmt(t.playoffOdds)}%`}</span></td>
-      ${o.byes ? `<td class="num">${fmt(t.byeOdds)}%</td>` : ''}<td class="num">${fmt(t.firstOdds)}%</td></tr>`).join('')}</tbody></table></div>
+      ${o.byes ? `<td class="num">${fmt(t.byeOdds)}%</td>` : ''}<td class="num">${t.finalOdds != null ? `${fmt(t.finalOdds)}%` : '—'}</td><td class="num"><b>${t.titleOdds != null ? `${fmt(t.titleOdds)}%` : '—'}</b></td></tr>`).join('')}</tbody></table></div>
     <p class="small muted">Cells: % chance of finishing in that place (darker = likelier). *In every simulation; not an official clinch.</p>`;
 }
 
@@ -399,7 +404,7 @@ async function viewHistory($) {
         const g = c ? c.w + c.l + c.t : 0;
         const p = g ? (c.w + c.t / 2) / g : null;
         const [bg, fg] = divColor(p);
-        return `<td class="cell" style="background:${bg};color:${fg}" data-tip="${esc(`<b>${esc(a.name)} vs ${esc(b.name)}</b>${g ? `${c.w}-${c.l}${c.t ? `-${c.t}` : ''} all-time` : 'Never played'}`)}">${g ? `${c.w}-${c.l}` : ''}</td>`;
+        return `<td class="cell" style="background:${bg};color:${fg};cursor:pointer" onclick="location.hash='#/rivalry?a=${encodeURIComponent(a.ownerId)}&b=${encodeURIComponent(b.ownerId)}'" data-tip="${esc(`<b>${esc(a.name)} vs ${esc(b.name)}</b>${g ? `${c.w}-${c.l}${c.t ? `-${c.t}` : ''} all-time` : 'Never played'}<br>Click for the rivalry page`)}">${g ? `${c.w}-${c.l}` : ''}</td>`;
       }).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="small muted">Blue = row team has the edge, red = column team does, gray = even.</p>`, { span: 12 })}
     ${card('League records', `<div class="kpis">
@@ -590,6 +595,7 @@ async function viewAnalyzer($) {
     const who = (e) => (Math.abs(e) <= 5 ? 'even' : `${e > 0 ? esc(nA) : esc(nB)} +${Math.abs(e)}%`);
     out.innerHTML = `<div class="card-head"><h2>Verdict</h2><span class="muted">${r.sourcesAgree ? '✓ sources agree' : '⚠ sources disagree'}</span></div>
       <div class="verdict" style="margin-top:0">${esc(verdict)}</div>
+      <div class="row" style="margin:-4px 0 12px;gap:8px"><span class="small muted">Make the pitch deck:</span>${[[state.a, nA], [state.b, nB]].map(([rid, nm]) => `<a class="chip" href="#/deck/proposal?a=${state.a}&b=${state.b}&ga=${encodeURIComponent([...state.A].join(','))}&gb=${encodeURIComponent([...state.B].join(','))}&owner=${encodeURIComponent(team(rid).ownerId)}">📊 ${esc(nm)}'s pitch</a>`).join('')}</div>
       <div class="row small muted" style="justify-content:space-between;max-width:620px"><span>◀ better for ${esc(nB)}</span><span>better for ${esc(nA)} ▶</span></div>
       <div style="max-width:620px">${edgeBar(r.consensus)}</div>
       <p class="small muted">Consensus value edge: <b>${who(r.consensus)}</b>${r.bestAsset ? ` · Best single asset: <b>${esc(r.bestAsset.label)}</b> (${esc(r.bestAsset.side === 'A' ? nB : nA)} receives it)` : ''}</p>
@@ -756,6 +762,7 @@ function tradeCard(t) {
       <div class="row"><span class="who">${teamAv({ name: s.team, avatar: s.avatar }, 'sm')}<span class="t"><span><b>${esc(s.team)}</b></span><small>${s.contender ? 'Contender' : 'Building'} · ${ordinal(s.recordRank)} in standings</small></span></span>
         <span style="display:flex;flex-direction:column;align-items:center;gap:4px"><span class="${gradeCls(s.grade)}" title="Market grade · score ${s.score}">${esc(s.grade)}</span>
           ${s.adjusted ? `<span class="small muted" title="League-adjusted grade: replacement level for this league + consolidation discount (edge ${s.adjusted.edge > 0 ? '+' : ''}${s.adjusted.edge}%)">Adj <b>${esc(s.adjusted.grade)}</b></span>` : ''}</span></div>
+      ${s.ownerId ? `<a class="small deck-link" href="#/deck/${esc(t.id)}?owner=${esc(s.ownerId)}">📊 ${esc(s.team)}'s pitch deck</a>` : ''}
       <div class="small muted" style="margin-top:8px">Receives</div>
       <ul class="gets">${s.received.map(assetLine).join('') || '<li class="muted">FAAB only</li>'}${s.faabIn ? `<li>💵 $${s.faabIn} FAAB</li>` : ''}</ul>
       <div class="small muted" style="margin-top:6px">Sends: ${s.sent.map((x) => esc(x.label)).join(', ') || '—'}${s.faabOut ? `${s.sent.length ? ', ' : ''}$${s.faabOut} FAAB` : ''}</div>
@@ -809,7 +816,7 @@ async function viewGazette($) {
   $.innerHTML = `<div class="paper">
     <div class="topline"><span>Vol. ${esc(e.season)} · No. ${e.week}</span><span>Week ${e.week} Edition</span><span>Price: $1 FAAB</span></div>
     <div class="flag">${esc(flag)}</div>
-    <div class="tag">All the news that's fit to roast</div>
+    <div class="tag">All the news that's fit to roast · <a href="#/awards">Special edition: the Awards issue →</a></div>
     <div class="weeknav">
       ${prev ? `<a class="chip" href="#/gazette?week=${prev}">← Week ${prev}</a>` : '<span></span>'}
       <select id="gz-week" aria-label="Edition">${d.weeks.map((w) => `<option value="${w}" ${w === e.week ? 'selected' : ''}>Week ${w}</option>`).join('')}</select>
@@ -822,11 +829,24 @@ async function viewGazette($) {
         ${e.median != null ? `<div class="small muted" style="font-family:var(--font)">Dashed line: league median (${fmt(e.median)})${e.medianGames ? ' · beat it for an extra win' : ''}</div>` : ''}</aside>
     </section>
     <section class="cols">${e.stories.map(story).join('')}</section>
+    ${e.interview ? `<section class="desk"><div class="section-title">The Locker Room</div>
+      <div class="item" style="grid-template-columns:minmax(0,1fr)"><div>
+        <div class="kicker">Exclusive interview${e.interview.voiceLabel ? ` · ${esc(e.interview.voiceLabel)}` : ''}</div>
+        <h3>${esc(e.interview.team)}${e.interview.nickname ? `, a.k.a. ${esc(e.interview.nickname)},` : ''} Takes Our Questions</h3>
+        ${e.interview.qa.map((x) => `<p style="margin:10px 0 2px"><b>GAZETTE:</b> ${esc(x.q)}</p><p style="margin:0"><b>${esc(e.interview.team.toUpperCase())}:</b> ${esc(x.a)}</p>`).join('')}
+        <p class="small muted" style="font-family:var(--font);margin-top:8px">Satire. Quotes are invented in the team's Gazette persona; no managers were harmed or actually interviewed.</p></div></div></section>` : ''}
     <section class="desk" id="gz-desk"></section>
     <section class="lower">
       <div><div class="section-title">Around the League</div><ul class="briefs">${e.briefs.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>
       <div class="ahead"><div class="section-title">Looking Ahead</div>${e.lookahead.length ? e.lookahead.map((x) => `<h4>${esc(x.headline)}</h4><p>${esc(x.body)}</p>`).join('') : '<p>The regular season is over. Pray for your playoff matchup.</p>'}</div>
     </section>
+    ${e.cast?.length ? `<section class="desk"><div class="section-title">Meet the Cast</div>
+      <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));padding-top:6px">${e.cast.map((c) => `<div>
+        <div class="kicker">${esc(c.archetype)}</div><h3 style="font-size:18px;margin-bottom:2px">${esc(c.team)}</h3>
+        <div class="small" style="font-family:var(--font);margin-bottom:4px"><i>${esc(c.nickname)}</i> · ${esc(c.voiceLabel)}</div>
+        <p style="font-size:14px">${esc(c.bio)}</p>
+        <p class="small" style="font-family:var(--font);margin-top:4px">Catchphrase: “${esc(c.catchphrase)}”${c.rival ? `<br>Rival: ${esc(c.rival)}` : ''}${c.mascot ? `<br>Mascot: ${esc(c.mascot)}` : ''}</p></div>`).join('')}</div>
+      <p class="small muted" style="font-family:var(--font)">Personas are generated from how each team plays; managers can write their own (data/personas.json).</p></section>` : ''}
     <div class="fine">Satire. Scores and stats are real; quotes, sources and experts are not. Any resemblance to competent management is coincidental.<br>
       ${e.generator === 'claude' ? `Written by Claude (${esc(e.model || 'AI')}) from this week's league data.` : "Written by the Gazette's in-house joke machine."}</div>
   </div>`;
@@ -950,6 +970,339 @@ async function viewPlayer($, id) {
   }
 }
 
+// ---------- awards ----------
+async function viewAwards($) {
+  const a = await api(L('/awards'));
+  $.innerHTML = `<div class="paper">
+    <div class="topline"><span>Vol. ${esc(a.season)} · Special Edition</span><span>${a.complete ? 'Season in review' : `Through Week ${a.weeksPlayed}`}</span><span>Price: $1 FAAB</span></div>
+    <div class="flag">${esc(`The ${session.leagueName} Gazette`)}</div>
+    <div class="tag">${esc(a.title)}: the envelopes, please</div>
+    <hr class="rule">
+    <div style="display:grid;gap:26px 30px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">${a.awards.map((w) => `<article class="story" style="margin:0">
+      <div class="kicker">${esc(w.title)}</div>
+      <h3>${esc(w.team)}${w.nickname ? ` <span style="font-weight:400;font-style:italic;font-size:15px">(${esc(w.nickname)})</span>` : ''}</h3>
+      <div style="font:700 13px/1.3 var(--font);margin:2px 0 6px">${esc(w.stat)}</div>
+      <p>${esc(w.blurb)}</p>${w.speech ? `<p style="margin-top:6px;font-style:italic">${esc(w.speech)}</p>` : ''}
+      ${w.team === session.teamName ? '<div class="small" style="margin-top:6px;font-family:var(--font)"><span class="chip warn">📣 That’s you</span></div>' : ''}</article>`).join('')}</div>
+    <div class="fine">Satire. Every stat is real; every acceptance speech is not. ${a.complete ? '' : 'Final awards print when the regular season ends.'}</div>
+  </div>`;
+}
+
+// ---------- rivalry ----------
+async function viewRivalry($) {
+  const lg = await api(L());
+  const teams = lg.teams;
+  const meOwner = session.userId;
+  let a = routeQuery.get('a') || meOwner, b = routeQuery.get('b');
+  if (!b) {
+    const per = await api(L('/personas')).catch(() => null);
+    const myRival = per?.personas.find((p) => p.ownerId === a)?.rival;
+    b = teams.find((t) => t.name === myRival)?.ownerId || teams.find((t) => t.ownerId !== a)?.ownerId;
+  }
+  const r = await api(L(`/rivalry?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`));
+  const sel = (id2, cur, other) => `<select id="${id2}">${teams.map((t) => `<option value="${esc(t.ownerId)}" ${t.ownerId === cur ? 'selected' : ''} ${t.ownerId === other ? 'disabled' : ''}>${esc(t.name)}</option>`).join('')}</select>`;
+  const lead = r.record.a > r.record.b ? r.a.team : r.record.b > r.record.a ? r.b.team : null;
+  const tape = (x, y) => `<div style="text-align:center">${teamAv({ name: x.team, avatar: x.avatar }, 'lg')}<h2 style="margin:8px 0 2px;font:700 22px/1.2 var(--font-display)">${esc(x.team)}</h2>
+    ${x.persona ? `<div class="small muted"><i>${esc(x.persona.nickname)}</i> · ${esc(x.persona.voiceLabel)}</div>` : ''}
+    <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(2,1fr)"><div class="kpi"><b>${esc(x.record || '—')}</b><span>This season</span></div><div class="kpi"><b>${esc(x.allTime || '—')}</b><span>All-time</span></div>
+      <div class="kpi"><b>${x.titles ? '🏆'.repeat(x.titles) : '0'}</b><span>Titles</span></div><div class="kpi"><b>${x.titleOdds != null ? `${fmt(x.titleOdds)}%` : '—'}</b><span>Title odds</span></div></div>
+    ${x.trashTalk ? `<p style="font-style:italic;margin-top:10px">${esc(x.trashTalk)}</p>` : ''}</div>`;
+  const maxM = Math.max(1, ...r.games.map((g) => Math.abs(g.margin)));
+  $.innerHTML = `${head('Rivalries', 'Everything between two teams, all-time: head-to-head, blowouts, trades, and the personas’ trash talk.', `<div class="row">${sel('rv-a', a, b)}<span class="muted">vs</span>${sel('rv-b', b, a)}</div>`)}
+  <div class="grid">
+    <section class="card span-12"><div class="rv-tape">
+      <div>${tape(r.a, r.b)}</div>
+      <div class="rv-mid"><div class="eyebrow">All-time</div><div style="font:700 44px/1 var(--font-display)">${r.record.a}–${r.record.b}${r.record.ties ? `–${r.record.ties}` : ''}</div>
+        <div class="small muted" style="margin-top:6px">${r.record.games} game${r.record.games === 1 ? '' : 's'}${lead ? ` · ${esc(lead)} leads` : r.record.games ? ' · dead even' : ''}</div>
+        ${r.streak ? `<div class="chip" style="margin-top:8px">${esc(r.streak.team)} ${r.streak.n > 1 ? `won the last ${r.streak.n}` : 'won the last one'}</div>` : ''}
+        ${r.next ? `<div class="chip warn" style="margin-top:8px">Next: Week ${r.next.week}</div>` : ''}
+        ${r.personaRivals.a || r.personaRivals.b ? '<div class="small" style="margin-top:8px">🔥 Official Gazette rivals</div>' : ''}</div>
+      <div>${tape(r.b, r.a)}</div></div></section>
+    ${card('Every game', r.games.length ? `<div>${r.games.map((g) => `<div class="bullet" style="grid-template-columns:90px 1fr 120px" data-tip="${esc(`<b>${g.season} · Week ${g.week}</b>${esc(r.a.team)} ${g.aPts} – ${esc(r.b.team)} ${g.bPts}`)}">
+        <span class="small muted">${g.season} W${g.week}</span>
+        <div class="track" style="background:transparent"><div class="mark" style="left:50%;background:var(--muted);width:1px"></div>
+          <div style="position:absolute;top:0;bottom:0;${g.margin >= 0 ? 'left:50%;border-radius:0 4px 4px 0;background:var(--div-pos-2)' : 'right:50%;border-radius:4px 0 0 4px;background:var(--div-neg-2)'};width:${(Math.abs(g.margin) / maxM) * 50}%"></div></div>
+        <span class="small num" style="text-align:right">${g.aPts}–${g.bPts}</span></div>`).join('')}
+        <div class="legend" style="margin-top:8px"><span><i style="background:var(--div-pos-2)"></i>${esc(r.a.team)} won</span><span><i style="background:var(--div-neg-2)"></i>${esc(r.b.team)} won</span></div></div>` : '<p class="muted">They have never played.</p>', { span: 7, note: `average margin ${r.avgMargin > 0 ? '+' : ''}${r.avgMargin} for ${esc(r.a.team)}` })}
+    ${card('Record book', `<div class="kpis" style="grid-template-columns:1fr">
+        ${r.biggestA ? `<div class="record"><span class="eyebrow">${esc(r.a.team)}'s biggest win</span><b>+${r.biggestA.margin}</b>${r.biggestA.aPts}–${r.biggestA.bPts} · ${r.biggestA.season} W${r.biggestA.week}</div>` : ''}
+        ${r.biggestB ? `<div class="record"><span class="eyebrow">${esc(r.b.team)}'s biggest win</span><b>+${Math.abs(r.biggestB.margin)}</b>${r.biggestB.bPts}–${r.biggestB.aPts} · ${r.biggestB.season} W${r.biggestB.week}</div>` : ''}
+        ${r.closest ? `<div class="record"><span class="eyebrow">Closest game</span><b>${Math.abs(r.closest.margin)}</b>${r.closest.aPts}–${r.closest.bPts} · ${r.closest.season} W${r.closest.week}</div>` : ''}</div>`, { span: 5 })}
+    ${card('Trades between them', r.trades.length ? r.trades.map((t) => `<div class="li"><div class="row" style="justify-content:space-between"><span class="small muted">${t.offseason ? 'Offseason' : `Week ${t.week}`} · ${new Date(t.at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}${t.teamsCount > 2 ? ' · 3-team' : ''}</span><span class="chip">${esc(t.verdict)}</span></div>
+        <div class="row" style="margin-top:6px"><span class="${gradeCls(t.a.grade)} sm">${esc(t.a.grade)}</span><span class="small">${esc(r.a.team)} got ${esc(t.a.received.join(', ') || 'FAAB')}</span></div>
+        <div class="row" style="margin-top:4px"><span class="${gradeCls(t.b.grade)} sm">${esc(t.b.grade)}</span><span class="small">${esc(r.b.team)} got ${esc(t.b.received.join(', ') || 'FAAB')}</span></div></div>`).join('') : '<p class="muted">No trades between these two. Trust issues, presumably.</p>', { span: 12 })}
+  </div>`;
+  const go = () => { location.hash = `#/rivalry?a=${encodeURIComponent(document.getElementById('rv-a').value)}&b=${encodeURIComponent(document.getElementById('rv-b').value)}`; };
+  document.getElementById('rv-a').onchange = go; document.getElementById('rv-b').onchange = go;
+}
+
+// ---------- season wrapped ----------
+async function viewWrapped($) {
+  const d = await api(L('/wrapped'));
+  const owner = routeQuery.get('team') || session.userId;
+  const t = d.teams.find((x) => x.ownerId === owner) || d.teams[0];
+  const tile = (eyebrow, big, sub, tone = '') => `<div class="card wrap-tile ${tone}"><div class="eyebrow">${eyebrow}</div><div class="wrap-big">${big}</div><div class="wrap-sub">${sub}</div></div>`;
+  const tradeLine = (tr) => (tr ? `${esc(tr.received.slice(0, 2).join(' + ') || 'FAAB')} from ${esc(tr.partners.join(' & '))}` : '');
+  $.innerHTML = `${head(`${esc(d.season)} Wrapped`, `${d.complete ? 'The full season' : `The season so far (${d.weeksPlayed} weeks)`}, one team at a time. Pick a team to see theirs.`,
+    `<select id="wr-team">${d.teams.map((x) => `<option value="${esc(x.ownerId)}" ${x === t ? 'selected' : ''}>${esc(x.team)}</option>`).join('')}</select>`)}
+  <section class="card hero" style="margin-bottom:16px"><div class="hero-team">${teamAv({ name: t.team, avatar: t.avatar }, 'lg')}<div>
+    <div class="eyebrow">${t.persona ? `${esc(t.persona.archetype)} · ${esc(t.persona.voiceLabel)}` : 'Season Wrapped'}</div><h1>${esc(t.team)}</h1>
+    ${t.persona ? `<div class="muted"><i>${esc(t.persona.nickname)}</i>: “${esc(t.persona.catchphrase)}”</div>` : ''}</div></div>
+    <div class="hero-stats"><div><b>${esc(t.record)}</b><span>Record</span></div><div><b>${t.pf}</b><span>Points for</span></div><div><b>${t.ppg}</b><span>Per week</span></div>
+      ${t.allPlay ? `<div><b>${esc(t.allPlay)}</b><span>All-play</span></div>` : ''}<div><b>${t.luck > 0 ? '+' : ''}${t.luck}</b><span>Luck (wins)</span></div></div></section>
+  <div class="wrap-grid">
+    ${t.bestWeek ? tile('Your best week', `${t.bestWeek.pts}`, `Week ${t.bestWeek.week}${t.bestWeek.opp ? ` vs ${esc(t.bestWeek.opp)} (${t.bestWeek.oppPts})` : ''}`, 'good') : ''}
+    ${t.worstWeek ? tile('Your worst week', `${t.worstWeek.pts}`, `Week ${t.worstWeek.week}. We don't talk about Week ${t.worstWeek.week}.`, 'bad') : ''}
+    ${t.mvp ? tile('Your MVP', esc(t.mvp.name), `${t.mvp.pts} pts in ${t.mvp.games} starts · ${esc(t.mvp.pos)}`) : ''}
+    ${t.mostStarted && t.mostStarted.name !== t.mvp?.name ? tile('Most trusted', esc(t.mostStarted.name), `Started ${t.mostStarted.games} of ${d.weeksPlayed} weeks`) : ''}
+    ${t.biggestWin ? tile('Most disrespectful win', `+${Math.round((t.biggestWin.pts - t.biggestWin.oppPts) * 10) / 10}`, `${t.biggestWin.pts}–${t.biggestWin.oppPts} over ${esc(t.biggestWin.opp)}, Week ${t.biggestWin.week}`, 'good') : ''}
+    ${t.toughestLoss ? tile('The heartbreaker', `${Math.round((t.toughestLoss.pts - t.toughestLoss.oppPts) * 10) / 10}`, `Lost ${t.toughestLoss.pts}–${t.toughestLoss.oppPts} to ${esc(t.toughestLoss.opp)}, Week ${t.toughestLoss.week}`, 'bad') : ''}
+    ${t.worstCall ? tile('Worst lineup call', `−${t.worstCall.cost}`, `Week ${t.worstCall.week}: benched ${esc(t.worstCall.benched.name)} (${t.worstCall.benched.pts}) for ${esc(t.worstCall.started.name)} (${t.worstCall.started.pts})`, 'bad') : ''}
+    ${tile('Points left on the bench', `${t.benchTotal}`, `All season. The bench thanks you for the opportunity.`)}
+    ${t.bestAdd ? tile('Best waiver pickup', esc(t.bestAdd.name), `${t.bestAdd.pts} pts in your lineup${t.bestAdd.faab ? ` · $${t.bestAdd.faab}` : ''} · ${t.adds} pickups total`, 'good') : tile('Waiver activity', `${t.adds}`, 'pickups this season')}
+    ${t.bestTrade ? tile('Best trade', `${esc(t.bestTrade.grade)}`, tradeLine(t.bestTrade), 'good') : tile('Trades', '0', 'A committed monogamist with this roster.')}
+    ${t.worstTrade ? tile('Worst trade', `${esc(t.worstTrade.grade)}`, tradeLine(t.worstTrade), 'bad') : ''}
+    ${t.outlook ? tile(d.complete ? 'Final outlook' : 'What happens next', `${t.outlook.playoffOdds >= 99.95 ? '>99' : Math.round(t.outlook.playoffOdds)}%`, `playoff odds · ${t.outlook.titleOdds != null ? `${fmt(t.outlook.titleOdds)}% to win it all` : `projected ${t.outlook.projWins} wins`}`) : ''}
+  </div>
+  <p class="small muted" style="margin-top:12px">Grades and values use today's numbers. ${d.complete ? '' : 'Updates every week until the season ends.'}</p>`;
+  document.getElementById('wr-team').onchange = (e) => { location.hash = `#/wrapped?team=${encodeURIComponent(e.target.value)}`; };
+}
+
+// ---------- draft grades ----------
+async function viewDrafts($) {
+  const d = await api(L('/drafts'));
+  if (!d.drafts.length) { $.innerHTML = `${head('Draft Grades', '')}<div class="card"><p class="muted">No completed drafts found for this league yet.</p></div>`; return; }
+  const idx = Math.max(0, d.drafts.findIndex((x) => x.id === routeQuery.get('draft')));
+  const dr = d.drafts[idx];
+  const pick = (r) => `${posTag(r.pos)} <a href="#/player/${esc(r.playerId)}">${esc(r.player)}</a>`;
+  $.innerHTML = `${head('Draft Grades', 'Every completed draft, re-graded at today’s market values. Each pick is compared with what its slot should have produced: the value of the player that draft yielded at that rank.',
+    `<div class="seg">${d.drafts.map((x, i) => `<button data-d="${esc(x.id)}" class="${i === idx ? 'on' : ''}">${esc(x.season)} ${x.kind === 'Startup draft' ? 'Startup' : 'Rookie'}</button>`).join('')}</div>`)}
+  <div class="grid">
+    ${card(`${esc(dr.season)} ${esc(dr.kind)}: team grades`, `<div class="scroll"><table><thead><tr><th>Team</th><th class="num">Grade</th><th class="num">Value vs slots</th><th>Best pick</th><th>Worst pick</th></tr></thead><tbody>
+      ${dr.teams.map((t) => `<tr class="${t.ownerId === session.userId ? 'me' : ''}"><td><b>${esc(t.team)}</b> <span class="muted small">${t.picks.length} picks</span></td><td class="num"><span class="${gradeCls(t.grade)} sm">${esc(t.grade)}</span></td>
+        <td class="num ${trendCls(t.pct)}">${t.pct > 0 ? '+' : ''}${t.pct}%</td>
+        <td class="small">${t.best && t.best.surplus > 0 ? `${pick(t.best)} <span class="muted">${esc(t.best.label)} → #${t.best.redraftPick}</span>` : '—'}</td>
+        <td class="small">${t.worst && t.worst.surplus < 0 ? `${pick(t.worst)} <span class="muted">${esc(t.worst.label)} → #${t.worst.redraftPick}</span>` : '—'}</td></tr>`).join('')}</tbody></table></div>`, { span: 12, note: `${dr.picks} picks · ${dr.rounds} rounds` })}
+    ${card('Steals', dr.steals.map((r) => `<div class="li row" style="justify-content:space-between"><span>${pick(r)} <span class="muted small">${esc(r.team)}</span></span><span class="small"><b>${esc(r.label)}</b> → redraft #${r.redraftPick}</span></div>`).join('') || '<p class="muted">None.</p>', { span: 6, note: 'went later than they would today' })}
+    ${card('Busts', dr.busts.map((r) => `<div class="li row" style="justify-content:space-between"><span>${pick(r)} <span class="muted small">${esc(r.team)}</span></span><span class="small"><b>${esc(r.label)}</b> → redraft #${r.redraftPick}</span></div>`).join('') || '<p class="muted">None.</p>', { span: 6, note: 'went earlier than they would today' })}
+    ${card('If we redrafted today', `<div class="scroll"><table><thead><tr><th class="num">#</th><th>Player</th><th>Originally</th><th>By</th><th class="num">Value now</th></tr></thead><tbody>
+      ${dr.redraft.map((r, i) => `<tr><td class="rank num">${i + 1}</td><td>${pick(r)}</td><td class="num">${esc(r.label)} <span class="muted small">(#${r.pickNo})</span> ${r.pickNo > i + 1 ? `<span class="up small">▲${r.pickNo - i - 1}</span>` : r.pickNo < i + 1 ? `<span class="down small">▼${i + 1 - r.pickNo}</span>` : ''}</td><td class="small">${esc(r.team)}</td><td class="num">${k(r.value)}</td></tr>`).join('')}</tbody></table></div>`, { span: 12 })}
+  </div>
+  <p class="small muted">Value = median of KTC, FantasyCalc and DynastyProcess today. Retired or unvalued players count as 0. Hindsight, obviously.</p>`;
+  $.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/drafts?draft=${encodeURIComponent(b.dataset.d)}`; }));
+}
+
+// ---------- pitch decks ----------
+async function viewDecks($) {
+  const d = await api(L('/decks'));
+  const bySeason = {};
+  for (const t of d.trades) (bySeason[t.season] ||= []).push(t);
+  const mine = (t) => t.sides.some((x) => x.ownerId === session.userId);
+  $.innerHTML = `${head('Pitch Decks', `Every trade in league history (${d.trades.length}) as an investor presentation, from either side: the deal, the assets, stats as of the trade, the strategic rationale, the chain of trades that funded it, and how the market sees it today. Open one, then present it full screen or save it as a PDF for the group chat.`)}
+  ${Object.keys(bySeason).sort((a, b) => b - a).map((season) => card(`${esc(season)} season`, `<div class="deck-list">${bySeason[season].map((t) => `<div class="deck-row ${mine(t) ? 'me' : ''}">
+      <div class="small muted">${t.offseason ? 'Offseason' : `Week ${t.week}`} · ${new Date(t.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+      <div class="deck-sides">${t.sides.map((x) => `<a class="deck-side" href="#/deck/${esc(t.id)}?owner=${esc(x.ownerId)}"><b>${esc(x.team)}</b><span class="small muted">gets ${esc(x.received.join(', ') || 'FAAB')}</span><span class="small deck-open">Open deck →</span></a>`).join('')}</div>
+    </div>`).join('')}</div>`, { span: 12, note: `${bySeason[season].length} trade${bySeason[season].length === 1 ? '' : 's'}` })).join('')}`;
+}
+
+const headshot = (id, cls = '') => `<img class="hs ${cls}" src="https://sleepercdn.com/content/nfl/players/${esc(id)}.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+const nflLogo = (t) => (t ? `<img class="logo" src="https://sleepercdn.com/images/team_logos/nfl/${esc(String(t).toLowerCase())}.png" alt="" onerror="this.remove()">` : '');
+const ordWord = (r) => ['', '1ST', '2ND', '3RD', '4TH', '5TH'][r] || `${r}TH`;
+
+function deckAsset(a, d, { dark = false, funded = false, small = false } = {}) {
+  if (a.kind === 'pick' && !a.became) {
+    const via = a.origOwner === d.presenter.ownerId ? `${esc(d.presenter.team)}'s own` : `via ${esc(a.origTeam)}`;
+    return `<div class="pk ${dark ? 'dark' : ''} ${funded ? 'funded' : ''} ${small ? 'sm' : ''}"><span class="yr">${esc(a.season)}</span><b>${ordWord(a.round)} ROUND</b><i>${a.slot && a.round ? `${a.round}.${String(a.slot).padStart(2, '0')} · ` : ''}${via}</i></div>`;
+  }
+  if (a.became?.prospect) {
+    const b = a.became;
+    return `<div class="pl prospect ${funded ? 'funded' : ''} ${small ? 'sm' : ''}"><div class="ini">${esc(b.name.split(' ').map((w) => w[0]).join(''))}</div><div class="cap"><b>${esc(b.name)}</b><span>${esc(b.pos)} | ${esc(String(b.college || '').split(' ')[0] || 'Prospect')} · ${esc(a.season)} ${a.round}.${String(b.slot).padStart(2, '0')}</span></div></div>`;
+  }
+  const id = a.became ? a.became.playerId : a.id, name = a.became ? a.became.name : a.name;
+  return `<div class="pl ${funded ? 'funded' : ''} ${small ? 'sm' : ''}" style="--tc:${esc(a.color || '#1b2a44')}">${nflLogo(a.nfl)}${headshot(id)}<div class="cap"><b>${esc(name)}</b><span>${a.became ? `${esc(a.season)} ${a.round}.${String(a.became.slot).padStart(2, '0')} pick` : `${esc(a.pos)}${a.nfl ? ` | ${esc(NFLshort(a))}` : ''}`}</span></div></div>`;
+}
+// Players as tall tiles, then picks stacked two to a column beside them.
+function stackTiles(xs, d, small) {
+  const isPick = (a) => a.kind === 'pick' && !a.became;
+  const pls = xs.filter((a) => !isPick(a)), pks = xs.filter(isPick);
+  const cols = [];
+  for (let i = 0; i < pks.length; i += 2) cols.push(`<div class="pkcol">${pks.slice(i, i + 2).map((a) => deckAsset(a, d, { small })).join('')}</div>`);
+  return pls.map((a) => deckAsset(a, d, { small })).join('') + cols.join('');
+}
+const NFLshort = (a) => String(a.nflName || a.nfl || '').split(' ').slice(0, -1).join(' ') || a.nfl;
+
+function deckSlides(d) {
+  const P = d.presenter, partners = d.partners.map((p) => p.team).join(' & ');
+  const foot = (n, note = '') => `<div class="foot"><span>${note || `${esc(P.team)} | Investor Presentation | ${esc(session.leagueName)} | ${esc(d.dateLabel)}`}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${n}</b></span></div>`;
+  const top = (eyebrow, title) => `<div class="eyebrow">${eyebrow}</div><h2>${esc(title)}</h2><hr>`;
+  const slides = [];
+  const tx = d.transaction;
+  const heroA = d.spotlights[0]?.asset;
+
+  // 1. Cover
+  slides.push(`<section class="slide s-cover">
+    <div class="cover-l">
+      <div class="brandrow">${teamAv({ name: P.team, avatar: P.avatar })}<div><b>${esc(P.team.toUpperCase())}</b><span>${esc(session.leagueName)}</span></div></div>
+      <h1>${esc(d.title)}</h1><div class="grn"></div>
+      <div class="sub">Investor Presentation &nbsp;|&nbsp; ${esc(d.dateLabel)}</div>
+      ${d.coverHeads.length ? `<div class="heads">${d.coverHeads.map((h) => `<div>${h.id ? headshot(h.id) : `<span class="ini">${esc(h.initials)}</span>`}</div>`).join('')}</div><div class="headnames">${d.coverHeads.map((h) => esc(h.name)).join(' &nbsp;|&nbsp; ')}</div>` : ''}
+    </div>
+    <div class="cover-r" style="--tc:${esc(heroA?.color || '#1b2a44')}">${heroA?.became?.prospect ? `<div class="bigpick"><span style="font-size:1.4cqw;color:#49a77a">${esc(heroA.season)} ${heroA.round}.${String(heroA.became.slot).padStart(2, '0')}</span><b>${esc(heroA.became.name.split(' ').slice(-1)[0].toUpperCase())}</b>${esc(heroA.became.college || '')}</div>` : heroA?.kind === 'player' ? `${nflLogo(heroA.nfl)}${headshot(heroA.id, 'big')}` : `<div class="bigpick">${heroA ? `${esc(heroA.season)}<b>${ordWord(heroA.round)}</b>ROUND` : ''}</div>`}</div>
+  </section>`);
+
+  // 2. Disclaimer
+  slides.push(`<section class="slide s-text">${top('DISCLAIMER', 'Forward-Looking Statements and Other Important Information')}
+    <ul class="disc">${d.disclaimers.map((x) => `<li><b>${esc(x.h)}</b> ${esc(x.t)}</li>`).join('')}</ul>${foot(2)}</section>`);
+
+  // 3. The transaction
+  const many = tx.received.length + tx.sent.length > 7;
+  slides.push(`<section class="slide s-text">${top(d.proposal ? 'THE PROPOSED TRANSACTION' : 'THE TRANSACTION', tx.headline)}
+    <div class="tx ${many ? 'many' : ''}">
+      <div class="tx-col send"><div class="lab">${esc(P.team.toUpperCase())} SENDS</div><div class="tiles">${tx.sent.map((a) => deckAsset(a, d, { dark: true, small: many })).join('') || '<div class="muted">Nothing but goodwill</div>'}${tx.faabOut ? `<div class="pk sm"><b>$${tx.faabOut}</b><i>FAAB</i></div>` : ''}</div></div>
+      <div class="arrow">➜</div>
+      <div class="tx-col"><div class="lab">${esc(P.team.toUpperCase())} RECEIVES${d.partners.length > 1 ? ` <span>(from ${esc(partners)})</span>` : ''}</div><div class="tiles">${stackTiles(tx.received, d, many)}${tx.faabIn ? `<div class="pk sm"><b>$${tx.faabIn}</b><i>FAAB</i></div>` : ''}</div></div>
+    </div>
+    <div class="txbar"><div class="cnt">${tx.sent.length} asset${tx.sent.length === 1 ? '' : 's'}</div><div class="cnt dark"><span>${tx.received.length} asset${tx.received.length === 1 ? '' : 's'}.</span><p>${esc(tx.tagline)}</p></div></div>
+    <div class="src">${d.proposal ? `Source: proposed trade from ${esc(P.team)} to ${esc(partners)}, prepared ${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}. Subject to acceptance, counteroffers and vibes.` : `Source: Sleeper trade between ${esc(P.team)} and ${esc(partners)} (${new Date(d.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}).`} Headshots: Sleeper.</div>${foot(3)}</section>`);
+
+  // 4+. Spotlights
+  for (const sp of d.spotlights) {
+    const a = sp.asset;
+    const pro = a.became?.prospect ? a.became : null;
+    const isPick = a.kind === 'pick' && !pro;
+    if (pro) {
+      slides.push(`<section class="slide s-spot">
+      <div class="spot-l prospect"><div class="bigpick"><span>${esc(a.season)} ${a.round}.${String(pro.slot).padStart(2, '0')}</span><b>${esc(pro.name.split(' ').slice(-1)[0].toUpperCase())}</b>${esc(pro.college || '')}<i>If ${esc(P.team)} drafts him</i></div></div>
+      <div class="spot-r">
+        <div class="who"><div><div class="eb">${esc(sp.eyebrow)}</div><h3>${esc(pro.name)}</h3><div class="meta">${esc(pro.pos)} &nbsp;|&nbsp; ${esc(pro.college || '')} &nbsp;|&nbsp; ${esc(a.season)} NFL Draft class</div></div></div>
+        <hr>
+        <div class="kpis3">${sp.stats.map((x) => `<div><b>${esc(x.big)}</b><span>${esc(x.label)}</span></div>`).join('')}</div>
+        <blockquote>${esc(sp.callout)}</blockquote>
+        <div class="foot dark"><span>${esc(sp.statsNote)}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${slides.length + 1}</b></span></div>
+      </div></section>`);
+      continue;
+    }
+    slides.push(`<section class="slide s-spot">
+      <div class="spot-l" style="--tc:${esc(a.color || '#1b2a44')}">${isPick ? `<div class="bigpick">${esc(a.season)}<b>${ordWord(a.round)}</b>ROUND<i>${a.origOwner === P.ownerId ? `${esc(P.team)}'s own` : `via ${esc(a.origTeam)}`}</i></div>` : `${nflLogo(a.nfl)}${headshot(a.id, 'big')}`}</div>
+      <div class="spot-r">
+        <div class="who">${isPick ? '' : headshot(a.id, 'round')}<div><div class="eb">${esc(sp.eyebrow)}</div><h3>${esc(isPick ? a.label : a.name)}</h3><div class="meta">${isPick ? `${esc(a.season)} rookie draft` : `${esc(a.pos)} &nbsp;|&nbsp; ${esc(a.nflName)}${a.age ? ` &nbsp;|&nbsp; Age ${a.age}` : ''}${a.viaPick ? ` &nbsp;|&nbsp; via ${esc(a.viaPick.split(' → ')[0])}` : ''}`}</div></div></div>
+        <hr>
+        <div class="kpis3">${sp.stats.map((x) => `<div><b>${esc(x.big)}</b><span>${esc(x.label)}</span></div>`).join('')}</div>
+        <blockquote>${esc(sp.callout)}</blockquote>
+        <div class="foot dark"><span>${esc(sp.statsNote)}</span><span class="r">${teamAv({ name: P.team, avatar: P.avatar }, 'sm')}<b>${slides.length + 1}</b></span></div>
+      </div></section>`);
+  }
+
+  // Strategic rationale
+  const R = d.rationale;
+  const cell = (c, solid) => `<div class="tl-cell">${c.assets.length ? `<div class="tl-assets">${c.assets.slice(0, 4).map((a) => (a.kind === 'player' || (a.became && !a.became.prospect) ? `<div class="tl-hs">${headshot(a.became ? a.became.playerId : a.id)}</div>` : deckAsset(a, d, { dark: !solid, small: true }))).join('')}${c.assets.length > 4 ? `<span class="more">+${c.assets.length - 4}</span>` : ''}</div>` : '<div class="tl-dot"></div>'}<div class="tl-note ${c.assets.length && solid ? 'b' : ''}">${esc(c.note)}</div></div>`;
+  slides.push(`<section class="slide s-text">${top('STRATEGIC RATIONALE', R.headline)}
+    <div class="tl" style="--cols:${R.cols.length}">
+      <div></div>${R.cols.map((c) => `<div class="tl-h">${esc(c)}</div>`).join('')}
+      <div class="tl-row"><b>Hold</b><span>Status quo</span></div><div class="tl-line dashed" style="grid-column:span ${R.cols.length}">${R.hold.map((c) => cell(c, false)).join('')}</div>
+      <div class="tl-row"><b>${d.proposal ? 'Accept the offer' : 'Execute the trade'}</b><span>${d.proposal ? 'Proposed to' : 'Agreed with'} ${esc(partners)}</span></div><div class="tl-line" style="grid-column:span ${R.cols.length}">${R.execute.map((c) => cell(c, true)).join('')}</div>
+    </div>
+    <div class="banner"><b>${esc(R.banner.h)}</b><p>${esc(R.banner.t)}</p></div>${foot(slides.length + 1)}</section>`);
+
+  // Case study
+  if (d.caseStudy) {
+    const C = d.caseStudy;
+    slides.push(`<section class="slide s-text">${top('CASE STUDY | VALUE CREATION', C.headline)}
+      <div class="cs-lab">TRADE I &nbsp;|&nbsp; WITH ${esc(C.trade.partners.toUpperCase())} · ${new Date(C.trade.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()}</div>
+      <div class="cs-row"><div class="tiles">${C.trade.sent.map((a) => deckAsset(a, d, { dark: true, small: true })).join('')}</div><div class="arrow">➜</div><div class="tiles">${C.trade.received.map((a) => deckAsset(a, d, { funded: a.funded, small: true })).join('')}</div></div>
+      <div class="cs-link">${esc(C.fundedLabel)} ↓</div>
+      <div class="cs-lab">TRADE ${C.trades > 2 ? C.trades : 'II'} &nbsp;|&nbsp; THIS DEAL</div>
+      <div class="cs-row"><div class="tiles">${C.current.sent.map((a) => deckAsset(a, d, { dark: true, funded: a.funded, small: true })).join('')}</div><div class="arrow">➜</div><div class="tiles">${C.current.received.map((a) => deckAsset(a, d, { small: true })).join('')}</div></div>
+      <div class="src">Source: Sleeper trade records.${C.trades > 2 ? ` This deal is the end of a chain of ${C.trades} trades; the scoreboard counts all of them.` : ''}</div>${foot(slides.length + 1)}</section>`);
+  }
+
+  // Scoreboard
+  if (d.scoreboard) {
+    const B = d.scoreboard;
+    const o = B.original;
+    slides.push(`<section class="slide s-dark">
+      <div class="eyebrow">THE SCOREBOARD</div><h2>${esc(B.headline)}</h2><p class="lede">${esc(B.lede)}</p>
+      <div class="sb">
+        <div class="sb-o">${o.slice(0, 2).map((a) => deckAsset(a, d, { small: true })).join('')}${o.length > 2 ? `<span class="more">+${o.length - 2}</span>` : ''}</div>
+        <div class="sb-x"><span>➜</span><b>${esc(B.multiple)}</b></div>
+        <div class="sb-h">${[...B.holdings].sort((x, y) => (x.kind === 'pick' && !x.became) - (y.kind === 'pick' && !y.became)).map((a) => `<div class="${a.stillHeld === false ? 'gone' : ''}">${deckAsset(a, d, { small: true })}</div>`).join('')}</div>
+      </div>
+      <div class="sb-k"><div><b>${esc(B.counts.total)}</b><span>total assets</span></div><div><b>+${B.counts.players}</b><span>players</span></div><div><b>+${B.counts.firsts}</b><span>first-round picks</span></div><div><b>+${B.counts.otherPicks}</b><span>other picks</span></div></div>
+      <div class="src">${B.market.multiple != null ? `Multiple by asset count. By today's market value it is <b>${B.market.multiple}x</b> (${B.market.original.toLocaleString()} → ${B.market.holdings.toLocaleString()})${B.adjusted.multiple != null ? `; league-adjusted with the consolidation discount, <b>${B.adjusted.multiple}x</b>` : ''}. ` : ''}${esc(B.footnote)}</div>
+      ${foot(slides.length + 1)}</section>`);
+  }
+
+  // Analyst coverage
+  const Cv = d.coverage;
+  const verdictLine = Cv.edge >= 15 ? 'Analysts are unanimous. The counterparty has been asked to stop answering its phone.' : Cv.edge <= -15 ? 'Analysts have questions. Management has answers. They are not the same questions.' : 'Analysts call it fair. Both sides will say they won anyway.';
+  slides.push(`<section class="slide s-text">${top('ANALYST COVERAGE', `The market's view today: ${Cv.edge > 0 ? '+' : ''}${Cv.edge}% in value for ${P.team}`)}
+    <div class="cov">
+      <div>
+        <div class="grades">${Cv.grade ? `<div><span class="${gradeCls(Cv.grade)}">${esc(Cv.grade)}</span><b>${esc(P.team)}</b>${Cv.adjustedGrade ? `<span class="small">League-adjusted ${esc(Cv.adjustedGrade)}</span>` : ''}</div>` : ''}${Cv.partnerGrades.map((g) => `<div><span class="${gradeCls(g.grade)}">${esc(g.grade)}</span><b>${esc(g.team)}</b></div>`).join('')}</div>
+        <div class="vals"><div><span>Received, today's value</span><b>${Cv.received.toLocaleString()}</b></div><div><span>Sent, today's value</span><b>${Cv.sent.toLocaleString()}</b></div></div>
+        ${Cv.perSource.length ? `<div class="srcs">${Cv.perSource.map((x) => `<div><span>${esc(x.source)}</span><div class="bar"><i style="${x.edge >= 0 ? 'left:50%' : `right:50%`};width:${Math.min(50, Math.abs(x.edge) / 2)}%;background:${x.edge >= 0 ? '#2f7d57' : '#b3412f'}"></i></div><b>${x.edge > 0 ? '+' : ''}${x.edge}%</b></div>`).join('')}</div>` : ''}
+        ${Cv.sincePts && !d.offseason && (Cv.sincePts.acquired || Cv.sincePts.departed) ? `<p class="small">Since the deal: acquired players ${Cv.sincePts.acquired} pts, departed players ${Cv.sincePts.departed} pts.</p>` : ''}
+        ${d.proposal ? '' : `<p class="small">Still on the roster: ${Cv.stillHeld.map((x) => `${esc(x.label)} ${x.held === false ? '✗' : '✓'}`).join(' · ')}</p>`}
+      </div>
+      <div>
+        <p class="vline">${esc(verdictLine)}</p>
+        ${Cv.management ? `<blockquote>${esc(Cv.management)}</blockquote>` : ''}${Cv.counterparty ? `<blockquote class="cp">${esc(Cv.counterparty)}</blockquote>` : ''}
+      </div>
+    </div>
+    <div class="src">${Cv.scenario ? `<b>${esc(Cv.scenario.text)}</b> ` : ''}Values: median of KeepTradeCut, FantasyCalc and DynastyProcess today${Cv.grade ? '. Grades from the Trade Grades page (value, lineup impact and fit).' : '.'} Quotes are satire, generated from each team's Gazette persona.</div>${foot(slides.length + 1)}</section>`);
+  return slides;
+}
+
+async function viewDeck($, tradeId) {
+  const owner = routeQuery.get('owner') || '';
+  const isProposal = tradeId === 'proposal';
+  // A proposal carries the analyzer's selections (a, b, ga, gb) in the query string.
+  // Proposals carry the analyzer's selections (a, b, ga, gb); any deck can carry a what-if (assume).
+  const withParam = (k, v) => { const q = new URLSearchParams(routeQuery); if (v) q.set(k, v); else q.delete(k); return q.toString(); };
+  const withOwner = (o) => withParam('owner', o);
+  const d = await api(L(`/deck/${encodeURIComponent(tradeId)}?${routeQuery.toString()}`));
+  const sc = d.scenario || { picks: [], options: [] };
+  const assumedKey = sc.assumed?.key || sc.picks[0]?.key || '';
+  const scenarioBar = sc.picks.length && sc.options.length ? `<div class="row deck-whatif"><span class="small muted">What if</span>
+      <select id="dk-pick">${sc.picks.map((p) => `<option value="${esc(p.key)}" ${p.key === assumedKey ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
+      <span class="small muted">becomes</span>
+      <select id="dk-pros"><option value="">— keep the pick's market value —</option>${sc.options.map((o) => `<option value="${esc(o.slug)}" ${sc.assumed?.slug === o.slug ? 'selected' : ''}>${esc(o.name)} (${esc(o.pos)})</option>`).join('')}</select></div>` : '';
+  const slides = deckSlides(d);
+  const backToAnalyzer = isProposal ? `#/analyzer?a=${encodeURIComponent(routeQuery.get('a') || '')}&b=${encodeURIComponent(routeQuery.get('b') || '')}&ga=${encodeURIComponent(routeQuery.get('ga') || '')}&gb=${encodeURIComponent(routeQuery.get('gb') || '')}` : '';
+  $.innerHTML = `${head(isProposal ? 'Pitch Deck: Proposed Trade' : 'Pitch Deck', isProposal
+    ? `A proposed trade between ${d.sides.map((x) => esc(x.team)).join(' and ')}, pitched as an investor presentation. ${slides.length} slides. Save it as a PDF and send it with the offer.`
+    : `${esc(d.season)} · ${d.offseason ? 'Offseason' : `Week ${d.week}`} trade between ${d.sides.map((x) => esc(x.team)).join(', ')}. ${slides.length} slides, told from one side.`,
+    `<div class="row deck-bar"><div class="seg">${d.sides.map((x) => `<button data-o="${esc(x.ownerId)}" class="${x.ownerId === d.presenter.ownerId ? 'on' : ''}">${esc(x.team)}'s deck</button>`).join('')}</div>
+      <button id="dk-present" class="primary">▶ Present</button><button id="dk-print">Save as PDF</button>${isProposal ? `<a class="chip" href="${backToAnalyzer}">← Edit in analyzer</a>` : '<a class="chip" href="#/decks">All decks</a>'}</div>`)}
+  ${scenarioBar}${sc.assumed ? `<p class="small deck-whatif-note">Scenario deck: ${esc(sc.assumed.name)} in place of the pick. Grades are hidden because they price the pick, not the player.</p>` : ''}
+  <div class="deck" id="deck">${slides.join('')}<div class="deck-nav"><button data-n="-1">‹</button><span id="dk-n"></span><button data-n="1">›</button><button data-x>✕</button></div></div>`;
+  $.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => {
+    location.hash = `#/deck/${encodeURIComponent(tradeId)}?${withOwner(b.dataset.o)}`;
+  }));
+  const pickSel = document.getElementById('dk-pick'), prosSel = document.getElementById('dk-pros');
+  const applyWhatIf = () => { location.hash = `#/deck/${encodeURIComponent(tradeId)}?${withParam('assume', prosSel.value ? `${pickSel.value}:${prosSel.value}` : '')}`; };
+  if (prosSel) { prosSel.onchange = applyWhatIf; pickSel.onchange = () => { if (prosSel.value) applyWhatIf(); }; }
+  const deck = document.getElementById('deck');
+  const all = [...deck.querySelectorAll('.slide')];
+  let cur = 0;
+  const show = (i) => { cur = Math.max(0, Math.min(all.length - 1, i)); all.forEach((s, j) => s.classList.toggle('on', j === cur)); document.getElementById('dk-n').textContent = `${cur + 1} / ${all.length}`; };
+  const stop = () => { deck.classList.remove('presenting'); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const keys = (e) => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+    else if (['ArrowLeft', 'PageUp'].includes(e.key)) show(cur - 1);
+    else if (e.key === 'Escape') stop();
+  };
+  document.getElementById('dk-present').onclick = () => {
+    deck.classList.add('presenting'); show(0); document.addEventListener('keydown', keys);
+    deck.requestFullscreen?.().catch(() => {});
+  };
+  deck.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) stop(); });
+  deck.querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => show(cur + Number(b.dataset.n))));
+  deck.querySelector('[data-x]').onclick = stop;
+  deck.addEventListener('click', (e) => { if (deck.classList.contains('presenting') && e.target.closest('.slide')) show(cur + 1); });
+  document.getElementById('dk-print').onclick = () => window.print();
+}
+
 // ---------- data status ----------
 async function viewStatus($) {
   const d = await api(`/status?league=${encodeURIComponent(session.leagueId)}`);
@@ -970,7 +1323,7 @@ async function viewStatus($) {
 }
 
 // ---------- router ----------
-const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, metrics: viewMetrics, news: viewNews, player: viewPlayer };
+const views = { status: viewStatus, '': viewDashboard, power: viewPower, history: viewHistory, team: viewTeam, waivers: viewWaivers, analyzer: viewAnalyzer, trades: viewTrades, rookies: viewRookies, rookie: viewRookie, gazette: viewGazette, grades: viewGrades, awards: viewAwards, decks: viewDecks, deck: viewDeck, rivalry: viewRivalry, wrapped: viewWrapped, drafts: viewDrafts, metrics: viewMetrics, news: viewNews, player: viewPlayer };
 
 async function route() {
   const [path, qs = ''] = location.hash.replace(/^#/, '').split('?');
@@ -978,7 +1331,7 @@ async function route() {
   routeQuery = new URLSearchParams(qs);
   if (siteConfig.leagueId && session && session.leagueId !== siteConfig.leagueId) { store.del('fh.session'); session = null; }
   if (!session?.leagueId || name === 'connect') return viewConnect();
-  const $ = renderShell(views[name] ? (name === 'rookie' ? 'rookies' : name) : '');
+  const $ = renderShell(views[name] ? (name === 'rookie' ? 'rookies' : name === 'deck' ? 'decks' : name) : '');
   try {
     await (views[name] || viewDashboard)($, arg ? decodeURIComponent(arg) : undefined);
   } catch (err) {
