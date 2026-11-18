@@ -101,10 +101,24 @@ export function getDynastyRankings(ctx, { altValues = null, pickOverride = null,
       ));
       const totalPlayers = assets.reduce((s, a) => s + a.value, 0);
       const age = totalPlayers ? assets.reduce((s, a) => s + (a.age ?? 26) * a.value, 0) / totalPlayers : null;
+      // Average age by position: every rostered player (taxi and IR included), plus a value-weighted
+      // version where the players who matter most count most.
+      const r1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
+      const ageByPos = Object.fromEntries(['QB', 'RB', 'WR', 'TE', 'All'].map((pos) => {
+        const ps = t.ids.map((id) => ({ id, pos: players[id]?.pos, age: players[id]?.age, value: baseVal(id) || 0 }))
+          .filter((p) => p.age && (pos === 'All' ? ['QB', 'RB', 'WR', 'TE'].includes(p.pos) : p.pos === pos));
+        const w = ps.reduce((s, p) => s + p.value, 0);
+        return [pos, {
+          n: ps.length,
+          avg: ps.length ? r1(ps.reduce((s, p) => s + p.age, 0) / ps.length) : null,
+          weighted: w ? r1(ps.reduce((s, p) => s + p.age * p.value, 0) / w) : null,
+          players: ps.sort((a, b) => b.value - a.value).map((p) => ({ name: players[p.id].name, age: p.age })),
+        }];
+      }));
       return {
         rosterId: t.rosterId, ownerId: t.ownerId, name: t.name, avatar: t.avatar,
         total: projected[0], projected, byPos: Object.fromEntries(Object.entries(byPos).map(([k, v]) => [k, Math.round(v)])),
-        avgAge: age && Math.round(age * 10) / 10,
+        avgAge: age && Math.round(age * 10) / 10, ageByPos,
         top: assets.sort((a, b) => b.value - a.value).slice(0, 4).map((a) => ({ id: a.id, name: players[a.id].name, pos: a.pos, age: a.age, value: Math.round(a.value) })),
         picks: picks.sort((a, b) => a.season - b.season || a.round - b.round),
       };
